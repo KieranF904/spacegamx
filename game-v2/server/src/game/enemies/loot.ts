@@ -1,12 +1,13 @@
 /**
  * @contract server.enemies.loot
- * owns:       a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts
+ * owns:       a hostile's death: pay the killer, party and helpers, roll its drop tables (data/loot.json) and salvage parts
  * needs:      Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common
  * invariants: a kill pays the killer XP and credits and drops a loot pod — server/src/game/enemies.test.ts
+ *             a design's drops, then a design's in its system, override its faction's; an elite rolls its eliteDrop once more — server/src/game/enemies/drops.test.ts
  * extend:     a new payout rule is a step in onDestroyed
  */
 
-import { Position, Velocity, InSystem, Bag, ShipState, partItemId, gradeReward, placeCost, migratePartItem, dhypot } from '@space-game/common';
+import { Position, Velocity, InSystem, Bag, ShipState, partItemId, gradeReward, placeCost, migratePartItem, dhypot, dropSpecFor, rollDrops } from '@space-game/common';
 import type { Enemies } from '../Enemies.js';
 import { SHARE_RANGE } from '../Party.js';
 import * as populations from './populations.js';
@@ -56,15 +57,11 @@ export function onDestroyed(self: Enemies, eid: number, killer: number | undefin
     if (d > 3000) continue;
     self.host.reward(p, Math.round(pay.xp * k * self.data.rules.assistXpShare), 0, true, label);
   }
-  // Loot: the faction table, rolled (twice for elites), plus salvaged parts
-  const bag: Bag = {};
-  for (let r = 0; r < k; r++) {
-    for (const l of f.loot) {
-      if (self.lootDice() >= l.chance) continue;
-      const n = l.min + Math.floor(self.lootDice() * (l.max - l.min + 1));
-      bag[l.item] = (bag[l.item] ?? 0) + n;
-    }
-  }
+  // Loot: its drop tables (a design in this system, else the design, else its faction: data/loot.json), an elite one
+  // more roll of its eliteDrop, plus salvaged parts
+  const sysId = self.host.systemId?.(num);
+  const spec = dropSpecFor(sysId ? self.data.spawns[sysId]?.loot?.[e.type] : undefined, f.ships[e.type], f);
+  const bag: Bag = rollDrops(self.data.lootTables ?? {}, spec, self.lootDice, e.elite ? 1 : 0);
   if (ship) {
     ship.blueprint.parts.forEach((p, i) => {
       if (p.fn === 'core' || !(ship.rebuildHp[i] > 0) || self.lootDice() >= f.partSalvage) return;

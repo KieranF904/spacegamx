@@ -317,6 +317,8 @@ const TABLE: Handlers = {
     h.pilot.setProfileDelta(msg);
   },
   items: (h, msg) => { h.pilot.setItems(msg); },
+  // Loot in pickup reach (the pickup panel: ui/pickup)
+  lootNear: (h, msg) => { h.pilot.setLootNear(msg); },
   gained,
   wreck: (h, msg) => { h.wreck = wreckFromMessage(msg, Date.now()); },
   // Your ship was lost: the backups you may respawn in (ui/BackupPicker.ts)

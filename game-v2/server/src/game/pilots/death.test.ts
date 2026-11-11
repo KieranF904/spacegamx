@@ -5,7 +5,7 @@
  * wreckOwnerMinutes, then anyone's for wreckOpenMinutes, then gone. A death in a boss chamber leaves it outside.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { Position, Velocity, InSystem, Lifetime, Health, placeCost, cloneJson, type Blueprint, type ServerMessage } from '@space-game/common';
+import { Position, Velocity, InSystem, Lifetime, Health, cloneJson, type Blueprint, type ServerMessage } from '@space-game/common';
 import { DEFAULT_DEATH_RULES } from '../Pilots.js';
 import { joinPilot, makeEmptyServer, resetGlobals, stepServer } from '../../testkits/world.testkit.js';
 import { startLinger } from '../../gameServer/combatLock.js';
@@ -135,7 +135,7 @@ describe('a death', () => {
 });
 
 describe('a wreck', () => {
-  it('holds all of the hold and a share of the parts as salvage (modules as items, structure as materials)', () => {
+  it('holds all of the hold and a share of the parts as salvage: refined materials from their bills, never parts', () => {
     const w = rig();
     const rec = flyProspector(w);
     const standing = rec.blueprint.parts.length;
@@ -147,16 +147,21 @@ describe('a wreck', () => {
     const inside = { ...w.pods.get(w.podAt(w.spot.x, w.spot.y)) } as Record<string, number>;
     for (const [id, n] of Object.entries(held)) expect(inside[id]).toBeGreaterThanOrEqual(n);
     for (const [id, n] of Object.entries(held)) inside[id] -= n;
-    // What's left is whole parts, round(salvageShare) of them: each part's placeCost
+    // What's left is round(salvageShare) of the parts as the refined materials of their bills: no parts, no components
     const salvage = Object.fromEntries(Object.entries(inside).filter(([, n]) => n > 0));
     const want = Math.round(standing * D.salvageShare);
     expect(want).toBeGreaterThan(0);
-    const ids = new Set(rec.blueprint.parts.flatMap((q) => Object.keys(placeCost(w.server.econ, q))));
-    for (const id of Object.keys(salvage)) expect(ids.has(id)).toBe(true);
+    const econ = w.server.econ;
+    const ids = new Set(rec.blueprint.parts.flatMap((q) => Object.keys(econ.recipes.partInputs(q))));
+    for (const id of Object.keys(salvage)) {
+      expect(ids.has(id), id).toBe(true);
+      expect(econ.items.get(id)?.category, id).toBe('refined');
+    }
     expect(Object.keys(salvage).length).toBeGreaterThan(0);
-    // (No more modules than the share of parts picked)
-    const modules = Object.entries(salvage).filter(([id]) => id.startsWith('part:')).reduce((n, [, k]) => n + k, 0);
-    expect(modules).toBeLessThanOrEqual(want);
+    // (No more than the bills of the share of parts picked: the whole ship's bill is a ceiling)
+    const whole: Record<string, number> = {};
+    for (const q of rec.blueprint.parts) for (const [id, n] of Object.entries(econ.recipes.partInputs(q))) whole[id] = (whole[id] ?? 0) + n;
+    for (const [id, n] of Object.entries(salvage)) expect(n).toBeLessThanOrEqual(whole[id]);
   });
 
   it('is its pilot\'s alone for wreckOwnerMinutes, then anyone\'s for wreckOpenMinutes, then gone; the marker says so', () => {

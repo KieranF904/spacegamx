@@ -54,6 +54,13 @@
       "highlight": [".tp kbd"]
     },
     {
+      "id": "pickup",
+      "title": "Loot in reach",
+      "lines": ["Ore comes in by itself in mining mode. Other drops wait in pods.", "Press {pickup} for the loot in reach. Click to take, Enter takes all."],
+      "trigger": { "kind": "panel", "panel": "pickup" },
+      "highlight": [".tp kbd"]
+    },
+    {
       "id": "dock",
       "title": "Dock at the yard",
       "lines": ["Fly into the yard station's docking ring, then press {dock}."],

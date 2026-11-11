@@ -15,6 +15,7 @@ import type { MinesServerMessage } from '../minesProtocol.js';
 import type { ClampServerMessage } from '../clampProtocol.js';
 import type { TutorialServerMessage } from '../tutorialProtocol.js';
 import type { GunRangeServerMessage } from '../gunRangeProtocol.js';
+import type { LootServerMessage } from '../lootProtocol.js';
 import type { CombatServerMessage } from '../combatProtocol.js';
 import type { UpdateServerMessage } from '../updateProtocol.js';
 import type { ServerOwnSyncMessage } from '../../sim/ownStep.js';
@@ -96,6 +97,7 @@ export type ServerMessage =
   | ClampServerMessage
   | TutorialServerMessage
   | GunRangeServerMessage
+  | LootServerMessage
   | CombatServerMessage
   | UpdateServerMessage
   | GuestServerMessage;

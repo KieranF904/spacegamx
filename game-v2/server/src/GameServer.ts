@@ -332,7 +332,10 @@ export class GameServer implements ServerCtx {
     // ---- (end part features)
     this.mining = new Mining(createMiningHost(this), this.gameData.miningTable, this.payout);
     this.weapons = new Weapons(weaponsDeps(this), this.ships, this.ships.tuning);
-    this.enemies = new Enemies(createEnemyHost(this), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns, this.payout);
+    const factions = withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id));
+    // (The drop tables they roll: data/loot.json)
+    factions.lootTables = this.gameData.lootFile.tables;
+    this.enemies = new Enemies(createEnemyHost(this), this.ships, factions, this.ships.enemyDesigns, this.payout);
     this.enemies.econ = this.econ;
     const profileStore = opts.profileStore ?? new MemoryProfileStore();
     this.pilots = new Pilots(createPilotHost(this), this.econ, this.ships, profileStore, pilotsOpts(this, opts));

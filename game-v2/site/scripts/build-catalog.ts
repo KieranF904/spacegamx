@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url';
 import { loadCatalog } from '../../common/src/ships/catalog.js';
 import { partMount } from '../../common/src/ships/blueprint.js';
 import { partStats } from '../../common/src/ships/partStats.js';
+import { dropChances } from '../../common/src/econ/loot.js';
 import type {
   CatalogBoss, CatalogFile, CatalogItem, CatalogPart, CatalogRibbon, CatalogShip, CatalogStation, CatalogStructure, CatalogSystem, PartCategory, PartGuide, PlanPart, RecipeInfo, ShipStats,
 } from '../src/catalog/types.js';
@@ -131,9 +132,12 @@ function usedIn(id: string): CatalogItem['usedIn'] {
   return out;
 }
 
+/** A boss's drops per kill from its loot tables (data/loot.json; common econ/loot.ts): the chance of at least one, and the amounts */
+const lootTables = fs.existsSync(path.join(dataDir, 'loot.json')) ? rj('loot.json').tables : {};
+const bossDrops = (b: any) => dropChances(lootTables, { drops: b.drops ?? [] }).map((d) => ({ ...d, chance: r2(d.chance) }));
 const bossLoot = (id: string) => Object.entries(bossesFile)
   .filter(([, b]) => !b._placeholder)
-  .flatMap(([bid, b]) => (b.loot ?? []).filter((l: any) => l.item === id).map((l: any) => ({ boss: bid, chance: l.chance ?? 1 })));
+  .flatMap(([bid, b]) => bossDrops(b).filter((l) => l.item === id).map((l) => ({ boss: bid, chance: l.chance })));
 
 const items: CatalogItem[] = itemsFile.map((i) => {
   const ore = rocks.map((r) => {
@@ -182,7 +186,7 @@ const ribbons: CatalogRibbon[] = (rj('achievements.json').ribbons as any[]).map(
 const bosses: CatalogBoss[] = Object.entries(bossesFile).filter(([, b]) => !b._placeholder).map(([id, b]) => ({
   id, name: String(b.name), system: b.system, level: b.level ?? 0, phases: (b.phases ?? []).length, xp: b.xp ?? 0, credits: b.credits ?? 0,
   respawnSeconds: b.respawnSeconds ?? 0,
-  loot: (b.loot ?? []).map((l: any) => ({ item: l.item, chance: l.chance ?? 1, min: l.min ?? 1, max: l.max ?? l.min ?? 1 })),
+  loot: bossDrops(b),
 }));
 
 // ---------------------------------------------------------------- ships (the plan library)

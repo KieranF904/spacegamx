@@ -43,6 +43,7 @@
   "hits",
   "hpCheck",
   "items",
+  "lootNear",
   "mapDots",
   "mapPing",
   "marketScan",

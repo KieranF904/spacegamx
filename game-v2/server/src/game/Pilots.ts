@@ -39,6 +39,7 @@ import * as freezer from './pilots/freeze.js';
 import * as session from './pilots/session.js';
 import * as returners from './pilots/returners.js';
 import * as convert from './pilots/convert.js';
+import * as pickup from './pilots/pickup.js';
 import { GuestKeep } from './pilots/guests.js';
 import type { LeaseResult } from '../profile/lease.js';
 
@@ -674,6 +675,7 @@ export class Pilots {
       type: 'profile' as const, guest: conn.userId === null, credits: p.credits, xp: p.xp, level: p.level,
       xpLevel: xpToReach(p.level), xpNext: xpToReach(p.level + 1), skillPoints: p.skillPoints, skills: p.skills,
       plans: p.plans, recipes: p.recipes, licences: p.licences, home: p.home, quickbar: p.quickbar, debt: p.debt ?? 0, ammo: p.ammo?.open ?? {}, ammoPrefer: lo?.first ?? {}, loadout: lo?.load ?? {}, outpost: p.outpost ?? null, now: this.now(), homeName: (homeEid >= 0 ? this.host.stationInfo(homeEid)?.name : undefined) ?? p.home,
+      pickup: pickup.pickupView(p),
     };
     // (A full state, and its clock only seeds the client's skew: a copy of what they hold is not sent again; mining and
     // ammo used to resend it every second or so)
@@ -689,9 +691,11 @@ export class Pilots {
   sendItems(conn: PilotConn): void {
     const s = this.sessions.get(conn);
     if (!s) return;
+    // (The hold changed: a ghost whose target it has reached goes, its stack real now: pilots/pickup.ts)
+    if (pickup.settle(s.profile)) s.dirty = true;
     const msg = {
       type: 'items' as const, cargo: s.profile.cargo, storage: s.profile.storage, cargoCapacity: cargo.cargoCapacity(this, conn),
-      credits: s.profile.credits, atStation: cargo.atStation(this, conn),
+      credits: s.profile.credits, atStation: cargo.atStation(this, conn), ...(s.profile.ship.wants?.length ? { ghosts: s.profile.ship.wants } : {}),
     };
     // (A full state: a copy of what they already hold changes nothing for them)
     const key = JSON.stringify(msg);
@@ -723,6 +727,12 @@ export class Pilots {
   handleJettison(conn: PilotConn, msg: { id: string; n: number }): void { return cargo.handleJettison(this, conn, msg); }
   handleUse(conn: PilotConn, msg: { id: string }): void { return cargo.handleUse(this, conn, msg); }
   scrapItem(conn: PilotConn, id: string, n: number): void { return cargo.scrapItem(this, conn, id, n); }
+  /** What this pilot's ship picks up by itself of a pod's contents (pilots/pickup.ts) */
+  autoTake(conn: PilotConn, items: Bag): Bag { return pickup.autoTake(this, conn, items); }
+  handleGhost(conn: PilotConn, msg: { item?: unknown; n?: unknown; remove?: unknown }): void { return pickup.handleGhost(this, conn, msg); }
+  handleGhostTemplate(conn: PilotConn, msg: { save?: unknown; load?: unknown; remove?: unknown }): void { return pickup.handleTemplate(this, conn, msg); }
+  handlePickupPrefs(conn: PilotConn, msg: { mining?: unknown }): void { return pickup.handlePrefs(this, conn, msg); }
+  handleOreBlacklist(conn: PilotConn, msg: { item?: unknown; on?: unknown; jettison?: unknown }): void { return pickup.handleBlacklist(this, conn, msg); }
   onDestroyed(conn: PilotConn, systemNum: number, x: number, y: number, vx: number, vy: number, cause: Record<string, unknown> = {}): void { return death.onDestroyed(this, conn, systemNum, x, y, vx, vy, cause); }
   wreckRecovered(key: string): void { return death.wreckRecovered(this, key); }
   reapplyShip(conn: PilotConn): void { return persist.reapplyShip(this, conn); }

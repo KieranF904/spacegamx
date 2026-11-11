@@ -17,15 +17,33 @@
       "ships": {
         "scrap_mite": {
           "xp": 15,
-          "credits": 2
+          "credits": 2,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 1
+            }
+          ]
         },
         "scrap_spitter": {
           "xp": 20,
-          "credits": 3
+          "credits": 3,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 1
+            }
+          ]
         },
         "scrap_crawler": {
           "xp": 40,
-          "credits": 8
+          "credits": 8,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 2
+            }
+          ]
         },
         "rivet_sower": {
           "xp": 40,
@@ -41,15 +59,41 @@
         },
         "scrap_lobber": {
           "xp": 45,
-          "credits": 9
+          "credits": 9,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 2
+            }
+          ]
         },
         "scrap_hulk": {
           "xp": 70,
-          "credits": 14
+          "credits": 14,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 2
+            },
+            {
+              "table": "scrap_rare",
+              "rolls": 1
+            }
+          ]
         },
         "scrap_nest": {
           "xp": 120,
-          "credits": 30
+          "credits": 30,
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 2
+            },
+            {
+              "table": "scrap_rare",
+              "rolls": 1
+            }
+          ]
         },
         "boss_scrap_mother": {
           "xp": 450,
@@ -60,38 +104,13 @@
           "credits": 160
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "iron_ore",
-          "chance": 0.7,
-          "min": 2,
-          "max": 6
-        },
-        {
-          "item": "copper_ore",
-          "chance": 0.5,
-          "min": 1,
-          "max": 4
-        },
-        {
-          "item": "scrap_electronics",
-          "chance": 0.35,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "alloy_plate",
-          "chance": 0.2,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.04,
-          "min": 1,
-          "max": 1
+          "table": "scrap_common",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "scrap_rare",
       "partSalvage": 0.1
     },
     "pirates": {
@@ -107,15 +126,41 @@
       "ships": {
         "pirate_skiff": {
           "xp": 30,
-          "credits": 9
+          "credits": 9,
+          "drops": [
+            {
+              "table": "pirate_common",
+              "rolls": 1
+            }
+          ]
         },
         "pirate_raider": {
           "xp": 60,
-          "credits": 24
+          "credits": 24,
+          "drops": [
+            {
+              "table": "pirate_common",
+              "rolls": 2
+            },
+            {
+              "table": "pirate_rare",
+              "rolls": 1
+            }
+          ]
         },
         "pirate_gunship": {
           "xp": 150,
-          "credits": 85
+          "credits": 85,
+          "drops": [
+            {
+              "table": "pirate_common",
+              "rolls": 2
+            },
+            {
+              "table": "pirate_rare",
+              "rolls": 1
+            }
+          ]
         },
         "boss_rustjaw": {
           "xp": 900,
@@ -130,38 +175,13 @@
           "credits": 640
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 0.8,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "iron_ore",
-          "chance": 0.5,
-          "min": 3,
-          "max": 8
-        },
-        {
-          "item": "copper_wire",
-          "chance": 0.35,
-          "min": 2,
-          "max": 5
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.08,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.06,
-          "min": 1,
-          "max": 1
+          "table": "pirate_common",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "pirate_rare",
       "partSalvage": 0.12
     },
     "scavengers": {
@@ -196,26 +216,13 @@
           "credits": 260
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 0.9,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "silicate",
-          "chance": 0.5,
-          "min": 2,
-          "max": 6
-        },
-        {
-          "item": "crystal",
-          "chance": 0.12,
-          "min": 1,
-          "max": 2
+          "table": "scavengers_common",
+          "rolls": 2
         }
       ],
+      "eliteDrop": "scavengers_common",
       "partSalvage": 0.08
     },
     "frost": {
@@ -258,32 +265,17 @@
           "credits": 440
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "frost_gland",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "frost_common",
+          "rolls": 2
         },
         {
-          "item": "ice",
-          "chance": 0.6,
-          "min": 4,
-          "max": 10
-        },
-        {
-          "item": "sapphire",
-          "chance": 0.06,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "shield_emitter",
-          "chance": 0.04,
-          "min": 1,
-          "max": 1
+          "table": "frost_rare",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "frost_rare",
       "partSalvage": 0.1
     },
     "cinder": {
@@ -322,32 +314,17 @@
           "credits": 1100
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "cinder_ash",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "cinder_common",
+          "rolls": 2
         },
         {
-          "item": "titanium_ore",
-          "chance": 0.5,
-          "min": 3,
-          "max": 8
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.12,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "ruby",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
+          "table": "cinder_rare",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "cinder_rare",
       "partSalvage": 0.12
     },
     "wraiths": {
@@ -378,38 +355,17 @@
           "credits": 1600
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "void_ichor",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "wraiths_common",
+          "rolls": 1
         },
         {
-          "item": "cobalt_ore",
-          "chance": 0.4,
-          "min": 2,
-          "max": 6
-        },
-        {
-          "item": "shield_emitter",
-          "chance": 0.08,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "void_opal",
-          "chance": 0.04,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "nav_computer",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
+          "table": "wraiths_rare",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "wraiths_rare",
       "partSalvage": 0.1
     },
     "maw": {
@@ -436,32 +392,17 @@
           "credits": 320
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "cobalt_ore",
-          "chance": 0.6,
-          "min": 4,
-          "max": 10
+          "table": "maw_common",
+          "rolls": 1
         },
         {
-          "item": "quantum_core",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "cobalt_alloy",
-          "chance": 0.3,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "ancient_relic",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
+          "table": "maw_rare",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "maw_rare",
       "partSalvage": 0.12
     },
     "redtooth": {
@@ -478,11 +419,29 @@
       "ships": {
         "redtooth_cutter": {
           "xp": 22,
-          "credits": 7
+          "credits": 7,
+          "drops": [
+            {
+              "table": "pirate_common",
+              "rolls": 1
+            }
+          ],
+          "eliteDrop": "pirate_rare"
         },
         "redtooth_brawler": {
           "xp": 50,
-          "credits": 16
+          "credits": 16,
+          "drops": [
+            {
+              "table": "pirate_common",
+              "rolls": 2
+            },
+            {
+              "table": "pirate_rare",
+              "rolls": 1
+            }
+          ],
+          "eliteDrop": "pirate_rare"
         },
         "redtooth_sledge": {
           "xp": 110,
@@ -497,38 +456,17 @@
           "credits": 180
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 0.7,
-          "min": 1,
-          "max": 3
+          "table": "redtooth_common",
+          "rolls": 2
         },
         {
-          "item": "iron_ore",
-          "chance": 0.5,
-          "min": 2,
-          "max": 6
-        },
-        {
-          "item": "copper_wire",
-          "chance": 0.3,
-          "min": 1,
-          "max": 4
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.06,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
+          "table": "redtooth_rare",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "redtooth_rare",
       "partSalvage": 0.12
     },
     "helios": {
@@ -549,29 +487,22 @@
       "ships": {
         "helios_drone": {
           "xp": 6,
-          "credits": 1
+          "credits": 1,
+          "drops": [
+            {
+              "table": "helios_common",
+              "rolls": 1
+            }
+          ]
         }
       },
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "copper_wire",
-          "chance": 0.3,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "alloy_plate",
-          "chance": 0.1,
-          "min": 1,
-          "max": 1
+          "table": "helios_common",
+          "rolls": 1
         }
       ],
+      "eliteDrop": "helios_common",
       "partSalvage": 0.05
     }
   },
@@ -2212,6 +2143,47 @@
     "sol_scrap_nest": {
       "_comment": "The Scrap Mother's den (docs/bosses/rework-2026-11.md 9.1, 14): heaps in its chambers (systems.json nests, fixed), each chamber's packs anchored round its open middle (`post`: the heaps are piled against the walls), their patrols kept clear of the rock (server Roaming.ts anchoredWaypoint); heaps off its faces patrol outside. Gullet 4 ships, Sorting Floor 6, Smelter 5, Gallery 7 (its guard back after 10 min), each face about 7 and the Seam 4. None in the Heart.",
       "grade": 1,
+      "loot": {
+        "scrap_crawler": {
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 1
+            },
+            {
+              "table": "nest_rare",
+              "rolls": 1
+            }
+          ],
+          "eliteDrop": "nest_rare"
+        },
+        "scrap_darter": {
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 1
+            },
+            {
+              "table": "nest_rare",
+              "rolls": 1
+            }
+          ],
+          "eliteDrop": "nest_rare"
+        },
+        "rivet_sower": {
+          "drops": [
+            {
+              "table": "scrap_common",
+              "rolls": 1
+            },
+            {
+              "table": "nest_rare",
+              "rolls": 1
+            }
+          ],
+          "eliteDrop": "nest_rare"
+        }
+      },
       "packs": 0,
       "groups": [],
       "nests": [

@@ -183,8 +183,8 @@ export function targetOptions(f: TargetFacts): MenuOption[] {
     case 'civilian':
     case 'ship': out = [fly(), tgt()]; break;
     case 'rock': out = [opt('approach', 'mine', 'Approach to mine', { hint: 'then hold RMB' })]; break;
-    case 'loot': out = [opt('collect', 'collect', 'Collect', { hint: 'fly over it' })]; break;
-    case 'wreck': out = [opt('recover', 'collect', 'Recover cargo', { hint: 'fly over it' })]; break;
+    case 'loot': out = [opt('collect', 'collect', 'Collect', { hint: 'fly close, then the pickup panel (F)' })]; break;
+    case 'wreck': out = [opt('recover', 'collect', 'Recover cargo', { hint: 'fly close, then the pickup panel (F)' })]; break;
   }
   const first = out.find((o) => !o.disabled);
   if (first) first.primary = true;

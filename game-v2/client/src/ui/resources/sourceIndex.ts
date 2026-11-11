@@ -1,7 +1,7 @@
 /**
  * @contract client.ui.resource-sources
  * owns:       the guide's source side of the resource index: every rock (what it yields, where it is found), every enemy and boss (what it drops, where it is found), and per item the icon-chip columns (mined, dropped, made from, sold at, rewards, used in)
- * needs:      the GameData shape from resourceIndex.ts (type only), tiers (no I/O, no DOM)
+ * needs:      the GameData shape from resourceIndex.ts (type only), tiers, drops (the loot tables' chances; no I/O, no DOM)
  * invariants: a rock's yields and an item's mined column agree, as do an enemy's drops and an item's dropped column — client/src/ui/resources/sourceIndex.test.ts
  *             no chance or share leaves this file as a number, only as a tier — client/src/ui/resources/sourceIndex.test.ts
  * extend:     a new column is one more list on ItemColumns, filled in buildSourceIndex, and one cell in resourceTable.ts
@@ -9,6 +9,7 @@
 
 import type { GameData } from './resourceIndex';
 import { tierOf, type Tier } from './tiers';
+import { bossDropRows, factionDropRows } from './drops';
 
 export interface Place { id: string; name: string; danger: number }
 /** A public system: its rocks, the resources obtainable there, and the enemies present (all by id, tiers only) */
@@ -101,16 +102,17 @@ function enemies(d: GameData): EnemyEntry[] {
     const sys = d.systems.find((s) => s.id === b.system && isPublicSystem(s));
     out.push({
       id, kind: 'boss', name: b.name, faction: f?.name ?? '', color: f?.color ?? '#9aa4b2', blueprint: b.design ?? id,
-      where: sys ? [sys.name] : [], systemIds: sys ? [sys.id] : [], drops: dropsOf(b.loot ?? []),
+      where: sys ? [sys.name] : [], systemIds: sys ? [sys.id] : [], drops: dropsOf(bossDropRows(d, id)),
     });
   }
   for (const [id, f] of Object.entries(d.factions)) {
-    if (!f.loot?.length) continue;
+    const rows = factionDropRows(d, id);
+    if (!rows.length) continue;
     const ship = Object.keys(f.ships ?? {}).find((s) => !(s in d.bosses) && !designs.has(s));
     const sys = d.systems.filter((s) => isPublicSystem(s) && s.nests?.some((n) => n.faction === id)).sort((a, b) => a.danger - b.danger);
     out.push({
       id: `faction:${id}`, kind: 'faction', name: `${f.name} (any ship)`, faction: f.name, color: f.color ?? '#9aa4b2', blueprint: ship,
-      where: sys.map((s) => s.name), systemIds: sys.map((s) => s.id), drops: dropsOf(f.loot),
+      where: sys.map((s) => s.name), systemIds: sys.map((s) => s.id), drops: dropsOf(rows),
     });
   }
   return out;

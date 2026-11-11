@@ -23,6 +23,7 @@ import {
 import { componentGates, gateCtx, PLATES, rowInputs } from './componentData';
 import { costLines, isOpen, tabCounts } from './componentAvail';
 import { CHECK, CHEVRON, costChipsHtml, esc, LOCK } from './componentKit';
+import { TIER_LABEL, tierOf } from './resources/tiers';
 
 export interface ComponentGuideDeps {
   catalog: Catalog;
@@ -390,7 +391,7 @@ export class ComponentGuideUI {
   }
 
   private dropText(drops: BossDrop[]): string {
-    return drops.map((d) => `dropped by ${esc(d.boss)}${d.system ? ` (${esc(d.system)})` : ''}${d.chance < 1 ? `, ${Math.round(d.chance * 100)}% a kill` : ''}`).join('; ');
+    return drops.map((d) => `dropped by ${esc(d.boss)}${d.system ? ` (${esc(d.system)})` : ''}${d.chance < 1 ? `, ${TIER_LABEL[tierOf('drop', d.chance)].toLowerCase()} chance a kill` : ''}`).join('; ');
   }
 
   private bagHtml(bag: Bag): string {

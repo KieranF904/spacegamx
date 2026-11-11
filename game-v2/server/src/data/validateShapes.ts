@@ -156,7 +156,8 @@ const plasmaSpec: Spec = (v, path, c) => {
   }
 };
 
-const lootSpec = arr(obj({ item: 'string', chance: 'number', min: 'number', max: 'number' }));
+/** Who rolls which loot tables (data/loot.json; common econ/loot.ts DropSpec) */
+const dropsSpec = arr(strict({ table: 'string', rolls: 'number' }));
 const behaviourSpec = obj({ aggro: 'number', range: 'number', flee: 'number', leash: 'number', 'accuracy?': 'number', 'strafe?': 'number' });
 
 const condSpec: Spec = (v, path, c) => {
@@ -314,6 +315,12 @@ export const SHAPES: Record<string, Spec> = {
       blast: obj({ fuse: 'number', radius: 'number', damage: 'number' }), shape: arr('number[]'), color: 'string', glow: 'string',
     })),
   }),
+  'loot.json': strict({
+    tables: rec(strict({
+      'kind?': oneOf('always'), 'nothing?': 'number',
+      entries: arr(strict({ item: 'string', 'weight?': 'number', 'min?': 'number', 'max?': 'number' })),
+    })),
+  }),
   'station.json': obj({
     charter: obj({ level: 'number', credits: 'number', items: 'bag' }),
     sites: arr(obj({ id: 'string', name: 'string', station: 'string' })),
@@ -352,7 +359,7 @@ export const SHAPES: Record<string, Spec> = {
         at: 'number', 'say?': 'string', 'escorts?': 'string[]', 'enrage?': 'number', 'heal?': 'number', 'blink?': 'number',
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
-      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
+      drops: dropsSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
       'stageHp?': 'number[]', 'limbs?': rec('number'), 'codex?': 'string[]', 'hints?': rec('string'), 'exposed?': arr('string[]'),
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
@@ -361,11 +368,11 @@ export const SHAPES: Record<string, Spec> = {
     const group = obj({ faction: 'string', ships: 'string[]', weight: 'number', 'passive?': 'boolean', 'plating?': 'number', 'limit?': 'number', 'respawnSeconds?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad') });
     return strict({
       factions: rec(obj({
-        name: 'string', color: 'string', behaviour: behaviourSpec, ships: rec(obj({ xp: 'number', credits: 'number' })),
-        loot: lootSpec, partSalvage: 'number', 'hpScale?': 'number', 'damageScale?': 'number', 'angrySeconds?': 'number',
+        name: 'string', color: 'string', behaviour: behaviourSpec, ships: rec(strict({ xp: 'number', credits: 'number', 'drops?': dropsSpec, 'eliteDrop?': 'string' })),
+        'drops?': dropsSpec, 'eliteDrop?': 'string', partSalvage: 'number', 'hpScale?': 'number', 'damageScale?': 'number', 'angrySeconds?': 'number',
       })),
       spawns: rec(strict({
-        'grade?': 'number', packs: 'number', groups: arr(group),
+        'grade?': 'number', packs: 'number', groups: arr(group), 'loot?': rec(strict({ 'drops?': dropsSpec, 'eliteDrop?': 'string' })),
         'zones?': arr(obj({ id: 'string', inner: 'number', outer: 'number', 'x?': 'number', 'y?': 'number', packs: 'number', 'respawnSeconds?': 'number', groups: arr(group) })),
         'nests?': arr(obj({ id: 'string', packs: 'number', 'respawnSeconds?': 'number', 'leash?': 'number', 'aggro?': 'number', 'roam?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad'), 'bias?': 'number', 'post?': 'xy', groups: arr(group) })),
         'events?': strict({

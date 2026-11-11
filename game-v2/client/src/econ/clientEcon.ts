@@ -8,6 +8,7 @@ import {
   Economy, Blueprint, Catalog, ItemsFile, RecipesFile, Stack, Bag, ShipTuning,
   ServerProfileMessage, ServerProfileDeltaMessage, applyProfileDelta, ServerItemsMessage, ServerRebuildStatusMessage, ServerHangarMessage, countOf, canCraft,
   OrderPlan, JobView, planOrders, setUnlockTable, UnlockTable, registerAmmo,
+  miningMode, type HoldGhost, type HoldView, type LootNearPod, type MiningMode, type ServerLootNearMessage,
 } from '@space-game/common';
 import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
@@ -43,7 +44,13 @@ export class PilotState {
   hangar: ServerHangarMessage | null = null;
   /** Server clock minus ours (ms), from the last hangar message */
   clockSkew = 0;
+  /** The hold's auto-pickup whitelist (the server's ghosts of the ship flown: common econ/holdGhosts.ts) */
+  ghosts: HoldGhost[] = [];
+  /** Loot in pickup reach, as last told (lootNear), and when (ms, ours: a wreck's lock counts down from it) */
+  near: LootNearPod[] = [];
+  nearAt = 0;
   private listeners = new Set<Listener>();
+  private nearListeners = new Set<Listener>();
 
   constructor(readonly econ: Economy) {}
 
@@ -54,6 +61,29 @@ export class PilotState {
 
   private emit(): void {
     for (const fn of this.listeners) fn();
+  }
+
+  /** The loot in reach changed (kept apart from onChange: it comes often while flying through a field of drops) */
+  onNear(fn: Listener): () => void {
+    this.nearListeners.add(fn);
+    return () => this.nearListeners.delete(fn);
+  }
+
+  setLootNear(m: ServerLootNearMessage): void {
+    this.near = m.pods;
+    this.nearAt = Date.now();
+    for (const fn of this.nearListeners) fn();
+  }
+
+  /** The hold as the pickup rules read it (common econ/holdGhosts.ts) */
+  holdView(): HoldView {
+    return { cargo: this.cargo, capacity: this.cargoCapacity, volume: (id) => this.econ.items.volume(id), category: (id) => this.econ.items.get(id)?.category };
+  }
+
+  /** Mining mode and the ore blacklist (the pilot's own: profile.pickup) */
+  mining(): MiningMode {
+    const p = this.profile?.pickup;
+    return p ? { on: p.mining, blacklist: p.blacklist } : miningMode(undefined);
   }
 
 
@@ -78,6 +108,7 @@ export class PilotState {
     this.cargoCapacity = m.cargoCapacity;
     this.credits = m.credits;
     this.atStation = m.atStation;
+    this.ghosts = m.ghosts ?? [];
     this.emit();
   }
 

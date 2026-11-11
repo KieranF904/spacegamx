@@ -19,7 +19,7 @@
  *   civilian    fly to · target
  *   asteroid    approach to mine (then hold RMB)
  *   loot pod,
- *   your wreck  fly over it (the tractor pulls it in)
+ *   your wreck  fly close (ore comes in by itself, the rest through the pickup panel: ui/pickup)
  *   open space  fly here · jump here (a drive fitted: why not, if it can't)
  *               · mark here (a ping)
  * Several things under the cursor: one section each. Every action is the

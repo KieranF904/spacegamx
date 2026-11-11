@@ -8,8 +8,8 @@
  */
 
 import {
-  isDevOnly, JOB_MATERIALS, MATERIAL_LEVEL, partItemId, STARTER_MATERIALS,
-  type Bag, type Catalog, type FunctionDef, type ItemDef,
+  isDevOnly, JOB_MATERIALS, MATERIAL_LEVEL, partItemId, STARTER_MATERIALS, dropChances,
+  type Bag, type Catalog, type FunctionDef, type ItemDef, type DropLine, type LootTable,
 } from '@space-game/common';
 import { defaultShape, shapesOf } from './componentShapes';
 
@@ -98,11 +98,11 @@ export function questTeaches(file: { quests: { id: string; name: string; onStart
   return file.quests.map((q) => ({ id: q.id, name: q.name, teaches: [...(q.onStart?.recipes ?? []), ...(q.rewards?.recipes ?? [])] })).filter((q) => q.teaches.length);
 }
 
-/** Where each boss's loot drops, by item, from bosses.json (systems by name) */
-export function bossDrops(file: { bosses: Record<string, { name: string; system?: string; loot?: { item: string; chance: number }[] }> }, systemName: (id: string) => string | undefined = () => undefined): Map<string, BossDrop[]> {
+/** Where each boss's loot drops, by item, from bosses.json and its tables (loot.json; `chance` per kill), systems by name */
+export function bossDrops(file: { bosses: Record<string, { name: string; system?: string; drops?: DropLine[] }> }, tables: Record<string, LootTable>, systemName: (id: string) => string | undefined = () => undefined): Map<string, BossDrop[]> {
   const out = new Map<string, BossDrop[]>();
   for (const b of Object.values(file.bosses)) {
-    for (const l of b.loot ?? []) out.set(l.item, [...(out.get(l.item) ?? []), { boss: b.name, chance: l.chance, system: b.system ? systemName(b.system) ?? b.system : undefined }]);
+    for (const l of dropChances(tables, { drops: b.drops })) out.set(l.item, [...(out.get(l.item) ?? []), { boss: b.name, chance: l.chance, system: b.system ? systemName(b.system) ?? b.system : undefined }]);
   }
   return out;
 }

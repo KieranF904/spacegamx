@@ -16,6 +16,7 @@ import type { MinesClientMessage } from '../minesProtocol.js';
 import type { ClampClientMessage } from '../clampProtocol.js';
 import type { TutorialClientMessage } from '../tutorialProtocol.js';
 import type { GunRangeClientMessage } from '../gunRangeProtocol.js';
+import type { LootClientMessage } from '../lootProtocol.js';
 import type { HitReport } from '../hits.js';
 import type { OwnCheck } from '../ownTick.js';
 import type { Blueprint } from '../../ships/types.js';
@@ -215,6 +216,7 @@ export type ClientMessage =
   | ClampClientMessage
   | TutorialClientMessage
   | GunRangeClientMessage
+  | LootClientMessage
   | GuestClientMessage;
 
 /**

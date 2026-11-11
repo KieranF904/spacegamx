@@ -207,6 +207,19 @@ export function createPodHost(gs: GameServer): PodHost {
       return pc ? gs.pilots.cargoFree(pc) : 0;
     },
     shipRadius: (eid) => gs.ships.get(eid)?.derived.radius ?? 40,
+    // (The pickup rules: ore and the hold's ghosts come in by themselves, the rest through the panel: pilots/pickup.ts)
+    autoTake: (eid, items) => {
+      const pc = gs.lingering.get(eid)?.conn ?? gs.pilots.connOf(eid);
+      return pc ? gs.pilots.autoTake(pc, items) : {};
+    },
+    sendNear: (eid, pods) => {
+      const pc = gs.pilots.connOf(eid);
+      if (pc) gs.send((pc as ClientConnection).ws, { type: 'lootNear', pods });
+    },
+    holdFull: (eid) => {
+      const pc = gs.pilots.connOf(eid);
+      if (pc) gs.pilots.toast(pc, 'Your hold is full', 'warn');
+    },
   };
 }
 

@@ -152,7 +152,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 503,
+      "lines": 505,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores, input/keybindings fillKeyNames (a toast's {actionId} key slots)",
       "events": "",
@@ -243,19 +243,19 @@
           "name": "TABLE",
           "kind": "const",
           "start": 304,
-          "end": 493
+          "end": 495
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 495,
-          "end": 496
+          "start": 497,
+          "end": 498
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 498,
-          "end": 503
+          "start": 500,
+          "end": 505
         }
       ]
     },
@@ -8447,6 +8447,343 @@
       ]
     },
     {
+      "id": "client.ui.auto-pickup-panel",
+      "path": "client/src/ui/pickup/AutoPickupPanel.ts",
+      "group": "client/ui/pickup",
+      "lines": 187,
+      "owns": "the auto-pickup panel the cargo panel opens: mining mode (mirrored from the cargo panel), the hold's whitelist (icons, a target or unlimited, right-click to set or remove), the pilot's ore blacklist (icons, right-click to remove), + Whitelist / + Blacklist (the catalogue), and the whitelist's templates (save as, load, delete)",
+      "needs": "PilotState (the whitelist, mining mode, templates), CataloguePicker, askBox, windowKit (tips, menus), itemIcons; the server's ghost, ghostTemplate, pickupPrefs and oreBlacklist; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every change is one message the server checks; the panel only shows what the server last said (no local copies)",
+          "test": "server/src/game/pickup.test.ts"
+        }
+      ],
+      "extend": "a new list is one more block in render() with its message",
+      "exports": [
+        "AutoPickupPanel"
+      ],
+      "sections": [
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 18,
+          "end": 47
+        },
+        {
+          "name": "AutoPickupPanel",
+          "kind": "class",
+          "start": 49,
+          "end": 187
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-picker",
+      "path": "client/src/ui/pickup/CataloguePicker.ts",
+      "group": "client/ui/pickup",
+      "lines": 194,
+      "owns": "the item catalogue window the auto-pickup panel opens: a search box, section chips (Mining, Enemy drops, Components, Refined materials, Salvage, Templates), icon tiles saying where each item comes from, locked tiles above the pilot's level; a click whitelists an item for this hold or (+ Blacklist) toggles an ore on the blacklist",
+      "needs": "catalogue.ts (the contents), PilotState (level, the whitelist, mining mode, templates), itemIcons, the field guide's category icons and lock rule (resources/categoryIcons, resources/levels); npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "search and chips only hide tiles (no re-render while typing); a click is one message (ghost or oreBlacklist)",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        }
+      ],
+      "extend": "a new section is one in catalogue.ts SECTIONS (its chip and tiles follow)",
+      "exports": [
+        "CataloguePicker",
+        "PickMode"
+      ],
+      "sections": [
+        {
+          "name": "PickMode",
+          "kind": "type",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "SECTION_ICON",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 23,
+          "end": 61
+        },
+        {
+          "name": "CataloguePicker",
+          "kind": "class",
+          "start": 63,
+          "end": 194
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-panel",
+      "path": "client/src/ui/pickup/PickupPanelUI.ts",
+      "group": "client/ui/pickup",
+      "lines": 148,
+      "owns": "the pickup panel: everything in pickup reach grouped by item with amounts, wrecks with their keeping, click to take one item, Take all (and Enter while it is open); F opens and closes it, Esc closes it; it never stops the ship flying",
+      "needs": "PilotState (near, cargo, the whitelist), pickupModel (the rows), windowKit (tips), itemIcons; the server's lootTake; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a take is one lootTake message (the server checks reach, keeping and room); rows that won't fit are greyed \"Hold full\"",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        }
+      ],
+      "extend": "a new row action is a button in renderRow sending one message",
+      "exports": [
+        "PickupPanelUI"
+      ],
+      "sections": [
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 17,
+          "end": 46
+        },
+        {
+          "name": "clock",
+          "kind": "const",
+          "start": 48,
+          "end": 48
+        },
+        {
+          "name": "PickupPanelUI",
+          "kind": "class",
+          "start": 50,
+          "end": 148
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-catalogue",
+      "path": "client/src/ui/pickup/catalogue.ts",
+      "group": "client/ui/pickup",
+      "lines": 127,
+      "owns": "the auto-pickup catalogue's contents: its sections (Mining, Enemy drops by enemy, Components, Refined materials, Salvage), each item's one-line \"where it comes from\", its level gate, and the search over them",
+      "needs": "the field guide's resource data (resourceData: entries, source index, levels), drops.ts (the loot tables' chances), tiers; no DOM; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every ore, component and refined material is in its section once; an enemy's drops list only items it can drop, by tier word, never a number",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        },
+        {
+          "text": "an item found only outside Sol says \"Not in Sol\"; a den's own table names the den",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        }
+      ],
+      "extend": "a new section is one entry in SECTIONS and its filter; a new kind of source is one step in whereFrom",
+      "exports": [
+        "CatalogueGroup",
+        "CatalogueItem",
+        "CatalogueSection",
+        "SECTIONS",
+        "SectionId",
+        "catalogue",
+        "matches",
+        "whereFrom"
+      ],
+      "sections": [
+        {
+          "name": "SectionId",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "SECTIONS",
+          "kind": "const",
+          "start": 16,
+          "end": 22
+        },
+        {
+          "name": "CatalogueItem",
+          "kind": "interface",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "CatalogueGroup",
+          "kind": "interface",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "CatalogueSection",
+          "kind": "interface",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "RARITY_WORD",
+          "kind": "const",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "ORE_CATEGORIES",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "inSol",
+          "kind": "const",
+          "start": 33,
+          "end": 34
+        },
+        {
+          "name": "dropperCache",
+          "kind": "let",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "droppers",
+          "kind": "function",
+          "start": 37,
+          "end": 72
+        },
+        {
+          "name": "whereFrom",
+          "kind": "function",
+          "start": 74,
+          "end": 96
+        },
+        {
+          "name": "item",
+          "kind": "const",
+          "start": 98,
+          "end": 101
+        },
+        {
+          "name": "cached",
+          "kind": "let",
+          "start": 103,
+          "end": 103
+        },
+        {
+          "name": "catalogue",
+          "kind": "function",
+          "start": 104,
+          "end": 121
+        },
+        {
+          "name": "matches",
+          "kind": "function",
+          "start": 123,
+          "end": 127
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup",
+      "path": "client/src/ui/pickup/index.ts",
+      "group": "client/ui/pickup",
+      "lines": 49,
+      "owns": "the pickup windows built and wired as one set (docs/design/loot-pickup-2026-11.md): the pickup panel (F), the auto-pickup panel (the cargo panel's chip), the catalogue picker; their per-frame show/hide and their keys (F, Esc, Enter)",
+      "needs": "PickupPanelUI, AutoPickupPanel, CataloguePicker, CargoPanelUI (the chip, its place), PilotState; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "none of them holds a key the ship flies with: Esc closes the top one, the catalogue swallows keys only while it is open; F (after the ship's own keys: the build overlay flips a part with it) toggles the pickup panel",
+          "test": "client/src/app/keys.test.ts"
+        }
+      ],
+      "extend": "a new pickup window is built here and given its place in update() and onKey()",
+      "exports": [
+        "PickupWindows"
+      ],
+      "sections": [
+        {
+          "name": "PickupWindows",
+          "kind": "class",
+          "start": 17,
+          "end": 49
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-model",
+      "path": "client/src/ui/pickup/pickupModel.ts",
+      "group": "client/ui/pickup",
+      "lines": 43,
+      "owns": "what the pickup panel lists from the loot in reach: one row per item (all pods summed) with how much would fit and whether it eats whitelist-reserved space, and one row per wreck with its keeping",
+      "needs": "common econ/holdGhosts.ts (manualRoom: the server's own room rule), LootNearPod; no DOM",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a locked wreck's items are not offered until its lock has run out; a row that cannot fit any is marked full",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        },
+        {
+          "text": "rows sum an item over every takeable pod",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        }
+      ],
+      "extend": "a new row fact is one field on PickupRow, worked out in pickupRows",
+      "exports": [
+        "PickupRow",
+        "WreckRow",
+        "lockLeft",
+        "pickupRows"
+      ],
+      "sections": [
+        {
+          "name": "PickupRow",
+          "kind": "interface",
+          "start": 12,
+          "end": 20
+        },
+        {
+          "name": "WreckRow",
+          "kind": "interface",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "lockLeft",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "pickupRows",
+          "kind": "function",
+          "start": 26,
+          "end": 43
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-category-icons",
       "path": "client/src/ui/resources/categoryIcons.ts",
       "group": "client/ui/resources",
@@ -8562,6 +8899,46 @@
           "kind": "function",
           "start": 128,
           "end": 144
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-drops",
+      "path": "client/src/ui/resources/drops.ts",
+      "group": "client/ui/resources",
+      "lines": 36,
+      "owns": "what each boss and each faction drops per kill, from the loot tables (data/loot.json) and who rolls them (factions.json drops, bosses.json drops), as chances for the guide to turn into tiers",
+      "needs": "common econ/loot.ts (dropChances, dropSpecFor); the GameData shape (type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a faction's chance for an item is the best of its ships' (any ship, anywhere it lives)",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        }
+      ],
+      "extend": "a new kind of dropper is one more function here",
+      "exports": [
+        "bossDropRows",
+        "factionDropRows"
+      ],
+      "sections": [
+        {
+          "name": "tablesOf",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "bossDropRows",
+          "kind": "function",
+          "start": 14,
+          "end": 17
+        },
+        {
+          "name": "factionDropRows",
+          "kind": "function",
+          "start": 19,
+          "end": 36
         }
       ]
     },
@@ -9240,7 +9617,7 @@
       "id": "client.ui.resource-index",
       "path": "client/src/ui/resources/resourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 321,
+      "lines": 324,
       "owns": "the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data",
       "needs": "common/ (FIELD only), sourceIndex + tiers, the data/*.json shapes in GameData below (no I/O, no DOM)",
       "events": "",
@@ -9274,218 +9651,218 @@
         {
           "name": "ResourceCategory",
           "kind": "type",
-          "start": 15,
-          "end": 16
+          "start": 16,
+          "end": 17
         },
         {
           "name": "CATEGORY_LABEL",
           "kind": "const",
-          "start": 18,
-          "end": 20
+          "start": 19,
+          "end": 21
         },
         {
           "name": "CATEGORY_ORDER",
           "kind": "const",
-          "start": 21,
-          "end": 21
+          "start": 22,
+          "end": 22
         },
         {
           "name": "SourceKind",
           "kind": "type",
-          "start": 23,
-          "end": 23
+          "start": 24,
+          "end": 24
         },
         {
           "name": "SOURCE_LABEL",
           "kind": "const",
-          "start": 24,
-          "end": 27
+          "start": 25,
+          "end": 28
         },
         {
           "name": "KIND_ORDER",
           "kind": "const",
-          "start": 28,
-          "end": 28
+          "start": 29,
+          "end": 29
         },
         {
           "name": "ResourceSource",
           "kind": "interface",
-          "start": 30,
-          "end": 35
+          "start": 31,
+          "end": 36
         },
         {
           "name": "ResourceEntry",
           "kind": "interface",
-          "start": 37,
-          "end": 54
+          "start": 38,
+          "end": 55
         },
         {
           "name": "Bag",
           "kind": "type",
-          "start": 56,
-          "end": 56
+          "start": 57,
+          "end": 57
         },
         {
           "name": "ItemRow",
           "kind": "interface",
-          "start": 57,
-          "end": 60
-        },
-        {
-          "name": "RockType",
-          "kind": "interface",
-          "start": 61,
+          "start": 58,
           "end": 61
         },
         {
-          "name": "DropRow",
+          "name": "RockType",
           "kind": "interface",
           "start": 62,
           "end": 62
         },
         {
-          "name": "Named",
+          "name": "DropRow",
           "kind": "interface",
           "start": 63,
           "end": 63
         },
         {
-          "name": "GameData",
+          "name": "Named",
           "kind": "interface",
           "start": 64,
-          "end": 106
+          "end": 64
+        },
+        {
+          "name": "GameData",
+          "kind": "interface",
+          "start": 65,
+          "end": 109
         },
         {
           "name": "cap",
           "kind": "const",
-          "start": 108,
-          "end": 108
+          "start": 111,
+          "end": 111
         },
         {
           "name": "plural",
           "kind": "const",
-          "start": 109,
-          "end": 109
+          "start": 112,
+          "end": 112
         },
         {
           "name": "secs",
           "kind": "const",
-          "start": 110,
-          "end": 110
+          "start": 113,
+          "end": 113
         },
         {
           "name": "some",
           "kind": "function",
-          "start": 111,
-          "end": 114
+          "start": 114,
+          "end": 117
         },
         {
           "name": "CATEGORY_OF",
           "kind": "const",
-          "start": 116,
-          "end": 118
+          "start": 119,
+          "end": 121
         },
         {
           "name": "categoryOf",
           "kind": "function",
-          "start": 119,
-          "end": 122
+          "start": 122,
+          "end": 125
         },
         {
           "name": "Ctx",
           "kind": "interface",
-          "start": 124,
-          "end": 132
+          "start": 127,
+          "end": 135
         },
         {
           "name": "makeCtx",
           "kind": "function",
-          "start": 134,
-          "end": 147
+          "start": 137,
+          "end": 150
         },
         {
           "name": "SourceFn",
           "kind": "type",
-          "start": 149,
-          "end": 149
+          "start": 152,
+          "end": 152
         },
         {
           "name": "mined",
           "kind": "const",
-          "start": 151,
-          "end": 175
+          "start": 154,
+          "end": 178
         },
         {
           "name": "seam",
           "kind": "const",
-          "start": 177,
-          "end": 185
+          "start": 180,
+          "end": 188
         },
         {
           "name": "trace",
           "kind": "const",
-          "start": 187,
-          "end": 195
+          "start": 190,
+          "end": 198
         },
         {
           "name": "refine",
           "kind": "const",
-          "start": 197,
-          "end": 200
+          "start": 200,
+          "end": 203
         },
         {
           "name": "fabricate",
           "kind": "const",
-          "start": 202,
-          "end": 209
+          "start": 205,
+          "end": 212
         },
         {
           "name": "cut",
           "kind": "const",
-          "start": 211,
-          "end": 217
+          "start": 214,
+          "end": 220
         },
         {
           "name": "drop",
           "kind": "const",
-          "start": 219,
-          "end": 229
+          "start": 222,
+          "end": 232
         },
         {
           "name": "bought",
           "kind": "const",
-          "start": 231,
-          "end": 242
+          "start": 234,
+          "end": 245
         },
         {
           "name": "questReward",
           "kind": "const",
-          "start": 244,
-          "end": 259
+          "start": 247,
+          "end": 262
         },
         {
           "name": "salvage",
           "kind": "const",
-          "start": 261,
-          "end": 267
+          "start": 264,
+          "end": 270
         },
         {
           "name": "SOURCES",
           "kind": "const",
-          "start": 269,
-          "end": 271
+          "start": 272,
+          "end": 274
         },
         {
           "name": "usedFor",
           "kind": "function",
-          "start": 273,
-          "end": 305
+          "start": 276,
+          "end": 308
         },
         {
           "name": "buildResourceIndex",
           "kind": "function",
-          "start": 307,
-          "end": 321
+          "start": 310,
+          "end": 324
         }
       ]
     },
@@ -9493,9 +9870,9 @@
       "id": "client.ui.resource-sources",
       "path": "client/src/ui/resources/sourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 173,
+      "lines": 175,
       "owns": "the guide's source side of the resource index: every rock (what it yields, where it is found), every enemy and boss (what it drops, where it is found), and per item the icon-chip columns (mined, dropped, made from, sold at, rewards, used in)",
-      "needs": "the GameData shape from resourceIndex.ts (type only), tiers (no I/O, no DOM)",
+      "needs": "the GameData shape from resourceIndex.ts (type only), tiers, drops (the loot tables' chances; no I/O, no DOM)",
       "events": "",
       "invariants": [
         {
@@ -9524,104 +9901,104 @@
         {
           "name": "Place",
           "kind": "interface",
-          "start": 13,
-          "end": 13
+          "start": 14,
+          "end": 14
         },
         {
           "name": "SystemEntry",
           "kind": "interface",
-          "start": 14,
-          "end": 21
+          "start": 15,
+          "end": 22
         },
         {
           "name": "RockEntry",
           "kind": "interface",
-          "start": 22,
-          "end": 30
+          "start": 23,
+          "end": 31
         },
         {
           "name": "EnemyEntry",
           "kind": "interface",
-          "start": 31,
-          "end": 39
+          "start": 32,
+          "end": 40
         },
         {
           "name": "Recipe",
           "kind": "interface",
-          "start": 40,
-          "end": 40
+          "start": 41,
+          "end": 41
         },
         {
           "name": "ItemColumns",
           "kind": "interface",
-          "start": 41,
-          "end": 51
+          "start": 42,
+          "end": 52
         },
         {
           "name": "SourceIndex",
           "kind": "interface",
-          "start": 52,
-          "end": 52
+          "start": 53,
+          "end": 53
         },
         {
           "name": "TIER_RANK",
-          "kind": "const",
-          "start": 54,
-          "end": 54
-        },
-        {
-          "name": "better",
           "kind": "const",
           "start": 55,
           "end": 55
         },
         {
+          "name": "better",
+          "kind": "const",
+          "start": 56,
+          "end": 56
+        },
+        {
           "name": "isPublicSystem",
           "kind": "function",
-          "start": 57,
-          "end": 60
+          "start": 58,
+          "end": 61
         },
         {
           "name": "rockSystemMap",
           "kind": "function",
-          "start": 62,
-          "end": 76
+          "start": 63,
+          "end": 77
         },
         {
           "name": "cap",
-          "kind": "const",
-          "start": 78,
-          "end": 78
-        },
-        {
-          "name": "sum",
           "kind": "const",
           "start": 79,
           "end": 79
         },
         {
+          "name": "sum",
+          "kind": "const",
+          "start": 80,
+          "end": 80
+        },
+        {
           "name": "rocks",
           "kind": "function",
-          "start": 81,
-          "end": 92
+          "start": 82,
+          "end": 93
         },
         {
           "name": "enemies",
           "kind": "function",
-          "start": 94,
-          "end": 117
+          "start": 95,
+          "end": 119
         },
         {
           "name": "systems",
           "kind": "function",
-          "start": 119,
-          "end": 143
+          "start": 121,
+          "end": 145
         },
         {
           "name": "buildSourceIndex",
           "kind": "function",
-          "start": 145,
-          "end": 173
+          "start": 147,
+          "end": 175
         }
       ]
     },
@@ -11308,6 +11685,300 @@
       ]
     },
     {
+      "id": "common.econ.hold-ghosts",
+      "path": "common/src/econ/holdGhosts.ts",
+      "group": "common/econ",
+      "lines": 129,
+      "owns": "what a ship picks up by itself: ore in mining mode (but blacklisted ores) and the items its hold has a ghost of; the space ghosts reserve; manual takes and their warning; templates of ghosts; the saved shapes' cleaning",
+      "needs": "econ/stacks (Stack, Bag, countOf, addTo); no I/O (the server's pickup and the client's panel and hold run the same rules)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "ore and other auto pickups never use another ghost's reserved space; a ghost's own item may; a manual take may use any free space",
+          "test": "common/src/econ/holdGhosts.test.ts"
+        },
+        {
+          "text": "mining mode collects every ore but the blacklisted; a ghost of an ore collects it whatever the blacklist and mode say",
+          "test": "common/src/econ/holdGhosts.test.ts"
+        },
+        {
+          "text": "a ghost with a target collects up to it, then goes (the stack is real); an unlimited one always reserves GHOST_RESERVE units",
+          "test": "common/src/econ/holdGhosts.test.ts"
+        }
+      ],
+      "extend": "a new kind of auto pickup is one more case in autoRoom",
+      "exports": [
+        "GHOST_RESERVE",
+        "GhostTemplate",
+        "HoldGhost",
+        "HoldView",
+        "MAX_BLACKLIST",
+        "MAX_GHOSTS",
+        "MAX_TEMPLATES",
+        "MAX_TEMPLATE_NAME",
+        "MiningMode",
+        "ORE_CATEGORIES",
+        "PickupPrefs",
+        "autoRoom",
+        "autoTake",
+        "cleanGhosts",
+        "cleanPickup",
+        "ghostReserve",
+        "isOre",
+        "manualRoom",
+        "miningMode",
+        "reservedSpace",
+        "settleGhosts"
+      ],
+      "sections": [
+        {
+          "name": "HoldGhost",
+          "kind": "interface",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "GhostTemplate",
+          "kind": "interface",
+          "start": 15,
+          "end": 16
+        },
+        {
+          "name": "PickupPrefs",
+          "kind": "interface",
+          "start": 17,
+          "end": 21
+        },
+        {
+          "name": "MiningMode",
+          "kind": "interface",
+          "start": 22,
+          "end": 23
+        },
+        {
+          "name": "miningMode",
+          "kind": "function",
+          "start": 25,
+          "end": 28
+        },
+        {
+          "name": "GHOST_RESERVE",
+          "kind": "const",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "MAX_GHOSTS",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "MAX_TEMPLATES",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "MAX_TEMPLATE_NAME",
+          "kind": "const",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "MAX_BLACKLIST",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "ORE_CATEGORIES",
+          "kind": "const",
+          "start": 37,
+          "end": 38
+        },
+        {
+          "name": "HoldView",
+          "kind": "interface",
+          "start": 40,
+          "end": 46
+        },
+        {
+          "name": "used",
+          "kind": "const",
+          "start": 48,
+          "end": 48
+        },
+        {
+          "name": "ghostReserve",
+          "kind": "function",
+          "start": 50,
+          "end": 53
+        },
+        {
+          "name": "reservedSpace",
+          "kind": "function",
+          "start": 55,
+          "end": 60
+        },
+        {
+          "name": "isOre",
+          "kind": "function",
+          "start": 62,
+          "end": 65
+        },
+        {
+          "name": "autoRoom",
+          "kind": "function",
+          "start": 67,
+          "end": 78
+        },
+        {
+          "name": "autoTake",
+          "kind": "function",
+          "start": 80,
+          "end": 89
+        },
+        {
+          "name": "manualRoom",
+          "kind": "function",
+          "start": 91,
+          "end": 98
+        },
+        {
+          "name": "settleGhosts",
+          "kind": "function",
+          "start": 100,
+          "end": 103
+        },
+        {
+          "name": "cleanGhosts",
+          "kind": "function",
+          "start": 105,
+          "end": 114
+        },
+        {
+          "name": "cleanPickup",
+          "kind": "function",
+          "start": 116,
+          "end": 129
+        }
+      ]
+    },
+    {
+      "id": "common.econ.loot",
+      "path": "common/src/econ/loot.ts",
+      "group": "common/econ",
+      "lines": 108,
+      "owns": "drop tables (data/loot.json): one weighted roll per table roll (\"nothing\" an entry like the rest), the always kind, who rolls what (faction, design, a design in one system), and each item's chance per kill",
+      "needs": "econ/stacks (Bag); no I/O, no randomness of its own (the caller's dice: the server's payout dice)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a roll picks exactly one entry or nothing, by weight; an always table drops every entry",
+          "test": "common/src/econ/loot.test.ts"
+        },
+        {
+          "text": "dropChances is the chance of at least one of an item per kill, worked out from the same tables rollDrops rolls",
+          "test": "common/src/econ/loot.test.ts"
+        }
+      ],
+      "extend": "a new table kind is one case in rollTable and in tableChances",
+      "exports": [
+        "DropChance",
+        "DropLine",
+        "DropSpec",
+        "LootDice",
+        "LootEntry",
+        "LootFile",
+        "LootTable",
+        "dropChances",
+        "dropSpecFor",
+        "rollDrops",
+        "rollTable"
+      ],
+      "sections": [
+        {
+          "name": "LootEntry",
+          "kind": "interface",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "LootTable",
+          "kind": "interface",
+          "start": 15,
+          "end": 19
+        },
+        {
+          "name": "LootFile",
+          "kind": "interface",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "DropLine",
+          "kind": "interface",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "DropSpec",
+          "kind": "interface",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "LootDice",
+          "kind": "type",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "amount",
+          "kind": "const",
+          "start": 33,
+          "end": 36
+        },
+        {
+          "name": "rollTable",
+          "kind": "function",
+          "start": 38,
+          "end": 52
+        },
+        {
+          "name": "rollDrops",
+          "kind": "function",
+          "start": 54,
+          "end": 59
+        },
+        {
+          "name": "dropSpecFor",
+          "kind": "function",
+          "start": 61,
+          "end": 70
+        },
+        {
+          "name": "tableChances",
+          "kind": "function",
+          "start": 72,
+          "end": 84
+        },
+        {
+          "name": "DropChance",
+          "kind": "interface",
+          "start": 86,
+          "end": 87
+        },
+        {
+          "name": "dropChances",
+          "kind": "function",
+          "start": 89,
+          "end": 108
+        }
+      ]
+    },
+    {
       "id": "common.gun-range.cheat-ship",
       "path": "common/src/gunRange/cheatShip.ts",
       "group": "common/gunRange",
@@ -11862,7 +12533,7 @@
       "id": "protocol.econ",
       "path": "common/src/network/econProtocol.ts",
       "group": "common/network",
-      "lines": 458,
+      "lines": 463,
       "owns": "the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and builds; every action is a request the server checks",
       "needs": "type-only imports of econ/stacks, econ/quests and other econ shapes",
       "events": "",
@@ -11946,380 +12617,380 @@
         {
           "name": "ServerProfileMessage",
           "kind": "interface",
-          "start": 34,
-          "end": 62
+          "start": 35,
+          "end": 65
         },
         {
           "name": "ServerProfileDeltaMessage",
           "kind": "interface",
-          "start": 64,
-          "end": 80
+          "start": 67,
+          "end": 83
         },
         {
           "name": "PROFILE_DELTA_FIELDS",
           "kind": "const",
-          "start": 82,
-          "end": 83
+          "start": 85,
+          "end": 86
         },
         {
           "name": "applyProfileDelta",
           "kind": "function",
-          "start": 85,
-          "end": 90
+          "start": 88,
+          "end": 93
         },
         {
           "name": "diffProfile",
           "kind": "function",
-          "start": 92,
-          "end": 109
+          "start": 95,
+          "end": 112
         },
         {
           "name": "ServerItemsMessage",
           "kind": "interface",
-          "start": 111,
-          "end": 120
+          "start": 114,
+          "end": 125
         },
         {
           "name": "ServerLootMessage2",
           "kind": "interface",
-          "start": 122,
-          "end": 133
+          "start": 127,
+          "end": 138
         },
         {
           "name": "ServerToastMessage",
           "kind": "interface",
-          "start": 135,
-          "end": 140
+          "start": 140,
+          "end": 145
         },
         {
           "name": "ServerWreckMessage",
           "kind": "interface",
-          "start": 142,
-          "end": 157
+          "start": 147,
+          "end": 162
         },
         {
           "name": "BackupOption",
           "kind": "interface",
-          "start": 159,
-          "end": 167
+          "start": 164,
+          "end": 172
         },
         {
           "name": "ServerBackupsMessage",
           "kind": "interface",
-          "start": 169,
-          "end": 175
+          "start": 174,
+          "end": 180
         },
         {
           "name": "ServerScanPulseMessage",
           "kind": "interface",
-          "start": 177,
-          "end": 181
+          "start": 182,
+          "end": 186
         },
         {
           "name": "ServerRebuildStatusMessage",
           "kind": "interface",
-          "start": 183,
-          "end": 204
+          "start": 188,
+          "end": 209
         },
         {
           "name": "ClientItemMoveMessage",
           "kind": "interface",
-          "start": 206,
-          "end": 212
+          "start": 211,
+          "end": 217
         },
         {
           "name": "ClientItemStoreMessage",
           "kind": "interface",
-          "start": 214,
-          "end": 218
+          "start": 219,
+          "end": 223
         },
         {
           "name": "ClientRestockLoadoutMessage",
           "kind": "interface",
-          "start": 220,
-          "end": 221
+          "start": 225,
+          "end": 226
         },
         {
           "name": "ClientSlotLoadoutMessage",
           "kind": "interface",
-          "start": 223,
-          "end": 224
+          "start": 228,
+          "end": 229
         },
         {
           "name": "ClientItemJettisonMessage",
           "kind": "interface",
-          "start": 226,
-          "end": 231
+          "start": 231,
+          "end": 236
         },
         {
           "name": "ClientItemUseMessage",
           "kind": "interface",
-          "start": 233,
-          "end": 237
+          "start": 238,
+          "end": 242
         },
         {
           "name": "EconServerMessage",
           "kind": "type",
-          "start": 239,
-          "end": 240
+          "start": 244,
+          "end": 245
         },
         {
           "name": "EconClientMessage",
           "kind": "type",
-          "start": 241,
-          "end": 245
+          "start": 246,
+          "end": 250
         },
         {
           "name": "ClientQuickbarSetMessage",
           "kind": "interface",
-          "start": 247,
-          "end": 252
+          "start": 252,
+          "end": 257
         },
         {
           "name": "HangarSlotView",
           "kind": "interface",
-          "start": 254,
-          "end": 272
+          "start": 259,
+          "end": 277
         },
         {
           "name": "JobView",
           "kind": "interface",
-          "start": 274,
-          "end": 283
+          "start": 279,
+          "end": 288
         },
         {
           "name": "ServerHangarMessage",
           "kind": "interface",
-          "start": 285,
-          "end": 302
+          "start": 290,
+          "end": 307
         },
         {
           "name": "ClientSlotSaveMessage",
           "kind": "interface",
-          "start": 304,
-          "end": 305
+          "start": 309,
+          "end": 310
         },
         {
           "name": "ClientSlotFlyMessage",
           "kind": "interface",
-          "start": 306,
-          "end": 307
+          "start": 311,
+          "end": 312
         },
         {
           "name": "ClientSlotClearMessage",
           "kind": "interface",
-          "start": 308,
-          "end": 309
+          "start": 313,
+          "end": 314
         },
         {
           "name": "ClientScrapItemMessage",
           "kind": "interface",
-          "start": 310,
-          "end": 311
+          "start": 315,
+          "end": 316
         },
         {
           "name": "ClientSlotBuildMessage",
           "kind": "interface",
-          "start": 312,
-          "end": 313
+          "start": 317,
+          "end": 318
         },
         {
           "name": "ClientSlotOrderMessage",
           "kind": "interface",
-          "start": 314,
-          "end": 315
+          "start": 319,
+          "end": 320
         },
         {
           "name": "ClientJobMessage",
           "kind": "interface",
-          "start": 316,
-          "end": 317
+          "start": 321,
+          "end": 322
         },
         {
           "name": "ClientMarketSellAllMessage",
           "kind": "interface",
-          "start": 318,
-          "end": 323
+          "start": 323,
+          "end": 328
         },
         {
           "name": "ServerQuestsMessage",
           "kind": "interface",
-          "start": 325,
-          "end": 341
+          "start": 330,
+          "end": 346
         },
         {
           "name": "ServerQuestBoardMessage",
           "kind": "interface",
-          "start": 343,
-          "end": 353
+          "start": 348,
+          "end": 358
         },
         {
           "name": "ServerTalkMessage",
           "kind": "interface",
-          "start": 355,
-          "end": 359
+          "start": 360,
+          "end": 364
         },
         {
           "name": "ServerPeopleMessage",
           "kind": "interface",
-          "start": 361,
-          "end": 365
+          "start": 366,
+          "end": 370
         },
         {
           "name": "ServerCodexMessage",
           "kind": "interface",
-          "start": 367,
-          "end": 376
+          "start": 372,
+          "end": 381
         },
         {
           "name": "ServerQuestStepMessage",
           "kind": "interface",
-          "start": 378,
-          "end": 387
+          "start": 383,
+          "end": 392
         },
         {
           "name": "ClientQuestBoardMessage",
           "kind": "interface",
-          "start": 389,
-          "end": 390
+          "start": 394,
+          "end": 395
         },
         {
           "name": "ClientQuestAcceptMessage",
           "kind": "interface",
-          "start": 391,
-          "end": 391
+          "start": 396,
+          "end": 396
         },
         {
           "name": "ClientQuestAbandonMessage",
           "kind": "interface",
-          "start": 392,
-          "end": 392
+          "start": 397,
+          "end": 397
         },
         {
           "name": "ClientQuestSeenMessage",
           "kind": "interface",
-          "start": 393,
-          "end": 394
+          "start": 398,
+          "end": 399
         },
         {
           "name": "ClientCodexReadMessage",
           "kind": "interface",
-          "start": 395,
-          "end": 396
+          "start": 400,
+          "end": 401
         },
         {
           "name": "ClientTalkMessage",
           "kind": "interface",
-          "start": 397,
-          "end": 398
+          "start": 402,
+          "end": 403
         },
         {
           "name": "ClientSkillUpMessage",
           "kind": "interface",
-          "start": 399,
-          "end": 404
+          "start": 404,
+          "end": 409
         },
         {
           "name": "ServerStationMessage",
           "kind": "interface",
-          "start": 406,
-          "end": 429
+          "start": 411,
+          "end": 434
         },
         {
           "name": "ClientStationOpenMessage",
           "kind": "interface",
-          "start": 431,
-          "end": 432
+          "start": 436,
+          "end": 437
         },
         {
           "name": "ClientRefineMessage",
           "kind": "interface",
-          "start": 433,
-          "end": 434
+          "start": 438,
+          "end": 439
         },
         {
           "name": "ClientCraftMessage",
           "kind": "interface",
-          "start": 435,
-          "end": 436
-        },
-        {
-          "name": "ClientGemCutMessage",
-          "kind": "interface",
-          "start": 437,
-          "end": 438
-        },
-        {
-          "name": "ClientGemSocketMessage",
-          "kind": "interface",
-          "start": 439,
-          "end": 440
-        },
-        {
-          "name": "ClientGemUnsocketMessage",
-          "kind": "interface",
-          "start": 441,
+          "start": 440,
           "end": 441
         },
         {
-          "name": "ClientDesignSaveMessage",
+          "name": "ClientGemCutMessage",
           "kind": "interface",
           "start": 442,
           "end": 443
         },
         {
-          "name": "ClientDesignDeleteMessage",
+          "name": "ClientGemSocketMessage",
           "kind": "interface",
           "start": 444,
-          "end": 444
+          "end": 445
+        },
+        {
+          "name": "ClientGemUnsocketMessage",
+          "kind": "interface",
+          "start": 446,
+          "end": 446
+        },
+        {
+          "name": "ClientDesignSaveMessage",
+          "kind": "interface",
+          "start": 447,
+          "end": 448
+        },
+        {
+          "name": "ClientDesignDeleteMessage",
+          "kind": "interface",
+          "start": 449,
+          "end": 449
         },
         {
           "name": "ClientOutpostCharterMessage",
           "kind": "interface",
-          "start": 445,
-          "end": 446
+          "start": 450,
+          "end": 451
         },
         {
           "name": "ClientOutpostUpgradeMessage",
           "kind": "interface",
-          "start": 447,
-          "end": 447
-        },
-        {
-          "name": "ClientFabOrderMessage",
-          "kind": "interface",
-          "start": 448,
-          "end": 449
-        },
-        {
-          "name": "ClientFabOrderCancelMessage",
-          "kind": "interface",
-          "start": 450,
-          "end": 450
-        },
-        {
-          "name": "ClientDevStationMessage",
-          "kind": "interface",
-          "start": 451,
+          "start": 452,
           "end": 452
         },
         {
-          "name": "ClientAmmoPreferMessage",
+          "name": "ClientFabOrderMessage",
           "kind": "interface",
           "start": 453,
           "end": 454
         },
         {
-          "name": "ClientMarketSellMessage",
+          "name": "ClientFabOrderCancelMessage",
           "kind": "interface",
           "start": 455,
-          "end": 456
+          "end": 455
+        },
+        {
+          "name": "ClientDevStationMessage",
+          "kind": "interface",
+          "start": 456,
+          "end": 457
+        },
+        {
+          "name": "ClientAmmoPreferMessage",
+          "kind": "interface",
+          "start": 458,
+          "end": 459
+        },
+        {
+          "name": "ClientMarketSellMessage",
+          "kind": "interface",
+          "start": 460,
+          "end": 461
         },
         {
           "name": "ClientMarketBuyMessage",
           "kind": "interface",
-          "start": 457,
-          "end": 458
+          "start": 462,
+          "end": 463
         }
       ]
     },
@@ -12854,6 +13525,93 @@
       ]
     },
     {
+      "id": "protocol.loot",
+      "path": "common/src/network/lootProtocol.ts",
+      "group": "common/network",
+      "lines": 48,
+      "owns": "the pickup messages: what loot is in reach (sent when it changes), taking it (one decision), the hold's ghosts and their templates, mining mode and the ore blacklist",
+      "needs": "type-only imports of econ/stacks (Bag) and econ/holdGhosts",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by name",
+          "test": "server/src/golden/structure.test.ts"
+        },
+        {
+          "text": "the server types the client handles itself are exactly the pinned set",
+          "test": "client/src/app/serverMessages.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of this area's client / server union below; then its handler (server/src/net/handlers/modules.ts) or its entry in client/src/app/serverMessages.ts, and the golden pins",
+      "exports": [
+        "ClientGhostMessage",
+        "ClientGhostTemplateMessage",
+        "ClientLootTakeMessage",
+        "ClientOreBlacklistMessage",
+        "ClientPickupPrefsMessage",
+        "LootClientMessage",
+        "LootNearPod",
+        "LootServerMessage",
+        "ServerLootNearMessage"
+      ],
+      "sections": [
+        {
+          "name": "LootNearPod",
+          "kind": "interface",
+          "start": 16,
+          "end": 24
+        },
+        {
+          "name": "ServerLootNearMessage",
+          "kind": "interface",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "LootServerMessage",
+          "kind": "type",
+          "start": 29,
+          "end": 31
+        },
+        {
+          "name": "ClientLootTakeMessage",
+          "kind": "interface",
+          "start": 33,
+          "end": 34
+        },
+        {
+          "name": "ClientGhostMessage",
+          "kind": "interface",
+          "start": 36,
+          "end": 37
+        },
+        {
+          "name": "ClientGhostTemplateMessage",
+          "kind": "interface",
+          "start": 39,
+          "end": 40
+        },
+        {
+          "name": "ClientPickupPrefsMessage",
+          "kind": "interface",
+          "start": 42,
+          "end": 43
+        },
+        {
+          "name": "ClientOreBlacklistMessage",
+          "kind": "interface",
+          "start": 45,
+          "end": 46
+        },
+        {
+          "name": "LootClientMessage",
+          "kind": "type",
+          "start": 48,
+          "end": 48
+        }
+      ]
+    },
+    {
       "id": "protocol.mines",
       "path": "common/src/network/minesProtocol.ts",
       "group": "common/network",
@@ -12937,7 +13695,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 83,
+      "lines": 85,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -12964,32 +13722,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 50,
-          "end": 62
-        },
-        {
-          "name": "PROTOCOL_WIRE_HASH",
-          "kind": "const",
-          "start": 63,
+          "start": 52,
           "end": 64
         },
         {
-          "name": "PROTOCOL_MISMATCH_CLOSE",
+          "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
           "start": 65,
           "end": 66
         },
         {
-          "name": "PROTOCOL_MISMATCH_REASON",
+          "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
           "start": 67,
-          "end": 67
+          "end": 68
+        },
+        {
+          "name": "PROTOCOL_MISMATCH_REASON",
+          "kind": "const",
+          "start": 69,
+          "end": 69
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 69,
-          "end": 83
+          "start": 71,
+          "end": 85
         }
       ]
     },
@@ -13643,7 +14401,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 312,
+      "lines": 314,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -13693,182 +14451,182 @@
         {
           "name": "ClientInputMessage",
           "kind": "interface",
-          "start": 27,
-          "end": 65
+          "start": 28,
+          "end": 66
         },
         {
           "name": "BodyCheck",
           "kind": "interface",
-          "start": 67,
-          "end": 71
+          "start": 68,
+          "end": 72
         },
         {
           "name": "ClientPingMessage",
           "kind": "interface",
-          "start": 73,
-          "end": 76
+          "start": 74,
+          "end": 77
         },
         {
           "name": "ClientMapViewMessage",
           "kind": "interface",
-          "start": 78,
-          "end": 82
+          "start": 79,
+          "end": 83
         },
         {
           "name": "ClientChatMessage",
           "kind": "interface",
-          "start": 84,
-          "end": 87
+          "start": 85,
+          "end": 88
         },
         {
           "name": "ClientInteractMessage",
           "kind": "interface",
-          "start": 89,
-          "end": 92
+          "start": 90,
+          "end": 93
         },
         {
           "name": "ClientDropItemMessage",
           "kind": "interface",
-          "start": 94,
-          "end": 98
+          "start": 95,
+          "end": 99
         },
         {
           "name": "ClientPickupMessage",
           "kind": "interface",
-          "start": 100,
-          "end": 103
+          "start": 101,
+          "end": 104
         },
         {
           "name": "ClientBuyMessage",
           "kind": "interface",
-          "start": 105,
-          "end": 110
+          "start": 106,
+          "end": 111
         },
         {
           "name": "ClientSellMessage",
           "kind": "interface",
-          "start": 112,
-          "end": 117
+          "start": 113,
+          "end": 118
         },
         {
           "name": "ClientRepairMessage",
           "kind": "interface",
-          "start": 119,
-          "end": 122
+          "start": 120,
+          "end": 123
         },
         {
           "name": "ClientRefuelMessage",
           "kind": "interface",
-          "start": 124,
-          "end": 127
+          "start": 125,
+          "end": 128
         },
         {
           "name": "ClientWarpMessage",
           "kind": "interface",
-          "start": 130,
-          "end": 133
+          "start": 131,
+          "end": 134
         },
         {
           "name": "ClientRespawnMessage",
           "kind": "interface",
-          "start": 135,
-          "end": 141
+          "start": 136,
+          "end": 142
         },
         {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 143,
-          "end": 156
+          "start": 144,
+          "end": 157
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 158,
-          "end": 165
+          "start": 159,
+          "end": 166
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 167,
-          "end": 170
+          "start": 168,
+          "end": 171
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 172,
-          "end": 176
+          "start": 173,
+          "end": 177
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 178,
-          "end": 218
+          "start": 179,
+          "end": 220
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 220,
-          "end": 229
+          "start": 222,
+          "end": 231
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 231,
-          "end": 238
+          "start": 233,
+          "end": 240
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 240,
-          "end": 247
+          "start": 242,
+          "end": 249
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 249,
-          "end": 259
+          "start": 251,
+          "end": 261
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 261,
-          "end": 275
+          "start": 263,
+          "end": 277
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 277,
-          "end": 282
+          "start": 279,
+          "end": 284
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 284,
-          "end": 287
+          "start": 286,
+          "end": 289
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 289,
-          "end": 291
+          "start": 291,
+          "end": 293
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 293,
-          "end": 300
+          "start": 295,
+          "end": 302
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 302,
-          "end": 305
+          "start": 304,
+          "end": 307
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 307,
-          "end": 311
+          "start": 309,
+          "end": 313
         }
       ]
     },
@@ -14660,7 +15418,7 @@
       "id": "protocol.server-union",
       "path": "common/src/network/protocol/serverMessage.ts",
       "group": "common/network/protocol",
-      "lines": 130,
+      "lines": 132,
       "owns": "the ServerMessage union over every family",
       "needs": "every server message family file",
       "events": "",
@@ -14678,8 +15436,8 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 27,
-          "end": 130
+          "start": 28,
+          "end": 132
         }
       ]
     },
@@ -18044,7 +18802,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 749,
+      "lines": 752,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -18072,7 +18830,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 119,
-          "end": 749
+          "end": 752
         }
       ]
     },
@@ -18640,7 +19398,7 @@
       "id": "server.data.game-data",
       "path": "server/src/data/GameData.ts",
       "group": "server/data",
-      "lines": 279,
+      "lines": 285,
       "owns": "loading and indexing the game data JSON files into GameData",
       "needs": "@space-game/common data shapes and terrain builders",
       "events": "",
@@ -18659,20 +19417,20 @@
         {
           "name": "GameDataFiles",
           "kind": "interface",
-          "start": 39,
-          "end": 73
+          "start": 40,
+          "end": 76
         },
         {
           "name": "checkedFiles",
           "kind": "const",
-          "start": 75,
-          "end": 76
+          "start": 78,
+          "end": 79
         },
         {
           "name": "GameData",
           "kind": "class",
-          "start": 78,
-          "end": 279
+          "start": 81,
+          "end": 285
         }
       ]
     },
@@ -18680,7 +19438,7 @@
       "id": "server.data.disk-loader",
       "path": "server/src/data/loadGameDataFromDisk.ts",
       "group": "server/data",
-      "lines": 45,
+      "lines": 46,
       "owns": "Node-only reading of the data JSON files from a directory into GameDataFiles",
       "needs": "fs, path, GameData.ts (GameDataFiles)",
       "events": "",
@@ -18700,13 +19458,13 @@
           "name": "readGameDataFiles",
           "kind": "function",
           "start": 17,
-          "end": 41
+          "end": 42
         },
         {
           "name": "loadGameDataFromDisk",
           "kind": "function",
-          "start": 43,
-          "end": 45
+          "start": 44,
+          "end": 46
         }
       ]
     },
@@ -18714,7 +19472,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 104,
+      "lines": 106,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "validate/* (one validator per data file, shared context), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -18741,20 +19499,20 @@
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 53,
-          "end": 75
+          "start": 54,
+          "end": 77
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 77,
-          "end": 83
+          "start": 79,
+          "end": 85
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 85,
-          "end": 104
+          "start": 87,
+          "end": 106
         }
       ]
     },
@@ -18762,7 +19520,7 @@
       "id": "server.data.validate-shapes",
       "path": "server/src/data/validateShapes.ts",
       "group": "server/data",
-      "lines": 582,
+      "lines": 589,
       "owns": "the shape pass of load-time data validation: a tiny schema language (Spec) and one spec per data file",
       "needs": "@space-game/common (tables, dictionary), game/brains ids; browser-safe: no Node imports",
       "events": "",
@@ -18908,88 +19666,88 @@
           "end": 157
         },
         {
-          "name": "lootSpec",
+          "name": "dropsSpec",
           "kind": "const",
           "start": 159,
-          "end": 159
+          "end": 160
         },
         {
           "name": "behaviourSpec",
           "kind": "const",
-          "start": 160,
-          "end": 160
+          "start": 161,
+          "end": 161
         },
         {
           "name": "condSpec",
           "kind": "const",
-          "start": 162,
-          "end": 182
+          "start": 163,
+          "end": 183
         },
         {
           "name": "LINE_KINDS",
           "kind": "const",
-          "start": 184,
-          "end": 196
+          "start": 185,
+          "end": 197
         },
         {
           "name": "lineSpec",
           "kind": "const",
-          "start": 197,
-          "end": 202
+          "start": 198,
+          "end": 203
         },
         {
           "name": "linesSpec",
           "kind": "const",
-          "start": 203,
-          "end": 203
+          "start": 204,
+          "end": 204
         },
         {
           "name": "STEP_FIELDS",
           "kind": "const",
-          "start": 205,
-          "end": 232
+          "start": 206,
+          "end": 233
         },
         {
           "name": "stepSpec",
           "kind": "const",
-          "start": 233,
-          "end": 238
+          "start": 234,
+          "end": 239
         },
         {
           "name": "rewardsSpec",
           "kind": "const",
-          "start": 240,
-          "end": 243
+          "start": 241,
+          "end": 244
         },
         {
           "name": "questSpec",
           "kind": "const",
-          "start": 245,
-          "end": 249
+          "start": 246,
+          "end": 250
         },
         {
           "name": "placeSpec",
           "kind": "const",
-          "start": 251,
-          "end": 251
+          "start": 252,
+          "end": 252
         },
         {
           "name": "SHAPES",
           "kind": "const",
-          "start": 253,
-          "end": 469
+          "start": 254,
+          "end": 476
         },
         {
           "name": "SHIP_SHAPES",
           "kind": "const",
-          "start": 471,
-          "end": 580
+          "start": 478,
+          "end": 587
         },
         {
           "name": "blueprintSpec",
           "kind": "const",
-          "start": 582,
-          "end": 582
+          "start": 589,
+          "end": 589
         }
       ]
     },
@@ -19024,8 +19782,8 @@
       "id": "validate.bosses",
       "path": "server/src/data/validate/bosses.ts",
       "group": "server/data/validate",
-      "lines": 32,
-      "owns": "bosses.json: lairs, designs and loot resolve",
+      "lines": 31,
+      "owns": "bosses.json: lairs and designs resolve (its drops: validate/loot.ts)",
       "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -19043,7 +19801,7 @@
           "name": "validateBosses",
           "kind": "function",
           "start": 13,
-          "end": 32
+          "end": 31
         }
       ]
     },
@@ -19232,7 +19990,7 @@
       "id": "validate.factions",
       "path": "server/src/data/validate/factions.ts",
       "group": "server/data/validate",
-      "lines": 64,
+      "lines": 63,
       "owns": "factions.json: ranks, rules, station defence and ship plans resolve",
       "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
       "events": "",
@@ -19251,7 +20009,7 @@
           "name": "validateFactions",
           "kind": "function",
           "start": 13,
-          "end": 64
+          "end": 63
         }
       ]
     },
@@ -19279,6 +20037,33 @@
           "kind": "function",
           "start": 12,
           "end": 20
+        }
+      ]
+    },
+    {
+      "id": "validate.loot",
+      "path": "server/src/data/validate/loot.ts",
+      "group": "server/data/validate",
+      "lines": 53,
+      "owns": "loot.json's tables (items exist, weights above 0, sane amounts) and every drops / eliteDrop in factions.json and bosses.json naming one",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling table or a bad weight is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new place that rolls tables is one more spec() call below",
+      "exports": [
+        "validateLoot"
+      ],
+      "sections": [
+        {
+          "name": "validateLoot",
+          "kind": "function",
+          "start": 12,
+          "end": 53
         }
       ]
     },
@@ -19592,7 +20377,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 735,
+      "lines": 745,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, backups, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -19625,62 +20410,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 45,
-          "end": 54
+          "start": 46,
+          "end": 55
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 56,
-          "end": 85
+          "start": 57,
+          "end": 86
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 87,
-          "end": 98
+          "start": 88,
+          "end": 99
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 100,
-          "end": 100
+          "start": 101,
+          "end": 101
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 102,
-          "end": 117
+          "start": 103,
+          "end": 118
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 119,
-          "end": 120
+          "start": 120,
+          "end": 121
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 122,
-          "end": 145
+          "start": 123,
+          "end": 146
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 147,
-          "end": 148
+          "start": 148,
+          "end": 149
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 150,
-          "end": 160
+          "start": 151,
+          "end": 161
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 162,
-          "end": 735
+          "start": 163,
+          "end": 745
         }
       ]
     },
@@ -19778,14 +20563,18 @@
       "id": "server.enemies.loot",
       "path": "server/src/game/enemies/loot.ts",
       "group": "server/game/enemies",
-      "lines": 78,
-      "owns": "a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts",
+      "lines": 75,
+      "owns": "a hostile's death: pay the killer, party and helpers, roll its drop tables (data/loot.json) and salvage parts",
       "needs": "Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
           "text": "a kill pays the killer XP and credits and drops a loot pod",
           "test": "server/src/game/enemies.test.ts"
+        },
+        {
+          "text": "a design's drops, then a design's in its system, override its faction's; an elite rolls its eliteDrop once more",
+          "test": "server/src/game/enemies/drops.test.ts"
         }
       ],
       "extend": "a new payout rule is a step in onDestroyed",
@@ -19796,8 +20585,8 @@
         {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 15,
-          "end": 78
+          "start": 16,
+          "end": 75
         }
       ]
     },
@@ -20355,7 +21144,7 @@
       "id": "server.gun-range.gate",
       "path": "server/src/game/gunRange/messageGate.ts",
       "group": "server/game/gunRange",
-      "lines": 54,
+      "lines": 55,
       "owns": "which client messages a pilot in the gun range may send: flying, shooting, talking and leaving pass; every build, hangar, trade, item, market, quest, travel and dev message is refused before its handler runs",
       "needs": "@space-game/common ClientMessage (type only)",
       "events": "",
@@ -20381,13 +21170,13 @@
           "name": "RANGE_GATE",
           "kind": "const",
           "start": 15,
-          "end": 49
+          "end": 50
         },
         {
           "name": "passesInRange",
           "kind": "function",
-          "start": 51,
-          "end": 54
+          "start": 52,
+          "end": 55
         }
       ]
     },
@@ -20688,7 +21477,7 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 199,
+      "lines": 203,
       "owns": "what dying costs a pilot: the ship lost to a plan, the wreck and its salvage, the backup they come back in, and the notices on return",
       "needs": "Pilots (sessions, host, ships, death rules), pilots/backups.ts; npm: @space-game/common",
       "events": "",
@@ -20699,6 +21488,10 @@
         },
         {
           "text": "a wreck holds all of the hold, is its pilot's alone for wreckOwnerMinutes, open to all for wreckOpenMinutes, then gone",
+          "test": "server/src/game/pilots/death.test.ts"
+        },
+        {
+          "text": "its salvage is refined materials from the bills of salvageShare of the parts, never a part",
           "test": "server/src/game/pilots/death.test.ts"
         },
         {
@@ -20721,50 +21514,50 @@
         {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 18,
-          "end": 76
+          "start": 19,
+          "end": 77
         },
         {
           "name": "salvage",
           "kind": "function",
-          "start": 78,
-          "end": 95
+          "start": 79,
+          "end": 97
         },
         {
           "name": "loseShip",
           "kind": "function",
-          "start": 97,
-          "end": 123
+          "start": 99,
+          "end": 127
         },
         {
           "name": "leaveWreck",
           "kind": "function",
-          "start": 125,
-          "end": 147
+          "start": 129,
+          "end": 151
         },
         {
           "name": "loanerLost",
           "kind": "function",
-          "start": 149,
-          "end": 159
+          "start": 153,
+          "end": 163
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 161,
-          "end": 170
+          "start": 165,
+          "end": 174
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 172,
-          "end": 185
+          "start": 176,
+          "end": 189
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 187,
-          "end": 199
+          "start": 191,
+          "end": 203
         }
       ]
     },
@@ -21104,6 +21897,103 @@
           "kind": "function",
           "start": 216,
           "end": 226
+        }
+      ]
+    },
+    {
+      "id": "server.pilots.pickup",
+      "path": "server/src/game/pilots/pickup.ts",
+      "group": "server/game/pilots",
+      "lines": 132,
+      "owns": "what a pilot's ship picks up by itself (ore in mining mode but the blacklisted, the hold's ghosts), the ghost and template requests, mining mode and the ore blacklist",
+      "needs": "Pilots (sessions, econ, toast, sendItems, sendProfile), pilots/cargo (capacity); npm: @space-game/common (econ/holdGhosts.ts, the rules)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a pod's non-ore loot is not picked up without a ghost of it; a ghost's item is, ore never into another ghost's reserved space",
+          "test": "server/src/game/pickup.test.ts"
+        },
+        {
+          "text": "ghosts are the flown ship's: another ship has its own, a death clears them, a template loads them in one go",
+          "test": "server/src/game/pickup.test.ts"
+        },
+        {
+          "text": "mining mode and the blacklist are the pilot's; \"Blacklist & jettison\" lists the ore and throws out what the hold has of it",
+          "test": "server/src/game/pickup.test.ts"
+        }
+      ],
+      "extend": "a new pickup setting is a field on PickupPrefs (common) and a branch in handlePrefs",
+      "exports": [
+        "autoTake",
+        "ghostsOf",
+        "handleBlacklist",
+        "handleGhost",
+        "handlePrefs",
+        "handleTemplate",
+        "holdView",
+        "pickupView",
+        "settle"
+      ],
+      "sections": [
+        {
+          "name": "ghostsOf",
+          "kind": "function",
+          "start": 15,
+          "end": 18
+        },
+        {
+          "name": "holdView",
+          "kind": "function",
+          "start": 20,
+          "end": 23
+        },
+        {
+          "name": "autoTake",
+          "kind": "function",
+          "start": 25,
+          "end": 30
+        },
+        {
+          "name": "settle",
+          "kind": "function",
+          "start": 32,
+          "end": 40
+        },
+        {
+          "name": "setGhosts",
+          "kind": "const",
+          "start": 42,
+          "end": 42
+        },
+        {
+          "name": "handleGhost",
+          "kind": "function",
+          "start": 44,
+          "end": 61
+        },
+        {
+          "name": "handleTemplate",
+          "kind": "function",
+          "start": 63,
+          "end": 94
+        },
+        {
+          "name": "handlePrefs",
+          "kind": "function",
+          "start": 96,
+          "end": 106
+        },
+        {
+          "name": "handleBlacklist",
+          "kind": "function",
+          "start": 108,
+          "end": 127
+        },
+        {
+          "name": "pickupView",
+          "kind": "function",
+          "start": 129,
+          "end": 132
         }
       ]
     },
@@ -23028,7 +23918,7 @@
       "id": "server.gameserver.hosts.places",
       "path": "server/src/gameServer/hosts/places.ts",
       "group": "server/gameServer/hosts",
-      "lines": 370,
+      "lines": 383,
       "owns": "host adapters for surfaces, sieges, pods and system memory, plus lod observers and body names",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -23066,37 +23956,37 @@
           "name": "createPodHost",
           "kind": "function",
           "start": 178,
-          "end": 211
+          "end": 224
         },
         {
           "name": "lodObservers",
           "kind": "function",
-          "start": 213,
-          "end": 244
+          "start": 226,
+          "end": 257
         },
         {
           "name": "whereIs",
           "kind": "function",
-          "start": 246,
-          "end": 253
+          "start": 259,
+          "end": 266
         },
         {
           "name": "createMemoryHost",
           "kind": "function",
-          "start": 255,
-          "end": 340
+          "start": 268,
+          "end": 353
         },
         {
           "name": "deathCause",
           "kind": "function",
-          "start": 342,
-          "end": 356
+          "start": 355,
+          "end": 369
         },
         {
           "name": "namedBody",
           "kind": "function",
-          "start": 358,
-          "end": 370
+          "start": 371,
+          "end": 383
         }
       ]
     },
@@ -23186,7 +24076,7 @@
       "id": "server.gameserver.hosts.world",
       "path": "server/src/gameServer/hosts/world.ts",
       "group": "server/gameServer/hosts",
-      "lines": 260,
+      "lines": 261,
       "owns": "host adapters for operations, events, mobs and enemies",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -23208,25 +24098,25 @@
           "name": "createOpsHost",
           "kind": "function",
           "start": 24,
-          "end": 110
+          "end": 111
         },
         {
           "name": "createEventHost",
           "kind": "function",
-          "start": 112,
-          "end": 168
+          "start": 113,
+          "end": 169
         },
         {
           "name": "createMobHost",
           "kind": "function",
-          "start": 170,
-          "end": 194
+          "start": 171,
+          "end": 195
         },
         {
           "name": "createEnemyHost",
           "kind": "function",
-          "start": 196,
-          "end": 260
+          "start": 197,
+          "end": 261
         }
       ]
     },
@@ -23940,7 +24830,7 @@
       "id": "server.net.handlers.modules",
       "path": "server/src/net/handlers/modules.ts",
       "group": "server/net/handlers",
-      "lines": 188,
+      "lines": 204,
       "owns": "client messages that only forward to one game module: party, trade, market, items, gems, quests, stations, sieges, contributor notes, admin",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common",
       "events": "",
@@ -23965,7 +24855,7 @@
           "name": "registerModuleHandlers",
           "kind": "function",
           "start": 23,
-          "end": 188
+          "end": 204
         }
       ]
     },
@@ -27258,7 +28148,7 @@
       },
       {
         "path": "server/src/game/gunRange/messageGate.ts",
-        "line": 49,
+        "line": 50,
         "text": "} as const satisfies Record<ClientMessage['type'], Verdict>;"
       }
     ]

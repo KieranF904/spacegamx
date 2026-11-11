@@ -8,7 +8,8 @@
  * extend:     a new way of getting an item is one function in SOURCES below; a hand-written line is one entry in data/guideHints.json
  */
 
-import { FIELD } from '@space-game/common';
+import { FIELD, type DropSpec, type LootTable } from '@space-game/common';
+import { bossDropRows, factionDropRows } from './drops';
 import { buildSourceIndex, isPublicSystem, rockSystemMap, type ItemColumns, type SourceIndex } from './sourceIndex';
 import { TIER_LABEL, tierOf } from './tiers';
 
@@ -82,10 +83,12 @@ export interface GameData {
     private?: boolean; tutorial?: boolean; gunRange?: unknown; surface?: unknown; instance?: unknown;
   }[];
   stations: { id: string; name: string; system: string; market?: { sells?: string[] } }[];
-  bosses: Record<string, { name: string; system: string; faction?: string; design?: string; loot?: DropRow[] }>;
-  factions: Record<string, { name: string; color?: string; ships?: Record<string, unknown>; loot?: DropRow[] }>;
-  /** data/factions.json `spawns`: each system's grade (1..5), which sets the level it opens at (levels.ts) */
-  spawns?: Record<string, { grade?: number }>;
+  bosses: Record<string, { name: string; system: string; faction?: string; design?: string; drops?: DropSpec['drops'] }>;
+  factions: Record<string, { name: string; color?: string; ships?: Record<string, DropSpec>; drops?: DropSpec['drops']; eliteDrop?: string }>;
+  /** data/factions.json `spawns`: each system's grade (1..5), which sets the level it opens at (levels.ts), and designs that drop their own way there */
+  spawns?: Record<string, { grade?: number; loot?: Record<string, DropSpec> }>;
+  /** data/loot.json: the drop tables (drops.ts works out the chances) */
+  loot?: { tables: Record<string, LootTable> };
   quests: {
     /** Systems that need a licence or clearance to enter (name and hint), by system id */
     restricted?: Record<string, { name: string; hint?: string }>;
@@ -221,8 +224,8 @@ const drop: SourceFn = (c, it) => {
   const add = (who: string, loot: DropRow[] | undefined, where?: string) => {
     for (const l of loot ?? []) if (l.item === it.id) rows.push({ chance: l.chance, line: `${who}${where ? ` (${where})` : ''}: ${TIER_LABEL[tierOf('drop', l.chance)]} chance, ${l.min === l.max ? l.min : `${l.min}-${l.max}`}` });
   };
-  for (const b of Object.values(c.d.bosses)) add(b.name, b.loot, c.system(b.system));
-  for (const f of Object.values(c.d.factions)) add(`${f.name} (any ship)`, f.loot);
+  for (const [id, b] of Object.entries(c.d.bosses)) add(b.name, bossDropRows(c.d, id), c.system(b.system));
+  for (const [id, f] of Object.entries(c.d.factions)) add(`${f.name} (any ship)`, factionDropRows(c.d, id));
   if (!rows.length) return [];
   rows.sort((a, b) => b.chance - a.chance);
   return [{ kind: 'drop', text: 'Dropped when you help kill these (chance, amount)', where: rows.map((r) => r.line) }];

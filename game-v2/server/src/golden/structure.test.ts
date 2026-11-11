@@ -86,8 +86,9 @@ describe('structure pins', () => {
     resetGlobals();
     const server = makeServer({ clock: () => 1_000_000 });
     const types = server.handledMessageTypes().sort();
-    // (103: trainingDrone went with protocol 68, nothing sent it; convertGuest came with the guest accounts)
-    expect(types.length).toBe(103);
+    // (103: trainingDrone went with protocol 68, nothing sent it; convertGuest came with the guest accounts. 108: the pickup
+    // panel's lootTake, the hold's ghost and ghostTemplate, mining mode's pickupPrefs and oreBlacklist: docs/design/loot-pickup-2026-11.md)
+    expect(types.length).toBe(108);
     pin('clientMessages.json', types);
   }, 120_000);
 

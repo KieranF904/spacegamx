@@ -2,7 +2,10 @@
  * The hold at a glance, always on, just above the chat: each stack's icon,
  * count and name, and how full the hold is (all of it goes in the wreck if the
  * ship is lost: docs/design/death-rework-2026-11.md). New arrivals flash; hovering shows the item and its value;
- * right-click jettisons. Your ammunition loadout's crates are tagged LOAD and
+ * right-click jettisons, whitelists it for auto-pickup, or (an ore) blacklists
+ * and jettisons it. The head has mining mode's switch and an "Auto-pickup: N"
+ * chip that opens the auto-pickup panel (ui/pickup); the fill bar shows the
+ * space the whitelist keeps as a faint segment. Your ammunition loadout's crates are tagged LOAD and
  * utility (consumables, the quick bar) UTIL: the storage controls leave both
  * aboard. A fixed height that scrolls (drag the top edge to resize; it keeps
  * clear of the side panel and the pilot readout above: `ceiling`), or folds
@@ -12,7 +15,7 @@
  * opens the full window.
  */
 
-import { RARITY_COLOR, cargoEffect, type ClientMessage } from '@space-game/common';
+import { RARITY_COLOR, cargoEffect, isOre, reservedSpace, type ClientMessage } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { injectWindowStyles, itemTipHtml, showTip, hideTip, openMenu, closeMenu, sortStacks } from './windowKit';
 import { itemIcon } from './itemIcons';
@@ -41,7 +44,11 @@ function injectStyles(): void {
 .sgc-head b { font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2px; color: #7dd3fc; }
 .sgc-head .f { margin-left: auto; color: #8394ad; }
 .sgc-head .tg { color: #56657c; font-size: 10px; width: 10px; }
-.sgc .sgw-bar { margin: 4px 0 0; height: 4px; }
+.sgc-head .chip { all: unset; cursor: pointer; font-size: 10px; padding: 0 7px; border-radius: 999px; border: 1px solid rgba(140, 170, 220, 0.25); color: #8394ad; line-height: 15px; }
+.sgc-head .chip:hover, .sgc-head .chip:focus-visible { color: #fff; border-color: rgba(125, 211, 252, 0.6); }
+.sgc-head .chip.on { color: #86efac; border-color: rgba(134, 239, 172, 0.5); background: rgba(134, 239, 172, 0.08); }
+.sgc .sgw-bar { margin: 4px 0 0; height: 4px; position: relative; }
+.sgc .sgw-bar .rs { position: absolute; top: 0; bottom: 0; background: rgba(125, 211, 252, 0.3); border-radius: 2px; pointer-events: none; }
 .sgc-grip { position: absolute; left: 10px; right: 10px; top: -4px; height: 8px; cursor: ns-resize; }
 .sgc-grip::after { content: ''; position: absolute; left: 50%; top: 3px; width: 34px; margin-left: -17px; height: 2px; border-radius: 1px; background: rgba(125, 160, 210, 0); transition: background .15s; }
 .sgc:hover .sgc-grip::after, .sgc-grip.drag::after { background: rgba(125, 160, 210, 0.45); }
@@ -98,6 +105,11 @@ export class CargoPanelUI {
   ship?: () => { mass: number; fullMass?: number } | null;
   private load: HTMLDivElement;
   private loadKey = '';
+  private miningChip: HTMLButtonElement;
+  private autoChip: HTMLButtonElement;
+  private reserve: HTMLElement;
+  /** The "Auto-pickup: N" chip was clicked (the auto-pickup panel: ui/pickup/AutoPickupPanel.ts) */
+  onAutoPickup?: () => void;
 
   constructor(private pilot: PilotState, private send: (m: ClientMessage) => void, private sound: (id: string) => void) {
     injectWindowStyles();
@@ -110,14 +122,21 @@ export class CargoPanelUI {
     this.root = document.createElement('div');
     this.root.className = 'sgc';
     this.root.dataset.hudAvoid = '1';
-    this.root.innerHTML = `<div class="sgc-grip" title="Drag to resize"></div><div class="sgc-head" title="Click to fold · I: full inventory"><span class="tg"></span><b>CARGO</b><span class="f"></span></div>
-      <div class="sgw-bar"><i></i></div><div class="sgc-load" hidden></div><div class="sgc-grid"></div>`;
+    this.root.innerHTML = `<div class="sgc-grip" title="Drag to resize"></div><div class="sgc-head" title="Click to fold · I: full inventory"><span class="tg"></span><b>CARGO</b>`
+      + `<button type="button" class="chip mine" title="Mining mode: every ore but the blacklisted comes in by itself (click to switch)">Mining</button>`
+      + `<button type="button" class="chip auto" title="What this hold picks up by itself: the whitelist, the ore blacklist and templates">Auto-pickup</button><span class="f"></span></div>
+      <div class="sgw-bar"><i></i><b class="rs"></b></div><div class="sgc-load" hidden></div><div class="sgc-grid"></div>`;
     const head = this.root.querySelector('.sgc-head') as HTMLElement;
     this.toggle = head.querySelector('.tg') as HTMLSpanElement;
     this.fill = head.querySelector('.f') as HTMLSpanElement;
     this.bar = this.root.querySelector('.sgw-bar') as HTMLElement;
     this.grid = this.root.querySelector('.sgc-grid') as HTMLDivElement;
     this.load = this.root.querySelector('.sgc-load') as HTMLDivElement;
+    this.miningChip = head.querySelector('.mine') as HTMLButtonElement;
+    this.autoChip = head.querySelector('.auto') as HTMLButtonElement;
+    this.reserve = this.root.querySelector('.rs') as HTMLElement;
+    this.miningChip.onclick = (e) => { e.stopPropagation(); this.send({ type: 'pickupPrefs', mining: !this.pilot.mining().on }); this.sound('ui_click'); };
+    this.autoChip.onclick = (e) => { e.stopPropagation(); this.onAutoPickup?.(); };
     this.load.addEventListener('mousemove', (e) => showTip(LOAD_TIP, e.clientX, e.clientY));
     this.load.addEventListener('mouseleave', hideTip);
     head.onclick = () => this.setCollapsed(!this.collapsed);
@@ -131,6 +150,11 @@ export class CargoPanelUI {
     const chat = document.getElementById('chatBox');
     if (chat && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => this.place()).observe(chat);
     window.addEventListener('resize', () => this.place());
+  }
+
+  /** Where it is on screen (the auto-pickup panel sits beside it), or null while hidden */
+  rect(): DOMRect | null {
+    return this.hidden ? null : this.root.getBoundingClientRect();
   }
 
   /** Place it again now (the side panel's room changed) */
@@ -240,6 +264,15 @@ export class CargoPanelUI {
     this.fill.textContent = `${Math.round(used)} / ${p.cargoCapacity}`;
     (this.bar.firstElementChild as HTMLElement).style.width = `${frac * 100}%`;
     this.bar.classList.toggle('full', frac >= 0.999);
+    // Mining mode and the whitelist in the head; the space the whitelist keeps, faint, after what's used
+    const mode = p.mining();
+    this.miningChip.classList.toggle('on', mode.on);
+    this.miningChip.textContent = mode.on ? 'Mining on' : 'Mining off';
+    this.autoChip.textContent = `Auto-pickup: ${p.ghosts.length + (mode.blacklist?.length ?? 0)}`;
+    this.autoChip.classList.toggle('on', p.ghosts.length > 0);
+    const kept = p.cargoCapacity > 0 ? Math.min(1 - frac, reservedSpace(p.holdView(), p.ghosts) / p.cargoCapacity) : 0;
+    this.reserve.style.left = `${frac * 100}%`;
+    this.reserve.style.width = `${Math.max(0, kept) * 100}%`;
 
     // What's arrived since last time (not on the first look at the hold)
     const fresh = new Set<string>();
@@ -247,7 +280,7 @@ export class CargoPanelUI {
     if (this.seen) for (const [id, n] of counts) if (n > (this.seen.get(id) ?? 0)) fresh.add(id);
     this.seen = counts;
     const lo = p.profile?.loadout ?? {};
-    const key = `${this.exposed}|${p.cargo.map((s) => `${s.id}:${s.n}`).join(',')}|${Object.keys(lo).join(',')}|${(p.profile?.quickbar ?? []).join(',')}`;
+    const key = `${this.exposed}|${p.cargo.map((s) => `${s.id}:${s.n}`).join(',')}|${Object.keys(lo).join(',')}|${(p.profile?.quickbar ?? []).join(',')}|${p.ghosts.map((g) => g.item).join(',')}`;
     if (key === this.key && !fresh.size) return;
     this.key = key;
 
@@ -270,8 +303,8 @@ export class CargoPanelUI {
       nm.textContent = d?.name ?? s.id;
       if (d) nm.style.color = RARITY_COLOR[d.rarity];
       const extra = (tag ? `<div class="t-h" style="color:${tag.cls === 'load' ? '#5eead4' : '#c4b5fd'}">${tag.tip}</div>` : '')
-        + '<div class="t-h" style="color:#fca5a5">Dropped in your wreck if your ship is destroyed</div>';
-      it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click to jettison' }), e.clientX, e.clientY));
+        + '<div class="t-h" style="color:#fca5a5">Goes in your wreck if your ship is lost</div>';
+      it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click: jettison, or auto-pickup' }), e.clientX, e.clientY));
       it.addEventListener('mouseleave', hideTip);
       it.addEventListener('contextmenu', (e) => { e.preventDefault(); hideTip(); this.jettisonMenu(s.id, e); });
       this.grid.appendChild(it);
@@ -280,12 +313,20 @@ export class CargoPanelUI {
     if (this.grid.style.height === 'auto') this.place();
   }
 
-  /** The same choices as the inventory window's */
+  /** The inventory window's jettison choices, then auto-pickup's: whitelist it, and for an ore blacklist and jettison it */
   private jettisonMenu(id: string, e: MouseEvent): void {
-    const have = this.pilot.cargo.find((s) => s.id === id)?.n ?? 0;
+    const p = this.pilot;
+    const have = p.cargo.find((s) => s.id === id)?.n ?? 0;
     if (!have) return;
     const items = [{ label: have > 1 ? `Jettison all (${have})` : 'Jettison', bad: true, run: () => { this.send({ type: 'itemJettison', id, n: have }); this.sound('ui_click'); } }];
     if (have > 1) items.push({ label: 'Jettison one', bad: true, run: () => { this.send({ type: 'itemJettison', id, n: 1 }); this.sound('ui_click'); } });
+    const white = p.ghosts.some((g) => g.item === id);
+    items.push(white
+      ? { label: 'Stop picking this up by itself', bad: false, run: () => { this.send({ type: 'ghost', item: id, remove: true }); this.sound('ui_click'); } }
+      : { label: 'Auto-pickup this', bad: false, run: () => { this.send({ type: 'ghost', item: id }); this.sound('ui_click'); } });
+    if (isOre(p.holdView(), id) && !p.mining().blacklist?.includes(id)) {
+      items.push({ label: 'Blacklist & jettison', bad: true, run: () => { this.send({ type: 'oreBlacklist', item: id, on: true, jettison: true }); this.sound('ui_click'); } });
+    }
     openMenu(e.clientX, e.clientY, items);
   }
 }
