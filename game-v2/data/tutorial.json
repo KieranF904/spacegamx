@@ -6,8 +6,8 @@
     "center": { "x": 4300, "y": -3000 },
     "spawnRadius": 1100,
     "leash": 25000,
-    "stopSpeed": 0.4,
-    "stopTicks": 45
+    "stopSpeed": 1.5,
+    "stopTicks": 30
   },
   "steps": [
     {
