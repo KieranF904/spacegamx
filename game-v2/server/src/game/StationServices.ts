@@ -11,9 +11,11 @@
  * wherever the pilot is. The fabricator needs its refined materials on hand:
  * refine them first (the hangar's build orders do both for you: Hangar.ts).
  *
- * Each queue runs as many jobs side by side as the pilot has slots for (the
- * fabricator's: unlocks, skills and the station's fabSlots perk; the
- * refinery's: unlocks); a job past that waits for the first lane to free up.
+ * Each queue runs as many jobs side by side as the pilot has lanes (one, plus
+ * one per engineering milestone: jobLanes, 4 at most); the queue itself holds
+ * as many as the slots allow (fabricator: unlocks, engineering and the
+ * station's fabSlots perk; refinery: unlocks), and a job past the lanes waits
+ * for the first lane to free up.
  *
  * Any job can be held (the rest of its queue moves up; it keeps the progress
  * of the run it was on), resumed (back into its place), moved to the front of
@@ -22,7 +24,7 @@
 
 import {
   Economy, StationData, Bag, CraftRecipe, ServerMessage, CraftJob,
-  canCraft, sellPrice, buyPrice, queueSlots, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
+  canCraft, sellPrice, buyPrice, queueSlots, jobLanes, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
   stationPerks, stationLearned, type PlayerProfile, armouryRound, stationTable, type Outpost,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
@@ -310,9 +312,9 @@ export class StationServices {
     this.pilots.markDirty(conn);
   }
 
-  /** How many jobs a queue runs at once: the fabricator's slots, or the refinery's */
-  private slots(p: PlayerProfile, refinery: boolean): number {
-    return Math.max(1, refinery ? unlocks(p).refinerySlots : queueSlots(p));
+  /** How many jobs a queue runs at once (the same for the refinery and the fabricator: engineering's lanes, not the queue's slots) */
+  private slots(p: PlayerProfile, _refinery: boolean): number {
+    return jobLanes(p);
   }
 
   /** When each lane of a queue comes free, jobs given the first free lane in their order (held ones aside) */

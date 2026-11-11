@@ -7,7 +7,7 @@
  */
 
 import {
-  unlocks,
+  unlocks, jobLanes,
 } from '@space-game/common';
 import { costHtml } from '../windowKit';
 import { itemIcon } from '../itemIcons';
@@ -61,7 +61,8 @@ export class RefineryTab {
     }
     const side = document.createElement('div');
     side.className = 'sgw-col';
-    side.innerHTML = `<h4>Refining <span class="r">${this.st!.jobs.filter((j) => j.recipe.startsWith('refine:')).length} / ${unlocks({ level, skills: this.d.pilot.profile?.skills }).refinerySlots}</span></h4>`;
+    const lanes = jobLanes({ skills: this.d.pilot.profile?.skills });
+    side.innerHTML = `<h4>Refining <span class="r" title="Jobs lined up / queue slots; the refinery runs ${lanes} at once">${this.st!.jobs.filter((j) => j.recipe.startsWith('refine:')).length} / ${unlocks({ level, skills: this.d.pilot.profile?.skills }).refinerySlots} · runs ${lanes} at once</span></h4>`;
     side.style.overflowY = 'auto';
     const jobs = document.createElement('div');
     jobs.dataset.jobs = 'refine';

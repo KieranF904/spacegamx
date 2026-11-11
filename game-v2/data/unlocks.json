@@ -10,7 +10,7 @@
   },
   "fabSlots": {
     "base": 4,
-    "label": "Fabricator slot",
+    "label": "Fabricator queue slot",
     "levels": {
       "18": 1,
       "38": 1

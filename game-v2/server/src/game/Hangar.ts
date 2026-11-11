@@ -613,7 +613,7 @@ export class Hangar {
         const got = this.supply(conn, want, tag);
         if (got.refining || got.fabricating) { changed = true; refining = true; }
         waits.push(...got.short);
-        if (!waits.length && k === 0 && !refining) waits.push(fab ? 'a free fabricator slot' : 'a fabricator');
+        if (!waits.length && k === 0 && !refining) waits.push(fab ? 'a free fabricator queue slot' : 'a fabricator');
       }
       const key = `${conn.playerId}:${o.id}`;
       if (o.made >= o.n) {

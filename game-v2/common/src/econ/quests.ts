@@ -554,7 +554,7 @@ export function repRank(v: number): { rank: number; name: string; next?: number;
  */
 export const SKILLS: Record<string, { name: string; max: number; first: number; per: string; sign?: -1 }> = {
   mining: { name: 'Mining', max: 20, first: 0.08, per: 'more ore from every rock' },
-  engineering: { name: 'Engineering', max: 20, first: 0.065, per: 'cheaper rebuilds (and a fabricator slot at 2, 5 and 9 points)', sign: -1 },
+  engineering: { name: 'Engineering', max: 20, first: 0.065, per: 'cheaper rebuilds (and at 2, 5 and 9 points: the refinery and fabricator each run one more job at once, and the fabricator queue gains a slot)', sign: -1 },
   navigation: { name: 'Navigation', max: 20, first: 0.065, per: 'more cargo space' },
 };
 
@@ -608,7 +608,7 @@ export function refundRetiredSkills(p: { skills: Record<string, number>; skillPo
   return back > 0 || p.skillPoints !== was;
 }
 
-/** Extra fabricator slots from engineering: one at 2, 5 and 9 points */
+/** Extra fabricator queue slots (and, in jobLanes, extra jobs run at once, for both refinery and fabricator) from engineering: one at 2, 5 and 9 points */
 export function engineeringSlots(points: number): number {
   return [2, 5, 9].filter((k) => points >= k).length;
 }

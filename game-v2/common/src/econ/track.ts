@@ -1,7 +1,7 @@
 /**
  * The unlock track: what each pilot level opens. Models at their unlock level
  * (data/ships/models.json `unlock`), structure materials at MATERIAL_LEVEL,
- * and room (build points, hangar bays, fabricator slots: data/unlocks.json).
+ * and room (build points, hangar bays, fabricator queue slots: data/unlocks.json).
  * The level-up message and the field guide both read it, so they agree.
  */
 

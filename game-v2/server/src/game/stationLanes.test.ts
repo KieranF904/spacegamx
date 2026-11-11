@@ -3,7 +3,7 @@
  * the station's fabSlots perk; the refinery's from unlocks), the rest wait for the first lane to free up.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { setStationTable, queueSlots, unlocks, type PlayerProfile, type StationFile } from '@space-game/common';
+import { setStationTable, queueSlots, unlocks, jobLanes, type PlayerProfile, type StationFile } from '@space-game/common';
 import { StationServices } from './StationServices.js';
 
 const T = 10_000;
@@ -67,7 +67,30 @@ describe('station job lanes', () => {
     expect(r.p.jobs.map((j) => j.startedAt)).toEqual([r.now(), r.now(), r.now()]);
   });
 
-  it('the slot counts are the real ones: fabricator with the station perk, refinery from unlocks', () => {
+  it('by default one lane: the queue is longer than the lanes, so jobs wait in series', () => {
+    const r = rig();
+    expect(jobLanes(r.p)).toBe(1);
+    r.fab(); r.fab();
+    expect(r.p.jobs[1].startedAt).toBe(r.p.jobs[0].readyAt);
+    r.ref(); r.ref();
+    const refs = r.p.jobs.filter((j) => j.recipe.startsWith('refine:'));
+    expect(refs[1].startedAt).toBe(refs[0].readyAt);
+  });
+
+  it('lanes rise with engineering ranks (2, 5, 9 points) to 4, for the refinery and the fabricator', () => {
+    expect([0, 1, 2, 4, 5, 8, 9, 20].map((e) => jobLanes({ skills: { engineering: e } }))).toEqual([1, 1, 2, 2, 3, 3, 4, 4]);
+    const r = rig();
+    r.p.skills = { engineering: 5 };
+    for (let i = 0; i < 4; i++) { r.fab(); r.ref(); }
+    const of = (refine: boolean) => r.p.jobs.filter((j) => j.recipe.startsWith('refine:') === refine);
+    for (const refine of [false, true]) {
+      const js = of(refine);
+      expect(js.slice(0, 3).every((j) => j.startedAt === r.now())).toBe(true);
+      expect(js[3].startedAt).toBe(r.now() + T);
+    }
+  });
+
+  it('the queue is the unlock slots (with the station perk), not the lanes', () => {
     setStationTable(perkTable(3));
     const r = rig({ outpost: station });
     const fabN = queueSlots(r.p), refN = unlocks(r.p).refinerySlots;
@@ -75,14 +98,11 @@ describe('station job lanes', () => {
     expect(fabN).toBe(queueSlots(rig({ outpost: station }).p) + 3);
     setStationTable(perkTable(3));
     for (let i = 0; i < fabN; i++) r.fab();
-    for (let i = 0; i < refN; i++) r.ref();
-    // Every job fills its own lane: all start now
-    expect(r.p.jobs.length).toBe(fabN + refN);
-    expect(r.p.jobs.every((j) => j.startedAt === r.now())).toBe(true);
-    // The queue is full for the fabricator (makeFor refuses); one more refinery job waits for a lane
+    expect(r.p.jobs.length).toBe(fabN);
     expect(r.fab()).toBe(0);
-    r.ref();
-    expect(r.p.jobs.filter((j) => j.recipe.startsWith('refine:')).pop()!.startedAt).toBe(r.now() + T);
+    // Past the lane (one) they wait their turn
+    expect(r.p.jobs.filter((j) => j.startedAt === r.now()).length).toBe(1);
+    expect(refN).toBeGreaterThan(1);
   });
 
   it('the speed of a job still scales its runs', () => {

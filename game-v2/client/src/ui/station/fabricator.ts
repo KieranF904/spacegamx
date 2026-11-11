@@ -7,7 +7,7 @@
  */
 
 import {
-  Bag, CraftRecipe, canCraft, partItemId, PIECE_NAMES, RARITY_COLOR, FN_NAMES, partStats, gradeOf, markName, unlocks, CATEGORY_LABEL, stationLearned, type ItemDef, type FunctionDef,
+  Bag, CraftRecipe, canCraft, partItemId, PIECE_NAMES, RARITY_COLOR, FN_NAMES, partStats, gradeOf, markName, unlocks, jobLanes, CATEGORY_LABEL, stationLearned, type ItemDef, type FunctionDef,
 } from '@space-game/common';
 import { FAMILY_LABEL, familyLabel, familyRank, keyStats, modelLock, sizeText, tradeOff } from '../../ships/modelCards';
 import { costHtml, itemTipHtml, showTip, hideTip } from '../windowKit';
@@ -426,7 +426,8 @@ export class FabricatorTab {
   private fabSide(): HTMLElement {
     const side = document.createElement('div');
     side.className = 'sgw-col';
-    side.innerHTML = `<h4>Build queue <span class="r">${this.st!.jobs.filter((j) => !j.recipe.startsWith('refine:')).length} / ${this.st!.queueSlots}</span></h4>`;
+    const lanes = jobLanes({ skills: this.d.pilot.profile?.skills });
+    side.innerHTML = `<h4>Build queue <span class="r" title="Jobs lined up / queue slots; the fabricator runs ${lanes} at once">${this.st!.jobs.filter((j) => !j.recipe.startsWith('refine:')).length} / ${this.st!.queueSlots} · runs ${lanes} at once</span></h4>`;
     side.style.overflowY = 'auto';
     const jobs = document.createElement('div');
     jobs.dataset.jobs = 'fab';

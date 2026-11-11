@@ -14,6 +14,7 @@ import type { ItemCatalog } from './items.js';
 import { parsePartItemId } from './items.js';
 import type { CraftRecipe } from './recipes.js';
 import { unlocks } from './unlocks.js';
+import { engineeringSlots } from './quests.js';
 import { registeredFunction } from '../ships/blueprint.js';
 import type { FunctionDef } from '../ships/types.js';
 import type { Outpost } from './outpost.js';
@@ -102,7 +103,12 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Fabricator queue slots (econ/unlocks.ts) */
+/** Jobs the refinery and the fabricator each run at once: one, and one more at 2, 5 and 9 engineering points (4 at most) */
+export function jobLanes(p: { skills?: Record<string, number> }): number {
+  return 1 + engineeringSlots(p.skills?.engineering ?? 0);
+}
+
+/** Fabricator queue slots: jobs lined up, beyond the lanes they wait (econ/unlocks.ts) */
 export function queueSlots(p: { level: number; skills?: Record<string, number>; outpost?: Outpost }): number {
   return unlocks(p).fabSlots;
 }
