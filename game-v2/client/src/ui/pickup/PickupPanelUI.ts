@@ -19,7 +19,7 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.sgp { position: fixed; right: 18px; top: 34%; width: 290px; z-index: 860; box-sizing: border-box; padding: 8px 10px 9px; display: none;
+.sgp { position: fixed; right: 18px; top: max(34%, 330px); width: 290px; z-index: 860; box-sizing: border-box; padding: 8px 10px 9px; display: none;
   background: rgba(8, 14, 26, 0.86); border: 1px solid rgba(134, 239, 172, 0.3); border-radius: 10px; color: #c9d4e5; font: 12px 'Segoe UI', system-ui, sans-serif; user-select: none; }
 .sgp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .sgp-head b { font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2px; color: #86efac; }
