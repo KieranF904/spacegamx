@@ -13,6 +13,7 @@ export * from './retiredWire.js';
 export * from './retiredDynamo.js';
 export * from './economy.js';
 export * from './mining.js';
+export * from './miningChunks.js';
 export * from './market.js';
 export * from './quests.js';
 export * from './dialogue.js';

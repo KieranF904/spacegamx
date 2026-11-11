@@ -400,6 +400,8 @@ export interface ServerAsteroidSpawnMessage {
   type: 'asteroidSpawn';
   tick: number;           // server tick when orbitAngle values are valid
   asteroids: AsteroidSpawnData[];
+  /** On entering a system with no belt seed: your part-worked mining chunks on these rocks (as asteroidSeed's) */
+  mine?: number[];
 }
 
 /** Deterministic asteroid seed message (client derives params locally) */
@@ -412,6 +414,12 @@ export interface ServerAsteroidSeedMessage {
   asteroidField?: string; // optional field ID for definition-based generation
   ids: number[];          // asteroid entity ids in this system, as ranges (ranges.ts: [start, count, ...])
   indices: number[];      // original deterministic indices for ids, as ranges, in the same order
+  /**
+   * Your part-worked mining chunks on the system's rocks, 4 numbers a rock (common econ/miningChunks.ts packChunk:
+   * rock, chunk, worked × 2 + kept, owed). Told once, on entering the system: your client steps its own hits from there
+   * to the same drops as the server, from each rock's public mining seed. Absent: none (every rock fresh for you)
+   */
+  mine?: number[];
 }
 
 export interface AsteroidSpawnData {

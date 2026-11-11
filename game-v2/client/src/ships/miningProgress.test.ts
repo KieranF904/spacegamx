@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
-import { unitsPerDrop, pulseProfile, pulseCut, pulseCutOver, MINING_PULSE, registerRockTypes, type MiningTable } from '@space-game/common';
+import {
+  unitsPerDrop, pulseProfile, pulseCut, pulseCutOver, MINING_PULSE, registerRockTypes, asteroidComposition, mineSeed, chunkWant, unitKept,
+  keepOdds, toolKeep, type MiningTable,
+} from '@space-game/common';
 
 // (No canvas here: the strike's particle textures are stand-ins)
 vi.mock('../rendering/fxTextures', () => ({ disc: () => 'disc', rock: (i: number) => `rock:${Math.abs(i) % 4}` }));
@@ -8,7 +11,7 @@ vi.mock('../rendering/fxTextures', () => ({ disc: () => 'disc', rock: (i: number
 import { readGameDataFiles } from '../../../server/src/data/loadGameDataFromDisk';
 import { Mining, type MiningHost, type MiningTool } from '../../../server/src/game/Mining';
 import { PayoutDice } from '../../../server/src/game/payoutDice';
-import { MiningProgress, SHOW_FOR, FADE } from './MiningProgress';
+import { MiningProgress, SHOW_FOR, FADE, type MineRock } from './MiningProgress';
 
 const table = readGameDataFiles(join(__dirname, '../../../data')).mining as unknown as MiningTable;
 registerRockTypes(table);
@@ -19,90 +22,83 @@ function rig() {
   return { p, at: (s: number) => { t = s; }, now: () => t };
 }
 
-const ME = 7, THEM = 8, ROCK = 1;
+const ME = 7, THEM = 8, ROCK = 1, TYPE = 'asteroid_metal';
+
+/** A rock as both sides know it: its composition key (system:index:spawnTick) and so its public seed and composition */
+function publicRock(key: string, tier: number, type = TYPE): MineRock {
+  return { seed: mineSeed(type, key), composition: asteroidComposition(table, type, key, 1e6, tier) };
+}
 
 /**
- * The server's mining (its own dice: a fixed secret) and your client's ring side by side, on one big rock of `tier`:
- * each tick `hit(tick)` says what lands (who, damage, tool), the server works it, your client works out your own the
- * way it does in play, and the server's mineChunk words reach it straight away (or `lag` ticks later). (The words go
- * rounded to a hundredth of a unit, hosts/mining.ts; here exact, so the fills can be held to a hair)
+ * The server's mining (its own dice: a fixed secret) and your client's ring side by side, on one big rock of `tier`.
+ * Every host call the server makes is counted (`calls`): the server has nothing to tell your client about its chunks
  */
-function pair(tier: number, type = 'asteroid_metal', lag = 0) {
+function pair(tier: number, type = TYPE, secret = 'mining-ring-test') {
   let tick = 0;
-  const drops = new Map<number, number>();
-  const told: { tick: number; miner: number; rock: number; due: number; at: number; drop: boolean }[] = [];
-  const host: MiningHost = {
-    spawnChunk: (_s, _x, _y, _vx, _vy, _items, miner) => { drops.set(miner ?? -1, (drops.get(miner ?? -1) ?? 0) + 1); },
-    chunk: (miner, rock, due, at, drop) => { told.push({ tick, miner, rock, due, at, drop }); },
+  const drops = new Map<number, number>(), calls = new Map<string, number>(), pods: Record<string, number>[] = [];
+  const base: MiningHost = {
+    spawnChunk: (_s, _x, _y, _vx, _vy, items, miner) => { drops.set(miner ?? -1, (drops.get(miner ?? -1) ?? 0) + 1); if (miner === ME) pods.push({ ...items }); },
     awardXp: () => {}, notify: () => {}, tick: () => tick, respawn: () => {}, crumble: () => {}, rockTier: () => tier,
   };
-  const server = new Mining(host, table, new PayoutDice('mining-ring-test'));
-  server.register(ROCK, 0, 0, type, 'ring:0', 1e6, tier);
-  const client = new MiningProgress(null, table, () => tick / 60);
-  return {
-    server, client, told, drops,
-    get tick() { return tick; },
-    step(): void { tick++; },
-    /** The server's words for your client that are due by now: delivered, as ShipMessages does */
-    deliver(): number {
-      let n = 0;
-      for (let i = 0; i < told.length; i++) {
-        const m = told[i];
-        if (m.miner !== ME || tick - m.tick < lag) continue;
-        client.chunk(m.rock, m.due, m.at, m.drop);
-        told.splice(i--, 1);
-        n++;
-      }
-      return n;
-    },
-    /** Your fill as the server has it (rock units into the chunk ÷ where its drop falls) */
-    serverFill(miner = ME): number {
-      const c = server.chunkOf(ROCK, miner)!;
-      return Math.min(1, c.at / c.due);
-    },
-  };
+  const host = new Proxy(base, { get: (o, k: string) => { if (typeof (o as never)[k] === 'function') calls.set(k, (calls.get(k) ?? 0) + 1); return (o as never)[k]; } });
+  const server = new Mining(host, table, new PayoutDice(secret));
+  const key = 'sol:3:1200';
+  server.register(ROCK, 0, 3, type, key, 1e6, tier);
+  const rock = publicRock(key, tier, type);
+  const client = new MiningProgress(null, table, () => tick / 60, (id) => (id === ROCK ? rock : undefined));
+  return { server, client, drops, calls, pods, rock, get tick() { return tick; }, step(): void { tick++; } };
 }
 
 const laser = (grade: number): MiningTool => ({ yield: table.tools.miner.yield, hardness: 2, grade });
 const gun: MiningTool = { yield: table.tools.fixed.yield, hardness: 1 };
 
+/** Your client's place in its chunks is the server's: the same chunk, units and keep, the fraction to a hair */
+function same(s: ReturnType<typeof pair>): void {
+  const a = s.client.chunkOf(ROCK), b = s.server.chunkOf(ROCK, ME);
+  if (!b) return;
+  expect(a).not.toBeNull();
+  expect([a!.chunk, a!.worked, a!.kept]).toEqual([b.chunk, b.worked, b.kept]);
+  expect(a!.owed).toBeCloseTo(b.owed, 9);
+}
+
 /**
- * Run `ticks` of one tool on the rock and check, hit by hit, that the ring is the server's: equal fills (to a hair:
- * floating point apart), and a drop exactly as the ring reaches full. Returns the drops seen
+ * Run `ticks` of one tool on the rock and check, hit by hit, that the ring is the server's: the same place in the same
+ * chunk, and a drop on exactly the hit the server throws one (the ring full on it, never before). Returns the drops
  */
 function run(s: ReturnType<typeof pair>, ticks: number, hit: (tick: number) => { dmg: number; tool: MiningTool; mine: (c: MiningProgress) => void } | null): number {
-  let drops = 0, heard = !!s.server.chunkOf(ROCK, ME);
+  let drops = 0;
   for (let k = 0; k < ticks; k++) {
     s.step();
     const h = hit(s.tick);
     if (!h) continue;
-    const before = s.drops.get(ME) ?? 0;
+    const before = s.drops.get(ME) ?? 0, chunkBefore = s.client.chunkOf(ROCK)?.chunk ?? 0, ring = s.client.progress(ROCK);
     s.server.extract(ROCK, ME, h.dmg, h.tool, -100, 0, -1, 0);
     h.mine(s.client);
-    const ring = s.client.progress(ROCK), dropped = (s.drops.get(ME) ?? 0) > before;
-    // A drop exactly as the ring reaches full: never before it fills, and it never sits full past one
-    if (heard) {
-      if (dropped) expect(ring).toBeGreaterThan(1 - 1e-6);
-      else expect(ring).toBeLessThan(1);
-    }
-    if (s.deliver()) heard = true;
-    if (dropped) drops++;
-    // ...and the same fill as the server's, the new chunk's after a drop
-    expect(s.client.progress(ROCK)).toBeCloseTo(s.serverFill(), 9);
+    const dropped = (s.drops.get(ME) ?? 0) - before, predicted = (s.client.chunkOf(ROCK)?.chunk ?? 0) - chunkBefore;
+    // The drop lands on the hit your client predicts it on: never before the ring fills
+    expect(predicted).toBe(dropped);
+    expect(ring).toBeLessThan(1);
+    same(s);
+    drops += dropped;
   }
   return drops;
 }
 
-describe('the mining progress ring is the server\'s (Mining.extract), worked out from your own hits', () => {
-  it('a mining laser cutting steadily (a ports ship\'s at its fill), a grade behind the rock: it keeps 80%, so drops carry', () => {
+describe('when a chunk drops is public: the ring steps your own hits to the server\'s drops (common econ/miningChunks.ts)', () => {
+  it("a starter's two Pips on Mk I rock (a 28 shell each every 30 ticks, staggered): every drop on the hit the ring fills", () => {
+    const s = pair(1);
+    const drops = run(s, 120 * 60, (t) => (t % 15 ? null : { dmg: 28, tool: gun, mine: (c) => c.shell(ROCK, 'fixed', 28, 1) }));
+    expect(drops).toBeGreaterThan(15);
+  });
+
+  it("a steady mining laser (a ports ship's at its fill), a grade behind the rock: it keeps 80%, so drops carry", () => {
     const s = pair(2), dps = 42 * 0.85, perTick = dps / 60;
     const drops = run(s, 60 * 60, () => ({ dmg: perTick, tool: laser(1), mine: (c) => c.laser(ROCK, dps, 1 / 60, 1, 2) }));
     expect(drops).toBeGreaterThan(10);
   });
 
-  it('a pulsed mining laser: it cuts by its pulse\'s curve, nearly half a pulse at its flare, and the ring fills by the same', () => {
+  it("a pulsed mining laser: it cuts by its pulse's curve, nearly half a pulse at its flare, and the ring steps the same", () => {
     const s = pair(1), prof = pulseProfile(MINING_PULSE), dps = 42;
-    // The pulses as your client draws them: one every MINING_PULSE.ticks from the first, the cut counted frame by frame
     const runs = [{ start: 1 }];
     let counted = 0;
     const drops = run(s, 60 * 60, (t) => {
@@ -113,108 +109,126 @@ describe('the mining progress ring is the server\'s (Mining.extract), worked out
       return { dmg: (dps / 60) * pulseCut(prof, age), tool: laser(1), mine: (c) => c.laser(ROCK, dps, dt, 1, 1) };
     });
     expect(drops).toBeGreaterThan(20);
-    // (Over a whole pulse it cuts what it would steadily)
     expect(pulseCutOver([{ start: 0 }], prof, -1, prof.ticks - 1)).toBeCloseTo(prof.ticks / 60, 9);
   });
 
-  it('guns on Mk II rock (they keep an eighth: long carries) at a big gunship\'s pace (past refDps, the square root)', () => {
+  it("guns on Mk II rock (they keep an eighth of the common ores: long carries) at a big gunship's pace (past refDps)", () => {
     const s = pair(2);
     const drops = run(s, 120 * 60, (t) => (t % 6 ? null : { dmg: 30, tool: gun, mine: (c) => c.shell(ROCK, 'fixed', 30, 2) }));
     expect(drops).toBeGreaterThan(5);
   });
 
-  it('a new chunk starts the ring over from where the server is in it, towards a drop it says (chunkUnits or a carry past)', () => {
-    const s = pair(1);
-    const seen: number[] = [];
-    for (let k = 0; k < 40 * 60; k++) {
-      s.step();
-      s.server.extract(ROCK, ME, 0.7, laser(1), -100, 0, -1, 0);
-      s.client.laser(ROCK, 42, 1 / 60, 1, 1);
-      const drop = s.told.find((m) => m.miner === ME && m.drop);
-      s.deliver();
-      if (!drop) continue;
-      seen.push(drop.due);
-      // (just past the drop: a sliver of the next unit)
-      expect(drop.at).toBeLessThan(1);
-      expect(s.client.progress(ROCK)).toBeCloseTo(drop.at / drop.due, 6);
-    }
-    // A laser keeping it all: every drop at chunkUnits, all of them seen
-    const [lo, hi] = table.chunkUnits;
-    expect(seen.length).toBeGreaterThan(10);
-    expect(Math.min(...seen)).toBe(lo);
-    expect(Math.max(...seen)).toBe(hi);
+  it('another tool on the same chunk (guns, then a laser): its keep moves where the carry ends, on both sides alike', () => {
+    const s = pair(2);
+    const drops = run(s, 60 * 60, (t) => (t < 900
+      ? (t % 10 ? null : { dmg: 30, tool: gun, mine: (c) => c.shell(ROCK, 'fixed', 30, 2) })
+      : { dmg: 0.7, tool: laser(2), mine: (c) => c.laser(ROCK, 42, 1 / 60, 2, 2) }));
+    expect(drops).toBeGreaterThan(10);
   });
 
-  it("another pilot's hits on the rock are theirs: your ring and your chunk are untouched, and they're told of their own", () => {
+  it("another pilot's hits on the rock are theirs: your chunks are untouched (each miner's work on a rock is their own)", () => {
     const s = pair(1);
-    let theirDrops = 0;
     const drops = run(s, 30 * 60, (t) => {
-      // They cut the same rock every tick, three times as hard
       s.server.extract(ROCK, THEM, 2.1, laser(1), 100, 0, 1, 0);
       return t % 2 ? null : { dmg: 1.4, tool: laser(1), mine: (c) => c.laser(ROCK, 42, 2 / 60, 1, 1) };
     });
-    theirDrops = s.drops.get(THEM) ?? 0;
     expect(drops).toBeGreaterThan(5);
-    expect(theirDrops).toBeGreaterThan(drops * 2);
-    expect(s.told.every((m) => m.miner === THEM)).toBe(true);
-    expect(s.told.length).toBeGreaterThan(0);
+    expect(s.drops.get(THEM) ?? 0).toBeGreaterThan(drops * 2);
   });
 
-  it('another tool on the same chunk moves its drop (its keep says where the carry ends): the server says so', () => {
-    // Guns keep an eighth on Mk II, so a chunk's drop is often carried past its size; a laser of the rock's grade keeps
-    // it all, so the same chunk's drop comes at its size. Over many rocks' first chunks, some move
-    let moved = 0;
-    for (let rock = 0; rock < 30; rock++) {
-      const s = pair(2);
-      s.server.register(50 + rock, 0, 0, 'asteroid_metal', `ring:${rock}`, 1e6, 2);
-      s.step();
-      s.server.extract(50 + rock, ME, 5, gun, -100, 0, -1, 0);
-      const gunDue = s.server.chunkOf(50 + rock, ME)!.due;
-      s.told.length = 0;
-      s.step();
-      s.server.extract(50 + rock, ME, 0.5, laser(2), -100, 0, -1, 0);
-      const laserDue = s.server.chunkOf(50 + rock, ME)!.due;
-      expect(laserDue).toBeLessThanOrEqual(gunDue);
-      expect(laserDue).toBeGreaterThanOrEqual(table.chunkUnits[0]);
-      expect(laserDue).toBeLessThanOrEqual(table.chunkUnits[1]);
-      // Told exactly when it moved (not a drop)
-      expect(s.told.map((m) => [m.rock, m.due, m.drop])).toEqual(laserDue === gunDue ? [] : [[50 + rock, laserDue, false]]);
-      if (laserDue !== gunDue) moved++;
-    }
-    expect(moved).toBeGreaterThan(3);
+  it('the chunk sizes and keeps are the seed\'s, the same on both sides: sizes chunkUnits evenly, keeps at the tool\'s odds', () => {
+    const { seed, composition } = publicRock('sol:3:1200', 1);
+    const [lo, hi] = table.chunkUnits, sizes = new Map<number, number>();
+    for (let c = 0; c < 6000; c++) { const w = chunkWant(table, seed, c); sizes.set(w, (sizes.get(w) ?? 0) + 1); }
+    expect([...sizes.keys()].sort()).toEqual(Array.from({ length: hi - lo + 1 }, (_, i) => lo + i));
+    for (const n of sizes.values()) expect(n / 6000).toBeCloseTo(1 / (hi - lo + 1), 1);
+    // Guns on Mk I: a third of the common ores, half that of the rest; the seed keeps them at that average
+    const odds = keepOdds(table, composition, { keep: toolKeep(table, {}, 1).keep, gun: table.guns, hardness: 1 });
+    let kept = 0;
+    for (let u = 0; u < 20000; u++) if (unitKept(seed, u >> 4, u & 15, odds.keep)) kept++;
+    expect(kept / 20000).toBeCloseTo(odds.keep, 2);
+    expect(odds.keep).toBeLessThan(table.guns!.keep);
+    expect(odds.keep).toBeGreaterThan(table.guns!.keep * table.guns!.keepOther);
+    // A laser keeping it all keeps every unit: drops at exactly chunkUnits
+    expect(keepOdds(table, composition, { keep: 1, gun: undefined, hardness: 2 }).keep).toBe(1);
   });
 
-  it('the server tells only when a chunk starts or moves: a few words a minute, never one a hit', () => {
+  it('the server sends nothing for it: no host call a hit or a chunk tells your client anything (only the pods it throws)', () => {
     const s = pair(1);
-    let words = 0;
-    for (let k = 0; k < 60 * 60; k++) {
-      s.step();
-      s.server.extract(ROCK, ME, 0.7, laser(1), -100, 0, -1, 0);
-      s.client.laser(ROCK, 42, 1 / 60, 1, 1);
-      words += s.deliver();
-    }
-    expect(words).toBe((s.drops.get(ME) ?? 0) + 1);
-    expect(words).toBeLessThan(60);
-  });
-
-  it('the server\'s word a little late still leaves the ring the server\'s at each word', () => {
-    const s = pair(1, 'asteroid_metal', 6);
-    for (let k = 0; k < 20 * 60; k++) {
-      s.step();
-      s.server.extract(ROCK, ME, 0.7, laser(1), -100, 0, -1, 0);
-      s.client.laser(ROCK, 42, 1 / 60, 1, 1);
-      const due = s.told.find((m) => m.miner === ME && s.tick - m.tick >= 6);
-      s.deliver();
-      if (due) expect(s.client.progress(ROCK)).toBeCloseTo(due.at / due.due, 6);
-    }
-    expect(s.drops.get(ME)).toBeGreaterThan(5);
+    run(s, 60 * 60, () => ({ dmg: 0.7, tool: laser(1), mine: (c) => c.laser(ROCK, 42, 1 / 60, 1, 1) }));
+    const told = [...s.calls.keys()].filter((k) => !['spawnChunk', 'minerAt', 'miningSkill', 'mined', 'awardXp', 'tick', 'rockTier', 'traceTier', 'notify'].includes(k));
+    expect(told).toEqual([]);
+    // (one pod a drop: the chunk itself, as ever)
+    expect(s.calls.get('spawnChunk')).toBe(s.drops.get(ME));
+    expect('chunk' in (s.server as unknown as { host: object }).host).toBe(false);
   });
 });
 
-describe('the mining progress ring before the server\'s first word on a rock', () => {
+describe('what a drop holds stays the server\'s secret', () => {
+  it('the public seed cannot predict the ore or gem: the same rock and hits under two secrets drop at the same units with different ore', () => {
+    const a = pair(1, TYPE, 'secret-a'), b = pair(1, TYPE, 'secret-b');
+    for (let k = 0; k < 60 * 60; k++) {
+      a.step(); b.step();
+      if (k % 15) continue;
+      a.server.extract(ROCK, ME, 28, gun, -100, 0, -1, 0);
+      b.server.extract(ROCK, ME, 28, gun, -100, 0, -1, 0);
+    }
+    // When: the same (public)
+    expect(a.server.chunkOf(ROCK, ME)).toEqual(b.server.chunkOf(ROCK, ME));
+    expect(a.pods.length).toBe(b.pods.length);
+    expect(a.pods.length).toBeGreaterThan(10);
+    // What: not (the secret's): the chunks' ore differs between the two
+    const differ = a.pods.filter((p, i) => JSON.stringify(p) !== JSON.stringify(b.pods[i])).length;
+    expect(differ).toBeGreaterThan(a.pods.length / 4);
+  });
+
+  it('a kept unit is each ore at its old odds given it was kept (guns keep the rarer ores at half): over many, the shares hold', () => {
+    const s = pair(1);
+    for (let k = 0; k < 600 * 60; k++) { s.step(); if (k % 15 === 0) s.server.extract(ROCK, ME, 28, gun, -100, 0, -1, 0); }
+    const got: Record<string, number> = {};
+    for (const p of s.pods) for (const [id, n] of Object.entries(p)) got[id] = (got[id] ?? 0) + n;
+    const odds = keepOdds(table, s.rock.composition, { keep: table.guns!.keep, gun: table.guns, hardness: 1 });
+    const total = Object.values(got).reduce((x, y) => x + y, 0), sum = odds.kept.reduce((x, y) => x + y, 0);
+    for (let i = 0; i < odds.ids.length; i++) if (odds.kept[i] / sum > 0.1) expect((got[odds.ids[i]] ?? 0) / total).toBeCloseTo(odds.kept[i] / sum, 1);
+  });
+});
+
+describe('entering a system: your part-worked chunks, told once (asteroidSeed `mine`)', () => {
+  it('a client coming in on a rock it part-worked (back from another system) picks up where the server is, and agrees from there', () => {
+    const s = pair(1);
+    // Worked a while (no client of yours watching)
+    for (let k = 0; k < 47 * 15; k++) { s.step(); if (k % 15 === 0) s.server.extract(ROCK, ME, 28, gun, -100, 0, -1, 0); }
+    const at = s.server.chunkOf(ROCK, ME)!;
+    expect(at.chunk).toBeGreaterThan(2);
+    // Entering: the one word (asteroidSeed `mine`, as enterSystem sends it: server/src/net/snapshot/systemEntry.test.ts), as JSON on the wire
+    const wire = JSON.parse(JSON.stringify({ mine: s.server.partWorked(ME, 0) })) as { mine: number[] };
+    expect(wire.mine).toHaveLength(4);
+    expect(JSON.stringify(wire).length).toBeLessThan(48);
+    const late = new MiningProgress(null, table, () => s.tick / 60, (id) => (id === ROCK ? s.rock : undefined));
+    late.enter(wire.mine, true);
+    expect(late.chunkOf(ROCK)).toEqual(at);
+    // ...and from there it steps your hits to the server's drops
+    s.client = late;
+    const drops = run(s, 60 * 60, (k) => (k % 15 ? null : { dmg: 28, tool: gun, mine: (c) => c.shell(ROCK, 'fixed', 28, 1) }));
+    expect(drops).toBeGreaterThan(5);
+  });
+
+  it('a pilot with no work on the system\'s rocks is told nothing of it; another pilot\'s work is never theirs', () => {
+    const s = pair(1);
+    for (let k = 0; k < 200; k++) { s.step(); s.server.extract(ROCK, THEM, 2, laser(1), 100, 0, 1, 0); }
+    expect(s.server.partWorked(ME, 0)).toEqual([]);
+    expect(s.server.partWorked(THEM, 0)).toHaveLength(4);
+    // Told nothing: every rock fresh for you, and fresh on the server too
+    const c = new MiningProgress(null, table, () => 0, () => s.rock);
+    c.enter(undefined, true);
+    expect(c.chunkOf(ROCK)).toBeNull();
+    expect(s.server.chunkOf(ROCK, ME)).toBeNull();
+  });
+});
+
+describe('the mining progress ring without a rock\'s seed (none known: the average)', () => {
   it("a starter's Pips fill it in about the server's average time between their drops on Mk I rock", () => {
     const { p, at } = rig();
-    // Two Pips, a 28 shell each every 30 ticks (112 a second between them), on soft Mk I rock
     let t = 100, filled = -1;
     for (let k = 0; k < 4000 && filled < 0; k++) {
       t += 15 / 60;
@@ -226,18 +240,8 @@ describe('the mining progress ring before the server\'s first word on a rock', (
     expect(filled).toBeLessThan(want * 1.1);
   });
 
-  it("a Mk I laser on its own grade's rock fills it in the server's average (it keeps it all); past its reach, nothing", () => {
-    const { p, at } = rig();
-    let t = 100, filled = -1;
-    for (let k = 0; k < 4000 && filled < 0; k++) {
-      t += 1 / 60;
-      at(t);
-      if (p.laser(7, 42, 1 / 60, 1, 1) >= 1) filled = t - 100;
-    }
-    const want = (unitsPerDrop(table, 1) * table.damagePerUnit) / (42 * table.tools.miner.yield);
-    expect(filled).toBeGreaterThan(want * 0.95);
-    expect(filled).toBeLessThan(want * 1.05);
-    // Mk III rock is past a Mk I laser: no work, no ring
+  it("a Mk I laser past its reach does no work: no ring", () => {
+    const { p } = rig();
     expect(p.laser(8, 42, 1, 1, 4)).toBe(0);
   });
 

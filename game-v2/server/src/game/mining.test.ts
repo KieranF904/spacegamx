@@ -94,7 +94,8 @@ describe('mining: work and keep', () => {
   });
 
   it("a starter's Pips throw chunks about as often as a Mk I laser on Mk I rock; the laser gets about three times the ore", () => {
-    const gun = rate('asteroid_metal', 1, pips()), mk1 = rate('asteroid_metal', 1, [{ tool: laser(), dps: LASER_DPS }]);
+    // (Long runs: the drops are dice, a ratio near 0.83 by unitsPerDrop)
+    const gun = rate('asteroid_metal', 1, pips(), 1800), mk1 = rate('asteroid_metal', 1, [{ tool: laser(), dps: LASER_DPS }], 1800);
     expect(gun.chunks / mk1.chunks).toBeGreaterThan(0.8);
     expect(gun.chunks / mk1.chunks).toBeLessThan(1.25);
     expect(mk1.ore / gun.ore).toBeGreaterThan(2.6);

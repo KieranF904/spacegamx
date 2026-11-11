@@ -44,7 +44,11 @@ export class StrikeFx {
 
   /** Your mining progress ring, drawn on the effect layer (init) */
   init(layer: ConstructorParameters<typeof MiningProgress>[0]): void {
-    this.miningProgress = new MiningProgress(layer, miningTable as unknown as MiningTable, () => performance.now() / 1000);
+    // (Each rock's public mining seed and composition, as its entity has them: your drops on it step from those)
+    this.miningProgress = new MiningProgress(layer, miningTable as unknown as MiningTable, () => performance.now() / 1000, (id) => {
+      const e = this.h.state.entities.get(id);
+      return e?.mineSeed !== undefined && e.composition ? { seed: e.mineSeed, composition: e.composition } : undefined;
+    });
   }
 
   /**

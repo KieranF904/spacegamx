@@ -1,12 +1,12 @@
 /**
  * @contract client.state.asteroid-entities
- * owns:       making the client's asteroid entities from spawn messages and from the deterministic belt seed, and clearing them
+ * owns:       making the client's asteroid entities (their composition and mining seed) from spawn messages and from the deterministic belt seed, and clearing them
  * needs:      AsteroidHost (entities, composeAsteroid, getRawServerTick), common asteroid orbit maths
  * invariants: a rock's first position is its orbit position at the current tick, not (0, 0) — client/src/state/asteroidGuideState.test.ts
  * extend:     a new way asteroids arrive is one more exported function here and one delegating method on GameState
  */
 
-import { EntityType, asteroidParamsAt, calcAsteroidPosition } from '@space-game/common';
+import { EntityType, asteroidParamsAt, calcAsteroidPosition, mineSeed } from '@space-game/common';
 import type { AsteroidSpawnData, AsteroidBeltData, Composition } from '@space-game/common';
 import type { EntityMap, InterpolatedEntity } from './entities';
 
@@ -53,6 +53,8 @@ export function spawnAsteroids(gs: AsteroidHost, tick: number, asteroids: Astero
       isDeterministic: true,
       composition: a.definitionId && a.index !== undefined && a.systemId
         ? gs.composeAsteroid?.(a.definitionId, `${a.systemId}:${a.index}:${a.epochTick}`, a.size, a.systemId, a.stage ?? undefined) : undefined,
+      // (The server's key for it, as its composition's: server Mining.register)
+      mineSeed: a.definitionId && a.index !== undefined && a.systemId ? mineSeed(a.definitionId, `${a.systemId}:${a.index}:${a.epochTick}`, a.stage ?? undefined) : undefined,
     };
 
     // Calculate initial position so the first frame isn't at (0,0)
@@ -124,6 +126,7 @@ export function seedAsteroids(
       wobblePhase: params.wobblePhase,
       isDeterministic: true,
       composition: gs.composeAsteroid?.(params.definitionId || 'asteroid_metal', `${systemId}:${index}:${params.epochTick}`, params.size, systemId, params.outlier ? 0 : undefined),
+      mineSeed: mineSeed(params.definitionId || 'asteroid_metal', `${systemId}:${index}:${params.epochTick}`, params.outlier ? 0 : undefined),
     };
 
     const currentTick = Math.round(gs.getRawServerTick());

@@ -51,7 +51,7 @@ export function wireRendererHooks(h: RendererHooksHost, renderer: Renderer, ship
   // Every drawn shell stops at the first drawn surface it touches (ships/drawnHit.ts), and its hit shows there
   renderer.castHit = (x0, y0, x1, y1, owner, skip, out) => h.drawnWorld.cast(x0, y0, x1, y1, owner, skip, out);
   renderer.onStruck = (id, x, y, type, target, owner) => h.strike.struck(id, x, y, type, target, owner);
-  // Your mining progress: a ring round the rock you're working, filling towards your next drop (the server says when: mineChunk)
+  // Your mining progress: a ring round the rock you're working, filling towards your next drop (when it drops is public: common econ/miningChunks.ts)
   h.strike.init(renderer.getEffectLayer());
   // A guided shell's guide line runs to your cursor while you hold fire
   renderer.guideTo = () => {

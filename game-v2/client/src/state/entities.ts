@@ -14,6 +14,8 @@ export interface InterpolatedEntity {
   orbitTick?: number;
   id: number;
   type: EntityType;
+  /** Asteroids: their public mining seed (common econ/miningChunks.ts mineSeed: when your chunks on them drop) */
+  mineSeed?: number;
   /** Asteroids: what they're made of (colours, seams, scanner) */
   composition?: Composition;
   // Physics (authoritative / predicted position)

@@ -96,6 +96,8 @@ export interface SnapshotHost {
   namedBody(eid: number): { name: string; kind: number } | undefined;
   flying(eid: number): boolean;
   asteroidSpawnData(eid: number): AsteroidSpawnData;
+  /** A pilot's part-worked mining chunks on a system's rocks, packed (Mining.partWorked): told once, on entering it */
+  mineState?(miner: number, systemNum: number): number[];
   readonly replication: Replication;
   readonly mobs: Mobs;
   readonly pods: LootPods;
@@ -217,7 +219,7 @@ export class SnapshotBuilder {
       world: host.world, gameData: host.gameData, scene: host.scene, events: host.events, surfaces: host.surfaces, crowd: this.crowd,
       focus: this.focus, away: this.away, asteroidIdsBySystem: host.asteroidIdsBySystem, asteroidSeedTickBySystem: host.asteroidSeedTickBySystem,
       asteroidIndexById: host.asteroidIndexById, respawnedAsteroids: host.respawnedAsteroids, send: host.send,
-      asteroidSpawnData: host.asteroidSpawnData, ticks,
+      asteroidSpawnData: host.asteroidSpawnData, mineState: host.mineState ? (m, s) => host.mineState!(m, s) : undefined, ticks,
     };
     this.structure = new ShipStructure({ ships: host.ships, send: host.send, hits: this.hits, ticks });
     this.own = new OwnRows({

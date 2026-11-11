@@ -452,9 +452,15 @@ const TABLE: Handlers = {
     // (its sound is its impact's, heard where and when it's drawn: WeaponFx.impactAt -> audio/CombatSounds.ts)
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
   },
-  asteroidSpawn: (h, msg) => { h.state.handleAsteroidSpawn(msg.tick, msg.asteroids); },
+  asteroidSpawn: (h, msg) => {
+    h.state.handleAsteroidSpawn(msg.tick, msg.asteroids);
+    // (Entering a system with no belt seed: your part-worked mining chunks on its rocks, as asteroidSeed's)
+    if (msg.mine) h.shipClient.minedState(msg.mine, false);
+  },
   asteroidSeed: (h, msg) => {
     h.state.handleAsteroidSeed(msg.tick, msg.systemId, msg.seed, msg.belt, unpackRanges(msg.ids), unpackRanges(msg.indices), msg.asteroidField);
+    // Entering the system: where you are on its rocks you've part-worked (none listed: every rock fresh for you)
+    h.shipClient.minedState(msg.mine, true);
     // Feed belt geometry to the system map
     if (msg.belt) {
       h.systemMapUI.setBelt(msg.belt.innerRadius, msg.belt.outerRadius);

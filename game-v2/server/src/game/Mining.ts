@@ -8,11 +8,16 @@
  *   tool's yield x its work rate / damagePerUnit). The rock loses every unit
  *   worked, kept or not, and a chunk is due every chunkUnits worked (3 to 5),
  *   so the work sets how often chunks come.
- * - The keep: the chance each unit worked ends up in the chunk; every unit is
- *   a dice roll (the rock's dice, from the server's secret: payoutDice.ts), and
- *   a failed roll is lost from the rock all the same. A chunk holds what was kept; a chunk due with nothing
+ * - The keep: the chance each unit worked ends up in the chunk; a unit not
+ *   kept is lost from the rock all the same. A chunk holds what was kept; a chunk due with nothing
  *   kept yet waits for the next unit that is kept (the carry), so no drop is ever skipped or empty and a tool that
  *   keeps little still drops about as often as the work says (unitsPerDrop). The averages are the keep; the drops vary.
+ *
+ * WHEN a chunk drops is public: each chunk's size and whether each unit is kept come from the rock's public mining
+ * seed (common econ/miningChunks.ts), so a miner's client steps the same units to the same drop from its own hits and
+ * is sent nothing for it (client MiningProgress.ts). WHAT a drop holds is secret: each kept unit's ore or gem (drawn by
+ * its odds given it was kept: keepOdds), the skill's bonus unit, the throw and the spill, all on the rock's dice (the
+ * server's secret: payoutDice.ts).
  *
  * Mining lasers keep all they work on rock of their grade or below (a grade or
  * two ahead works it a little faster). A grade or two behind the rock's tier
@@ -30,7 +35,10 @@
  * last stage breaks up like any other rock.
  */
 
-import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, type GunMining, dcos, dhypot, dsin, workedUnits, gunDps, gunPace } from '@space-game/common';
+import {
+  Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, dcos, dhypot, dsin, workedUnits, gunDps, gunPace,
+  mineSeed, keepOdds, workUnit, freshChunk, packChunk, UNIT_KEPT, UNIT_DROP, type ChunkState, type KeepOdds, type UnitRule,
+} from '@space-game/common';
 import { PayoutDice, type Dice } from './payoutDice.js';
 
 export interface MiningTool {
@@ -42,22 +50,11 @@ export interface MiningTool {
   mining?: boolean;
 }
 
-/** A miner's work on one rock */
+/** A miner's work on one rock (each miner's own) */
 interface Work {
-  /** Rock units owed (the fraction of the next) */
-  owed: number;
-  /** Rock units worked since the last chunk, and how many the next chunk wants (chunkUnits) */
-  worked: number;
-  want: number;
-  /**
-   * The chunk's units' dice, rolled when it starts (UNIT_DRAWS a unit: seam, ore, keep, bonus), so the unit it's thrown
-   * at is known then (`due`: the first at or past `want` with something kept) and its miner is told (MiningHost.chunk)
-   */
-  draws: number[];
-  due: number;
-  /** The tool `due` was worked out for (its keep, hardness and kind): another tool, it's worked out again */
-  toolKey: string;
-  /** What's been kept and not yet thrown */
+  /** Where they are in their chunks: public, stepped alike by their client (common econ/miningChunks.ts) */
+  s: ChunkState;
+  /** What's been kept and not yet thrown (secret till it's thrown) */
   bag: Bag;
   /** Guns: damage on the rock in about the last second (a leaking sum), as of tick `t` */
   dps: number;
@@ -66,15 +63,6 @@ interface Work {
 
 /** A chunk thrown at its miner flies this much faster (units a tick, on top of 1.2 to 2.6) */
 const CHUNK_BOOST = 3.6;
-/** Dice a unit worked draws (seam, ore, keep, bonus), and the most units a chunk's dice are rolled ahead for */
-const UNIT_DRAWS = 4, MAX_AHEAD = 512;
-
-/** How a tool takes a rock's units: what it keeps (the gun's lower keep off the common ores), the hardest it cracks */
-interface UnitRule {
-  keep: number;
-  gun: GunMining | undefined;
-  hardness: number;
-}
 
 export interface MiningHost {
   /** Drop a chunk of ore as a loot pod (`miner`: who broke it off, for quests) */
@@ -87,12 +75,6 @@ export interface MiningHost {
   mined?(playerEid: number, ores: Bag, from: TraceSource): void;
   /** Award mining XP to a player entity */
   awardXp(playerEid: number, xp: number): void;
-  /**
-   * A miner's chunk on a rock: its next drop comes at `due` rock units worked into it, and `at` are worked so far
-   * (fractions too); `drop`: one was just thrown. Told when a chunk starts (the first hit on a rock, each drop) and when
-   * another tool changes where it's due: the dice are the server's, so the client can't know (MiningProgress.ts)
-   */
-  chunk?(playerEid: number, asteroid: number, due: number, at: number, drop: boolean): void;
   /** Tell a player something (throttled by the caller) */
   notify(playerEid: number, text: string): void;
   /** A rock type's tier for its traces here and now, if above the system's (the comet passing) */
@@ -116,8 +98,12 @@ interface Rock extends Composition {
   left: number;
   /** Each miner's work on it */
   work: Map<number, Work>;
+  /** Its public mining seed (mineSeed: its chunks' sizes and keeps, which its miners' clients step alike) */
+  seed: number;
+  /** Tools' odds on it (keepOdds), by tool rule */
+  odds: Map<string, KeepOdds>;
   /**
-   * Its dice (its keep, gem, ore and bonus rolls, its chunks' sizes and throws): from the server's secret, never from
+   * Its dice (what each kept unit is, the bonus rolls, the throws and spills): from the server's secret, never from
    * anything a client knows (payoutDice.ts). Its composition, which a client works out for its looks and odds, is
    * from the rock's own key as ever
    */
@@ -142,7 +128,7 @@ export class Mining {
   register(eid: number, systemNum: number, index: number, type: string, key: string, size: number, tier: number, outlier?: { stage: number; wholeSize: number; left?: number }): void {
     const c = asteroidComposition(this.table, type, key, size, tier, outlier?.stage);
     this.rocks.set(eid, {
-      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), work: new Map(), dice: this.payout.stream('rock', eid, this.registered++), tier: this.host.rockTier?.(systemNum) ?? 1,
+      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), work: new Map(), seed: mineSeed(type, key, outlier?.stage), odds: new Map(), dice: this.payout.stream('rock', eid, this.registered++), tier: this.host.rockTier?.(systemNum) ?? 1,
       ...(outlier ? { wholeSize: outlier.wholeSize } : {}),
     });
   }
@@ -165,10 +151,23 @@ export class Mining {
     return this.rocks.get(eid)?.left ?? 0;
   }
 
-  /** A miner's chunk on a rock: rock units worked into it (fractions too) and where its drop falls (as MiningHost.chunk tells) */
-  chunkOf(eid: number, miner: number): { at: number; due: number } | null {
+  /** A miner's place in their chunks on a rock (a copy) */
+  chunkOf(eid: number, miner: number): ChunkState | null {
     const w = this.rocks.get(eid)?.work.get(miner);
-    return w ? { at: w.worked + w.owed, due: w.due } : null;
+    return w ? { ...w.s } : null;
+  }
+
+  /**
+   * A miner's part-worked chunks on a system's rocks, packed (packChunk: 4 numbers a rock), for their client on
+   * entering it (asteroidSeed `mine`): the only time it's told, as from then on it steps the same units itself
+   */
+  partWorked(miner: number, systemNum: number): number[] {
+    const out: number[] = [];
+    for (const [eid, r] of this.rocks) {
+      const w = r.systemNum === systemNum ? r.work.get(miner) : undefined;
+      if (w && (w.s.chunk || w.s.worked || w.s.owed || w.s.kept)) out.push(...packChunk(eid, w.s));
+    }
+    return out;
   }
 
   private rand(r: Rock): number {
@@ -207,18 +206,8 @@ export class Mining {
     }
     // (An outlier's stage gives only its share: the rest stays for the next)
     const floor = this.nextStage(r)?.units ?? 0;
-    const rule: UnitRule = { keep, gun, hardness: tool.hardness };
-    const fresh = !r.work.has(miner);
+    const odds = this.oddsOf(r, { keep, gun, hardness: tool.hardness });
     const w = this.workOf(r, miner);
-    // A new chunk, or another tool on this one (its keep says where the drop falls): where it's due, rolled ahead
-    let tell = fresh, drop = false;
-    const key = `${keep}|${gun ? 1 : 0}|${tool.hardness}`;
-    if (key !== w.toolKey) {
-      const was = w.due;
-      w.toolKey = key;
-      w.due = this.dueOf(r, w, rule, floor);
-      if (w.due !== was) tell = true;
-    }
     // Guns: past refDps damage a second on the rock, the pace grows only with its square root
     if (gun) {
       const now = this.host.tick();
@@ -226,46 +215,33 @@ export class Mining {
       w.t = now;
       work *= gunPace(this.table, w.dps);
     }
-    w.owed += workedUnits(this.table, damage, tool.yield, work);
+    w.s.owed += workedUnits(this.table, damage, tool.yield, work);
     const got: Bag = {};
     let units = 0;
-    while (w.owed >= 1 && r.left > floor) {
-      w.owed -= 1;
+    while (w.s.owed >= 1 && r.left > floor) {
+      w.s.owed -= 1;
       r.left -= 1;
-      // The unit's dice, rolled when the chunk started: a gem or an ore the tool can crack, kept or lost (a failed
-      // roll still takes the unit out of the rock), and the mining skill's (and a wing's) chance of an extra one
-      const at = w.worked * UNIT_DRAWS;
-      while (w.draws.length < at + UNIT_DRAWS) w.draws.push(this.rand(r));
-      const u = this.unitOf(r, rule, w.draws[at], w.draws[at + 1], w.draws[at + 2]);
-      w.worked++;
-      if (u.kept) {
+      // Kept or lost, and does the chunk drop on it: public (the rock's seed: its miner's client steps the same units,
+      // MiningProgress). A unit not kept still comes out of the rock
+      const f = workUnit(this.table, r.seed, w.s, odds.keep);
+      if (f & UNIT_KEPT) {
+        // What it is (a gem, or an ore the tool can crack) and the mining skill's (and a wing's) chance of an extra
+        // one: the rock's secret dice
+        const id = this.keptOre(r, odds);
         units++;
         let n = 1;
         const bonus = this.host.miningSkill?.(miner) ?? 0;
-        if (bonus > 0 && w.draws[at + 3] < bonus) n++;
-        w.bag[u.id] = (w.bag[u.id] ?? 0) + n;
-        got[u.id] = (got[u.id] ?? 0) + n;
+        if (bonus > 0 && this.rand(r) < bonus) n++;
+        w.bag[id] = (w.bag[id] ?? 0) + n;
+        got[id] = (got[id] ?? 0) + n;
       }
-      // Its due unit: throw what was kept (due is the first unit at or past the chunk's want with something kept: the
-      // carry, so a tool that keeps a third still drops every chunk or so rather than skipping a drop in two)
-      if (w.worked >= w.due) {
-        if (Object.keys(w.bag).length) {
-          this.throwChunk(r, miner, w, x, y, nx, ny);
-          this.newChunk(r, w);
-          w.toolKey = key;
-          drop = true;
-        }
-        // (Rolled no further ahead than MAX_AHEAD or the rock: roll on)
-        w.due = this.dueOf(r, w, rule, floor);
-        tell = true;
-      }
+      // The chunk's drop (at or past its size with something kept: the carry, so a tool that keeps a third still drops
+      // every chunk or so rather than skipping a drop in two): throw what was kept
+      if (f & UNIT_DROP) this.throwChunk(r, miner, w, x, y, nx, ny);
     }
     if (units) this.host.mined?.(miner, got, { tier: Math.max(r.tier, this.host.traceTier?.(r.systemNum, r.type) ?? 0), seam: !!r.seam, traceMul: this.table.types[r.type]?.traceMul, traceBoost: this.table.types[r.type]?.traceBoost });
     if (units) this.addXp(miner, units * this.table.xpPerUnit);
-    if (r.left > floor) {
-      if (tell) this.host.chunk?.(miner, asteroid, w.due, w.worked + w.owed, drop);
-      return;
-    }
+    if (r.left > floor) return;
     // The rock spent (or an outlier, mined down to its next stage): what's kept goes out with it, and nothing's left to hold it together
     if (Object.keys(w.bag).length) this.throwChunk(r, miner, w, x, y, nx, ny);
     this.host.crumble(asteroid);
@@ -273,54 +249,29 @@ export class Mining {
 
   private workOf(r: Rock, miner: number): Work {
     let w = r.work.get(miner);
-    if (!w) {
-      r.work.set(miner, (w = { owed: 0, worked: 0, want: 0, draws: [], due: 0, toolKey: '', bag: {}, dps: 0, t: this.host.tick() }));
-      this.newChunk(r, w);
-    }
+    if (!w) r.work.set(miner, (w = { s: freshChunk(), bag: {}, dps: 0, t: this.host.tick() }));
     return w;
   }
 
-  /** A miner's next chunk on a rock: its want (chunkUnits), its dice not yet rolled */
-  private newChunk(r: Rock, w: Work): void {
-    w.worked = 0;
-    w.want = this.chunkWant(r);
-    w.draws = [];
-    w.toolKey = '';
+  /** A tool's odds on a rock (keepOdds: public, its client works out the same), kept by rule */
+  private oddsOf(r: Rock, rule: UnitRule): KeepOdds {
+    const key = `${rule.keep}|${rule.gun ? 1 : 0}|${rule.hardness}`;
+    let o = r.odds.get(key);
+    if (!o) r.odds.set(key, (o = keepOdds(this.table, r, rule)));
+    return o;
   }
 
-  /** A unit worked by a tool, from its dice (seam, ore, keep): what it is, and is it kept */
-  private unitOf(r: Rock, rule: UnitRule, seam: number, ore: number, keep: number): { id: string; kept: boolean } {
-    let id: string;
-    if (r.seam && rule.hardness >= r.seam.hardness && seam < this.table.seamGemChance) id = r.seam.gem;
-    else {
-      id = pickOre(r, ore);
-      if ((this.table.oreHardness[id] ?? 1) > rule.hardness) id = this.softest(r, rule.hardness);
+  /** What a kept unit is: drawn by its odds given it was kept (keepOdds), on the rock's secret dice */
+  private keptOre(r: Rock, odds: KeepOdds): string {
+    let sum = 0;
+    for (const k of odds.kept) sum += k;
+    let roll = this.rand(r) * sum;
+    for (let i = 0; i < odds.ids.length; i++) {
+      roll -= odds.kept[i];
+      if (roll < 0) return odds.ids[i];
     }
-    const p = rule.gun && !rule.gun.common.includes(id) ? rule.keep * rule.gun.keepOther : rule.keep;
-    return { id, kept: p >= 1 || keep < p };
-  }
-
-  /**
-   * The unit (counted from the chunk's start) a miner's chunk is thrown at: the first at or past its want with
-   * something kept by then, its dice rolled ahead as far as that. No further than the rock holds (spent, it crumbles and
-   * throws what's kept) or MAX_AHEAD units ahead
-   */
-  private dueOf(r: Rock, w: Work, rule: UnitRule, floor: number): number {
-    let kept = Object.keys(w.bag).length > 0;
-    const end = w.worked + Math.min(MAX_AHEAD, Math.max(0, r.left - floor));
-    for (let i = w.worked; i < end; i++) {
-      while (w.draws.length < (i + 1) * UNIT_DRAWS) w.draws.push(this.rand(r));
-      const at = i * UNIT_DRAWS;
-      if (!kept) kept = this.unitOf(r, rule, w.draws[at], w.draws[at + 1], w.draws[at + 2]).kept;
-      if (kept && i + 1 >= w.want) return i + 1;
-    }
-    return Math.max(end, w.worked + 1);
-  }
-
-  /** Rock units the next chunk wants worked (chunkUnits) */
-  private chunkWant(r: Rock): number {
-    const [lo, hi] = this.table.chunkUnits;
-    return lo + Math.floor(this.rand(r) * (hi - lo + 1));
+    for (let i = odds.ids.length - 1; i >= 0; i--) if (odds.kept[i] > 0) return odds.ids[i];
+    return r.primary;
   }
 
   /** Throw a miner's kept ore out of the rock as a chunk */
@@ -337,15 +288,6 @@ export class Mining {
     const c = dcos(spread), sn = dsin(spread);
     this.host.spawnChunk(r.systemNum, sx, sy, (dx * c - dy * sn) * s, (dx * sn + dy * c) * s, w.bag, miner);
     w.bag = {};
-  }
-
-  /** The most common ore in the rock that the tool can crack */
-  private softest(r: Rock, hardness: number): string {
-    let best = '', w = -1;
-    for (const [id, v] of Object.entries(r.ores)) {
-      if ((this.table.oreHardness[id] ?? 1) <= hardness && v > w) { best = id; w = v; }
-    }
-    return best || r.primary;
   }
 
   /** An asteroid broke: a little of what's left spills out, and it comes back later */

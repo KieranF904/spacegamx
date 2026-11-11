@@ -298,6 +298,11 @@ export class ShipClient {
     return this.fx.damageFx?.bubbleAt(x, y) ?? false;
   }
 
+  /** Entering a system: where you are on its rocks you've part-worked (asteroidSeed `mine`; `fresh`: the whole word) */
+  minedState(mine: readonly number[] | undefined, fresh: boolean): void {
+    this.strike.miningProgress?.enter(mine, fresh);
+  }
+
   /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
   readonly hits: ConfirmedHits;
   /** Client-detected hits (part D): the hits found here on the tick-faithful layer, and the chain reported */

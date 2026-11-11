@@ -1,6 +1,6 @@
 /**
  * @contract client.ship.messages
- * owns:       routing the server messages a ship client reacts to (hits, damage, bosses, scans, ship sync, system info, docking, your mining chunks) to the pieces that draw or track them
+ * owns:       routing the server messages a ship client reacts to (hits, damage, bosses, scans, ship sync, system info, docking) to the pieces that draw or track them
  * needs:      ShipMessageHost (state, store, fx getters, debris, away, selfHits, hits, own, causes, moves, flow, turrets, dock, jump, strike); npm: @space-game/common
  * invariants: returns false for messages the game also draws itself — client/src/app/serverMessages.test.ts
  * extend:     a new ship server message is one more case below
@@ -135,10 +135,6 @@ export function handleShipMessage(h: ShipMessageHost, msg: ServerMessage): boole
       // (A shell drawn here shows its hit where it's seen to strike, struckFx; the server's only confirms it)
       if (!h.scene()?.drawsShell(msg.id)) h.strike.struck(msg.id, msg.x, msg.y, h.state.entities.get(msg.id)?.data?.[0] ?? -1);
       return false; // the game stops the tracer and throws the sparks
-    // Your chunk on a rock: where its drop falls (the server's dice) and how far in you are; your progress ring snaps to it
-    case 'mineChunk':
-      h.strike.miningProgress?.chunk(msg.r, msg.n, msg.w, !!msg.d);
-      return true;
     case 'scanPulse':
       h.scannerFx()?.pulse(msg.seconds);
       h.sound?.('scan_ping');

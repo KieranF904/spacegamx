@@ -135,6 +135,7 @@ export function snapshotDeps(gs: GameServer): ConstructorParameters<typeof Snaps
     namedBody: (eid) => gs.namedBody(eid),
     flying: (eid) => gs.flying(eid),
     asteroidSpawnData: (eid) => gs.asteroidSpawnData(eid),
+    mineState: (miner, num) => gs.mining.partWorked(miner, num),
     replication: gs.replication,
     mobs: gs.mobs,
     pods: gs.pods,

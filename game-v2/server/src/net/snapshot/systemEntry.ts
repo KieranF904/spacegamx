@@ -1,8 +1,8 @@
 /**
  * @contract server.snapshot.system-entry
- * owns:       a client entering a system (briefings, the asteroid seed and regrown rocks, a clean slate of what it was
- *             sent), its HUD numbers (playerState) and the system's visuals (systemInfo)
- * needs:      EntryHost (world, gameData, scene, events, surfaces, crowd, focus, away, asteroid maps, send, ticks); npm: bitecs
+ * owns:       a client entering a system (briefings, the asteroid seed and regrown rocks, your part-worked mining
+ *             chunks on them, a clean slate of what it was sent), its HUD numbers (playerState) and the system's visuals (systemInfo)
+ * needs:      EntryHost (world, gameData, scene, events, surfaces, crowd, focus, away, asteroid maps, mineState, send, ticks); npm: bitecs
  * invariants: a new system starts the client from scratch (known, synced, names, map) — server/src/net/cells/focusCells.test.ts
  *             playerState only when it changed (or every 600 ticks) — server/src/net/snapshot/snapshotParts.test.ts
  * extend:     a new per-system thing a client is told on entry is one send in enterSystem
@@ -36,6 +36,8 @@ export interface EntryHost {
   readonly respawnedAsteroids: ReadonlySet<number>;
   readonly send: (ws: ClientSocket, msg: ServerMessage) => void;
   readonly asteroidSpawnData: (eid: number) => AsteroidSpawnData;
+  /** The pilot's part-worked mining chunks on the system's rocks, packed (server Mining.partWorked) */
+  readonly mineState?: (miner: number, systemNum: number) => number[];
   readonly ticks: { readonly currentTick: number };
 }
 
@@ -88,6 +90,10 @@ export function enterSystem(h: EntryHost, conn: ClientConnection, playerSystemId
   const regrown = alive.filter(eid => h.respawnedAsteroids.has(eid));
   const indices = ids.map(eid => h.asteroidIndexById.get(eid) ?? 0);
   const seedTick = h.asteroidSeedTickBySystem.get(playerSystemId) ?? h.ticks.currentTick;
+  // (Your part-worked mining chunks here, told once: from then on your client steps its own hits to their drops,
+  // common econ/miningChunks.ts. On the first of the two below that goes; none, nothing)
+  let mine: number[] | undefined = h.mineState?.(conn.playerId, playerSystemId);
+  if (!mine?.length) mine = undefined;
 
   if (belt && ids.length > 0) {
     for (const id of ids) conn.knownEntities.add(id);
@@ -108,12 +114,14 @@ export function enterSystem(h: EntryHost, conn: ClientConnection, playerSystemId
       asteroidField: systemData?.asteroidField,
       ids: packRanges(ids),
       indices: packRanges(indices),
+      ...(mine ? { mine } : {}),
     } as ServerAsteroidSeedMessage);
+    mine = undefined;
   }
   // (Outside the belt's seed: a system with no belt, the training yard's, has only these)
   if (regrown.length) {
     for (const id of regrown) conn.knownEntities.add(id);
-    h.send(conn.ws, { type: 'asteroidSpawn', tick: h.ticks.currentTick, asteroids: regrown.map((eid) => h.asteroidSpawnData(eid)) });
+    h.send(conn.ws, { type: 'asteroidSpawn', tick: h.ticks.currentTick, asteroids: regrown.map((eid) => h.asteroidSpawnData(eid)), ...(mine ? { mine } : {}) });
   }
 }
 

@@ -89,7 +89,7 @@ export class ShipFx {
     };
     // Your own laser cutting rock: its work towards your next drop
     this.beamFx.onOwnCut = (rock, x, y, dps, dt, material) => {
-      this.h.strike.miningProgress?.laser(rock, dps, dt, gradeOf(this.h.store.catalog.materials.get(material)), this.h.strike.systemTier());
+      this.h.strike.miningProgress?.laser(rock, dps, dt, gradeOf(this.h.store.catalog.materials.get(material)), this.h.strike.systemTier(), material);
     };
     this.chargeFx = new ChargeFx(renderer.getEffectLayer(), this.h.store, this.h.state, this.h.tuning, this.h.chargeTells);
     renderer.addBloomSource(this.chargeFx.glowLayer);
