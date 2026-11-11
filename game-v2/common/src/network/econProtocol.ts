@@ -23,6 +23,7 @@ import type { QuestView, QuestLead, BuildView, RewardView } from '../econ/quests
 import type { PersonView, TalkView } from '../econ/dialogue.js';
 import type { CodexView } from '../econ/codex.js';
 import type { Blueprint } from '../ships/types.js';
+import type { GhostTemplate, HoldGhost } from '../econ/holdGhosts.js';
 
 // ---------------------------------------------------------------------------
 // Server → client
@@ -58,6 +59,8 @@ export interface ServerProfileMessage {
   loadout?: Record<string, number>;
   /** Your station (econ/outpost.ts), and the server's clock (for its build) */
   outpost?: Outpost | null;
+  /** Pickup settings (econ/holdGhosts.ts): mining mode, the ores it leaves, and the saved ghost templates */
+  pickup?: { mining: boolean; blacklist: string[]; templates: GhostTemplate[] };
   now?: number;
 }
 
@@ -117,6 +120,8 @@ export interface ServerItemsMessage {
   credits: number;
   /** Close enough to a station to reach storage */
   atStation: boolean;
+  /** The hold's ghosts: items the ship you fly picks up by itself (econ/holdGhosts.ts) */
+  ghosts?: HoldGhost[];
 }
 
 /** Items gained (floating pickup text) */

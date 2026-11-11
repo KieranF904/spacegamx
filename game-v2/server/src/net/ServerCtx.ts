@@ -14,6 +14,7 @@ import type { GameData } from '../data/GameData.js';
 import type { UserStore } from '../auth/types.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Pilots } from '../game/Pilots.js';
+import type { LootPods } from '../game/LootPods.js';
 import type { Ammo } from '../game/Ammo.js';
 import type { Outpost } from '../game/Outpost.js';
 import type { StationServices } from '../game/StationServices.js';
@@ -126,6 +127,8 @@ export interface ServerCtx {
   readonly tutorial?: Tutorial;
   /** The gun range (game/gunRange): going in, the weapon picker, X at its door, and the messages its visitors may send */
   readonly gunRange: GunRange;
+  /** Loot pods: the pickup panel's take (docs/design/loot-pickup-2026-11.md) */
+  readonly pods: Pick<LootPods, 'takeFor'>;
   /** A fresh player ship entity (respawn) */
   createPlayer(): number;
   /** Put a pilot's ship in a system at a point (respawn's rally) */

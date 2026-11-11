@@ -78,6 +78,22 @@ export function registerModuleHandlers(t: HandlerRegistry): void {
   t.on('itemUse', (ctx, conn, msg) => {
     ctx.pilots.handleUse(conn, msg);
   });
+  // The pickup panel and the hold's ghosts (docs/design/loot-pickup-2026-11.md): one take, one decision
+  t.on('lootTake', (ctx, conn, msg) => {
+    ctx.pods.takeFor(conn.playerId, typeof msg.item === 'string' ? msg.item : undefined);
+  });
+  t.on('ghost', (ctx, conn, msg) => {
+    ctx.pilots.handleGhost(conn, msg);
+  });
+  t.on('ghostTemplate', (ctx, conn, msg) => {
+    ctx.pilots.handleGhostTemplate(conn, msg);
+  });
+  t.on('pickupPrefs', (ctx, conn, msg) => {
+    ctx.pilots.handlePickupPrefs(conn, msg);
+  });
+  t.on('oreBlacklist', (ctx, conn, msg) => {
+    ctx.pilots.handleOreBlacklist(conn, msg);
+  });
   t.on('stationOpen', (ctx, conn, msg) => {
     ctx.services.open(conn);
     ctx.quests.board(conn);

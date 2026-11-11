@@ -21,6 +21,7 @@ export * from './hangar.js';
 export * from './loadout.js';
 export * from './salvage.js';
 export * from './loot.js';
+export * from './holdGhosts.js';
 export * from './backups.js';
 export * from './orders.js';
 export * from './levels.js';

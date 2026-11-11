@@ -1,8 +1,11 @@
 /**
  * Loot pods: containers floating in space (drops, jettisoned cargo, a
- * destroyed pilot's hold). A pod drifts to a stop; a ship with cargo space
- * that comes close pulls it in, and its contents go into cargo. Whatever
- * doesn't fit stays in the pod.
+ * destroyed pilot's hold). A pod drifts to a stop; a ship that comes close
+ * pulls it in if it would pick up something in it by itself (ore, or an item
+ * its hold has a ghost of: common econ/holdGhosts.ts), and only that goes
+ * into cargo. The rest waits for the pickup panel: each pilot is told what is
+ * in reach when that changes (`lootNear`), and takes it with one `lootTake`
+ * (docs/design/loot-pickup-2026-11.md).
  *
  * Pods are DroppedItem entities. Snapshot data: [rarity index of the best
  * item inside, number of kinds of item, item count].
@@ -11,7 +14,7 @@
 import { addEntity, addComponent, hasComponent, entityExists, defineQuery, IWorld } from 'bitecs';
 import {
   Position, Velocity, Radius, DroppedItem, Lifetime, InSystem, NetworkSync, Dead, Player,
-  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift, dcos, dhypot, dsin, mulberry32,
+  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift, dcos, dhypot, dsin, mulberry32, type LootNearPod,
 } from '@space-game/common';
 
 export interface PodHost {
@@ -32,6 +35,12 @@ export interface PodHost {
   keyOf?(playerEid: number): string | undefined;
   /** A kept pod was emptied */
   emptied?(eid: number, key: string): void;
+  /** Of a pod's contents, what this ship would pick up by itself (none given: all of it, as far as it fits) */
+  autoTake?(playerEid: number, items: Bag): Bag;
+  /** Tell a pilot what is in their pickup reach (only when it changed) */
+  sendNear?(playerEid: number, pods: LootNearPod[]): void;
+  /** A pilot's take found no room for anything */
+  holdFull?(playerEid: number): void;
 }
 
 /** Where a pod was, how fast, on which tick: from there it just drifts (podDrift) until something moves it */
@@ -41,8 +50,10 @@ const podQuery = defineQuery([DroppedItem, Position]);
 
 /** Seconds a pod lasts before it's gone */
 const POD_LIFE_TICKS = 60 * 60 * 5;
-/** Pull starts this far beyond the ship's hull; collection at the hull */
-const PULL_RANGE = 380;
+/** Pull starts this far beyond the ship's hull; collection at the hull. Also the pickup panel's reach */
+export const PULL_RANGE = 380;
+/** How often (ticks) each pilot's pickup reach is looked at again (sent only when it changed) */
+const NEAR_EVERY = 10;
 
 export class LootPods {
   private contents = new Map<number, Bag>();
@@ -56,6 +67,8 @@ export class LootPods {
   private anchors = new Map<number, PodAnchor>();
   /** Pods only one pilot can take until a tick (their wreck) */
   private kept = new Map<number, { key: string; until: number }>();
+  /** What each pilot was last told is in their reach (a key of it), so it's sent only when it changes */
+  private nearSent = new Map<number, string>();
 
   /** Only `key`'s pilot can collect this pod until `untilTick` */
   keep(eid: number, key: string, untilTick: number): void {
@@ -128,6 +141,101 @@ export class LootPods {
   }
   // ---- (end Tow Beam)
 
+  // ---- The pickup panel (docs/design/loot-pickup-2026-11.md C)
+  /** May this ship take from this pod now (not someone else's wreck still kept for them) */
+  private mayTake(eid: number, p: number): boolean {
+    const kept = this.kept.get(eid);
+    return !kept || (this.host.tick?.() ?? this.ticks) >= kept.until || this.host.keyOf?.(p) === kept.key;
+  }
+
+  /** Pods in a ship's pickup reach (PULL_RANGE past its hull), nearest first */
+  inReach(p: number): number[] {
+    const r = this.host.shipRadius(p);
+    const d = (eid: number) => dhypot(Position.x[eid] - Position.x[p], Position.y[eid] - Position.y[p]);
+    return this.near(InSystem.systemId[p], Position.x[p], Position.y[p], PULL_RANGE + r).sort((a, b) => d(a) - d(b) || a - b);
+  }
+
+  /**
+   * The panel's one decision: take `item` (or everything) from the pods in reach into the ship's hold, nearest pod
+   * first, as far as the hold has room (a manual take may use space ghosts keep). Returns what was taken
+   */
+  takeFor(p: number, item?: string): Bag {
+    const w = this.host.world;
+    if (!hasComponent(w, Player, p) || hasComponent(w, Dead, p)) return {};
+    const got: Bag = {};
+    let full = false;
+    for (const eid of this.inReach(p)) {
+      const bag = this.contents.get(eid);
+      if (!bag || !this.mayTake(eid, p)) continue;
+      const want: Bag = item === undefined ? { ...bag } : bag[item] ? { [item]: bag[item] } : {};
+      if (!Object.keys(want).length) continue;
+      const left = this.host.give(p, want, { x: Position.x[eid], y: Position.y[eid] }, 'loot');
+      const rest: Bag = { ...bag };
+      for (const [id, n] of Object.entries(want)) {
+        const k = n - (left[id] ?? 0);
+        if (k <= 0) continue;
+        got[id] = (got[id] ?? 0) + k;
+        rest[id] -= k;
+        if (rest[id] <= 0) delete rest[id];
+      }
+      this.settle(eid, rest);
+      if (Object.keys(left).length) { full = true; break; }
+    }
+    if (full && !Object.keys(got).length) this.host.holdFull?.(p);
+    return got;
+  }
+
+  /** What a pilot's panel lists: each pod in reach with its contents, and a wreck's keeping */
+  nearFor(p: number): LootNearPod[] {
+    const now = this.host.tick?.() ?? this.ticks;
+    const key = this.host.keyOf?.(p);
+    const out: LootNearPod[] = [];
+    for (const eid of this.inReach(p)) {
+      const bag = this.contents.get(eid);
+      if (!bag) continue;
+      const kept = this.kept.get(eid);
+      const pod: LootNearPod = { id: eid, items: { ...bag } };
+      if (kept && kept.key === key) pod.mine = true;
+      else if (kept && now < kept.until) pod.lock = Math.ceil((kept.until - now) / 60);
+      out.push(pod);
+    }
+    return out;
+  }
+
+  /** Every NEAR_EVERY ticks: tell each pilot whose reach changed what is in it now */
+  private sendNear(): void {
+    if (!this.host.sendNear) return;
+    const w = this.host.world;
+    const systems = new Set<number>();
+    for (const eid of podQuery(w)) if (this.contents.has(eid)) systems.add(InSystem.systemId[eid]);
+    // (And wherever someone was told of pods last time: an empty list tells them they've gone)
+    for (const p of this.nearSent.keys()) systems.add(InSystem.systemId[p]);
+    const seen = new Set<number>();
+    for (const sys of systems) {
+      for (const p of this.host.collectors(sys)) {
+        if (seen.has(p) || !hasComponent(w, Player, p) || hasComponent(w, Dead, p)) continue;
+        seen.add(p);
+        const pods = this.nearFor(p);
+        // (A wreck's lock counts down on the client: its end, not the seconds left, is what changes the list)
+        const k = pods.map((q) => `${q.id}:${q.mine ? 'm' : ''}${q.lock ? this.kept.get(q.id)?.until : ''}:${Object.entries(q.items).map(([i, n]) => `${i}=${n}`).join(',')}`).join('|');
+        if ((this.nearSent.get(p) ?? '') === k) continue;
+        if (k) this.nearSent.set(p, k); else this.nearSent.delete(p);
+        this.host.sendNear(p, pods);
+      }
+    }
+    for (const p of [...this.nearSent.keys()]) if (!seen.has(p)) this.nearSent.delete(p);
+  }
+
+  /** A pod's contents after a take: emptied (and a wreck recovered), or what's left */
+  private settle(eid: number, rest: Bag): void {
+    if (Object.keys(rest).length) { this.contents.set(eid, rest); this.refresh(eid); return; }
+    this.contents.delete(eid);
+    const kept = this.kept.get(eid);
+    if (kept) { this.kept.delete(eid); this.host.emptied?.(eid, kept.key); }
+    this.host.remove(eid);
+  }
+  // ---- (end pickup panel)
+
   /** Snapshot data for a pod entity */
   snapshotData(eid: number): number[] {
     const bag = this.contents.get(eid) ?? {};
@@ -157,7 +265,7 @@ export class LootPods {
     return n;
   }
 
-  /** Drift, pull towards nearby ships with room, and collect */
+  /** Drift, pull towards nearby ships that would pick something in it up by themselves, and collect that */
   tick(): void {
     this.ticks++;
     const w = this.host.world;
@@ -169,6 +277,8 @@ export class LootPods {
       if (f === undefined) room.set(p, (f = this.host.cargoFree(p)));
       return f;
     };
+    // What a ship in reach would pick up by itself from a pod (ore, its hold's ghosts); without the rule, all of it
+    const autoOf = (p: number, bag: Bag) => (this.host.autoTake ? this.host.autoTake(p, bag) : bag);
     for (const eid of podQuery(w)) {
       if (hasComponent(w, Dead, eid)) continue;
       const bag = this.contents.get(eid);
@@ -179,7 +289,7 @@ export class LootPods {
       Position.x[eid] += Velocity.x[eid];
       Position.y[eid] += Velocity.y[eid];
 
-      let target = -1, best = Infinity;
+      let target = -1, best = Infinity, take: Bag = {};
       const sys = InSystem.systemId[eid];
       let near = collectors.get(sys);
       if (!near) collectors.set(sys, (near = this.host.collectors(sys).filter((p) => hasComponent(w, Player, p) && !hasComponent(w, Dead, p))));
@@ -189,25 +299,27 @@ export class LootPods {
         if (d >= PULL_RANGE || d >= best || roomOf(p) < 1) continue;
         const ig = this.ignore.get(eid);
         if (ig && ig.eid === p && this.ticks < ig.until) continue;
-        const kept = this.kept.get(eid);
-        if (kept && (this.host.tick?.() ?? this.ticks) < kept.until && this.host.keyOf?.(p) !== kept.key) continue;
-        best = d; target = p;
+        if (!this.mayTake(eid, p)) continue;
+        // (Nothing in it this ship picks up by itself: it waits for the pickup panel)
+        const auto = autoOf(p, bag);
+        if (!Object.keys(auto).length) continue;
+        best = d; target = p; take = auto;
       }
       if (target < 0) continue;
       if (best < 24) {
-        const left = this.host.give(target, bag, { x: Position.x[eid], y: Position.y[eid] }, this.minedBy.get(eid) === target ? 'mined' : 'loot');
+        const left = this.host.give(target, take, { x: Position.x[eid], y: Position.y[eid] }, this.minedBy.get(eid) === target ? 'mined' : 'loot');
         room.delete(target);
-        if (!Object.keys(left).length) {
-          this.contents.delete(eid);
-          const kept = this.kept.get(eid);
-          if (kept) { this.kept.delete(eid); this.host.emptied?.(eid, kept.key); }
-          this.host.remove(eid);
-        } else {
-          this.contents.set(eid, left);
-          this.refresh(eid);
+        const rest: Bag = { ...bag };
+        for (const [id, n] of Object.entries(take)) { rest[id] -= n - (left[id] ?? 0); if (rest[id] <= 0) delete rest[id]; }
+        this.settle(eid, rest);
+        if (Object.keys(left).length && Object.keys(rest).length) {
           // Bounce off: the hold is full
           Velocity.x[eid] = (Position.x[eid] - Position.x[target]) * 0.02;
           Velocity.y[eid] = (Position.y[eid] - Position.y[target]) * 0.02;
+        } else if (Object.keys(rest).length) {
+          // What it won't pick up by itself rides along beside the ship, in the panel's reach, rather than coasting off
+          Velocity.x[eid] = Velocity.x[target];
+          Velocity.y[eid] = Velocity.y[target];
         }
         continue;
       }
@@ -229,5 +341,6 @@ export class LootPods {
         this.anchors.set(eid, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], t: tick });
       }
     }
+    if (this.ticks % NEAR_EVERY === 0) this.sendNear();
   }
 }

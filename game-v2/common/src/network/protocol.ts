@@ -23,6 +23,8 @@ export * from './minesProtocol.js';
 export * from './clampProtocol.js';
 export * from './tutorialProtocol.js';
 export * from './gunRangeProtocol.js';
+// (Loot tables, the pickup panel and hold ghosts: docs/design/loot-pickup-2026-11.md)
+export * from './lootProtocol.js';
 export * from './combatProtocol.js';
 export * from './updateProtocol.js';
 export * from './guestProtocol.js';

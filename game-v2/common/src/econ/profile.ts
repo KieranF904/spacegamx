@@ -26,6 +26,7 @@ import { fieldUpdate, setActiveShip } from './fieldUpdate.js';
 export { setActiveShip };
 import { cleanBank, type RepairBank } from './field/bank.js';
 import { cleanFieldRecord, type FieldRecord } from './field/record.js';
+import { cleanGhosts, cleanPickup, type HoldGhost, type PickupPrefs } from './holdGhosts.js';
 import { newTutorial, cleanTutorial } from '../tutorial/state.js';
 import type { TutorialProfile } from '../tutorial/types.js';
 
@@ -132,6 +133,8 @@ export interface ShipRecord {
   ammo?: ShipLoadout;
   /** Field work kept between sessions: machine switches, the recycling queue, planned parts waiting, what the machines hold (econ/field/record.ts) */
   field?: FieldRecord;
+  /** The hold's ghosts (econ/holdGhosts.ts): items this ship picks up by itself. The ship's own: another ship has its own; a death clears them */
+  wants?: HoldGhost[];
 }
 
 /**
@@ -224,6 +227,8 @@ export interface PlayerProfile {
   bank?: RepairBank;
   /** The training yard (common/src/tutorial): a new pilot starts in it; a profile saved before it is `left` (never enters) */
   tutorial: TutorialProfile;
+  /** Pickup settings (econ/holdGhosts.ts): "Collect all ore" (on unless `oreOff`) and the saved ghost templates */
+  pickup?: PickupPrefs;
   createdAt: string;
   updatedAt: string;
 }
@@ -308,6 +313,7 @@ function cleanRecord(s: ShipRecord): ShipRecord {
     ...(Array.isArray(s.free) && s.free.some(Number.isInteger) ? { free: s.free.filter((u) => Number.isInteger(u)) } : {}),
     ...cleanLoadout(s.ammo),
     ...cleanFieldRecord(s.field),
+    ...((w) => (w.length ? { wants: w } : {}))(cleanGhosts(s.wants)),
   };
 }
 
@@ -380,6 +386,7 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     // (a save from before the tutorial is a pilot who has left it: existing pilots never enter the yard)
     tutorial: cleanTutorial(r.tutorial),
     ...((b) => (b ? { bank: b } : {}))(cleanBank(r.bank)),
+    ...((pk) => (pk ? { pickup: pk } : {}))(cleanPickup(r.pickup)),
     ...(Array.isArray(r.fabOrders) ? { fabOrders: (r.fabOrders as FabOrder[]).filter((o) => o && typeof o.item === 'string' && typeof o.n === 'number').map((o) => ({ id: num(o.id, 0), item: o.item, n: Math.floor(o.n), made: Math.floor(num(o.made, 0)) })) } : {}),
     ...(Array.isArray(r.designs) ? { designs: (r.designs as unknown[]).map((b) => (b && typeof b === 'object' && Array.isArray((b as Blueprint).parts) && typeof (b as Blueprint).name === 'string' ? (b as Blueprint) : null)) } : {}),
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : base.createdAt,

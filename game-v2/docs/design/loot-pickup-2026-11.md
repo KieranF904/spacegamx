@@ -47,33 +47,49 @@ Components in a bill (chips, servos) do not come back. Cargo still all goes in t
   or a pod's contents changed (a wreck: `mine`, or `lock` seconds until it opens to all). Not a per-tick record.
 - **Panel** (`client/src/ui/pickup/`): F opens it (Esc or F closes; it does not block flying). Rows grouped by item
   with amounts across pods; wrecks as a row each with the owner timer. Click a row: take that item; Take all, or
-  Enter while open. Items that won't fit show greyed "Hold full"; a take that would use space a ghost reserves warns.
+  Enter while open. Items that won't fit show greyed "Hold full"; a take that would use space the whitelist reserves
+  warns.
 - **Taking is one decision message**: `lootTake { item? }` (none: all). The server checks range, the wreck's keeping,
   and hold space, takes from the nearest pods first, and gives through the normal give path, which sends `gained` and
   the `PickupItem` effect (the tractor line from pod to ship) that pulled pods already used. No fire or input latency.
 
-## D. Auto-pickup and ghosts
+## D. Auto-pickup: mining mode, the whitelist and the blacklist
 
-- **Ore** (categories mineral, gem, volatile: what mining yields) auto-collects while `Collect all ore` is on (default
-  on: `profile.pickup.oreOff` absent).
-- **Ghosts** (`ShipRecord.wants`, on the ship's record): `{ item, n? }`. No `n`: unlimited, always collects, reserves 5
-  units of its volume. With `n`: reserves `n - held`, collects up to `n`, then the ghost is removed (the stack is now
-  real). Ore and other auto pickups can't use another ghost's reservation; a ghost's item uses its own and free space;
-  a manual take may use reserved space (the panel warns). Pure rules: `common/src/econ/holdGhosts.ts` (both sides).
-- Pods are pulled only by a ship that would auto-collect something in them, and on contact only that part is given;
-  the rest stays for the panel. Mining chunks are ore, so mining feels as before.
-- Ghosts stay with the ship: a different ship has its own; a death clears them (the record's design is rebuilt bare).
-- **Templates** (`profile.pickup.templates`, up to 12): "Save current ghosts as..." and "Load" (replaces the current
-  ghosts) from the hold. Messages: `ghost { item, n?, remove? }`, `ghostTemplate { save | load | remove }`,
-  `pickupPrefs { ore }`.
+Two refinements from Kieran (2026-11-11) replaced the first "Collect all ore" switch and the ghosts shown in the hold.
+
+- **Mining mode**: a toggle on the cargo panel (mirrored in the auto-pickup panel). On, every ore (categories mineral,
+  gem, volatile: whatever a rock gives) comes in by itself except the blacklisted ones; off, ores come in only through
+  the whitelist or the pickup panel. The pilot's (`profile.pickup.miningOff`); new pilots: on.
+- **Blacklist**: ores mining mode skips, the pilot's (`profile.pickup.blacklist`), empty for new pilots. Only ores can
+  be listed. Added from the catalogue ("+ Blacklist"), or by right-clicking an ore in the hold: "Blacklist & jettison"
+  (lists it and throws out what the hold has of it: one `oreBlacklist { item, on, jettison }`).
+- **Whitelist** (in code: the hold's ghosts, `ShipRecord.wants`, `{ item, n? }`): items the ship picks up by itself.
+  The hold's own: another ship has its own, a death clears it. No `n`: unlimited, always collects, reserves 5 units of
+  its volume. With `n`: reserves `n - held`, collects up to `n`, then the entry goes (the stack is now real). Ore and
+  other auto pickups can't use another entry's reservation; an entry's own item uses its own and free space; a manual
+  take may use reserved space (the pickup panel warns). A whitelisted ore comes in whatever mining mode and the
+  blacklist say. Pure rules: `common/src/econ/holdGhosts.ts` (server and client both).
+- **The auto-pickup panel** (`client/src/ui/pickup/AutoPickupPanel.ts`), opened from the cargo panel's small
+  "Auto-pickup: N" chip: the mining mode toggle, the whitelist and the blacklist as icon lists (right-click an icon:
+  remove, or set / clear a target), "+ Whitelist" / "+ Blacklist" (the catalogue), and the templates. The cargo panel
+  shows real cargo only, with the reserved space as a faint segment on its fill bar. Right-click a real item in the
+  hold: "Auto-pickup this" (whitelist), and for ores "Blacklist & jettison".
+- **Templates** (`profile.pickup.templates`, up to 12): whitelists only. "Save as..." and "Load" (replaces the hold's
+  whitelist) in the panel and the catalogue.
+- Pods are pulled only by a ship that would pick up something in them by itself, and on contact only that part is
+  given; the rest stays for the pickup panel. Mining chunks are ore, so mining feels as before.
+- Messages: `ghost { item, n?, remove? }` (a whitelist entry), `ghostTemplate { save | load | remove }`,
+  `pickupPrefs { mining }`, `oreBlacklist { item, on, jettison? }`; the hold's entries ride in `items.ghosts`, the
+  pilot's settings in `profile.pickup { mining, blacklist, templates }`.
 
 ## E. The item catalogue picker
 
-Opened from the hold (`+ Want item`) and its Templates menu. Reuses the field guide's item icons
-(`guideChips.itemIcon`), category icons and level gates (`levels.ts`). Sections: Mining (ores, gems), Enemy drops
-(by enemy, Low/Medium/High), Components, Refined materials, Salvage (items that come from scrapping and wrecks),
-Templates; a search box. Each tile says where it comes from ("Scrap Nest den · rare", "Nebula tar rocks", "Not in
-Sol"). Items above the pilot's level show with a lock and their level. Model: `client/src/ui/pickup/catalogue.ts`.
+Opened from the auto-pickup panel ("+ Whitelist" / "+ Blacklist") and for its templates. Reuses the field guide's item
+icons (`guideChips.itemIcon`), category icons and level gates (`levels.ts`). Sections: Mining (ores, gems; blacklisted
+ones marked, a click toggles them), Enemy drops (by enemy, Low/Medium/High), Components, Refined materials, Salvage
+(items from scrapping and wrecks), Templates; a search box. Each tile says where it comes from ("Scrap Nest den ·
+rare", "Nebula tar rocks", "Not in Sol"). Items above the pilot's level show with a lock and their level. Model:
+`client/src/ui/pickup/catalogue.ts`.
 
 ## F. Training
 
@@ -87,9 +103,14 @@ One step after "Mine the belt": "Loot in reach" (`panel: pickup`), teaching F an
   rare table (a mite) still has a defined extra roll (scrapborn: `scrap_rare`; in the den: `nest_rare`).
 - **The den rolls** differ from the same designs outside it, so a third override level (`spawns.<system>.loot`) was
   needed; it is keyed by design and only exists for `sol_scrap_nest`.
-- **"Ore"** for the switch: minerals, rough gems and volatiles, i.e. everything a rock gives.
-- **Unlimited ghost reservation**: 5 units of space always kept free for it (not "5 minus held"), so a ghost item can
+- **"Ore"** for mining mode and the blacklist: minerals, rough gems and volatiles, i.e. everything a rock gives.
+- **Unlimited whitelist reservation**: 5 units of space always kept free for it (not "5 minus held"), so the item can
   keep coming in however many are held.
+- **A pod with ore and other loot**: the ore is pulled in; what is left rides along at the ship's speed (in the panel's
+  reach) instead of coasting off with the pull's speed.
+- **Bytes**: `items` carries `ghosts` only when the hold has a whitelist; `profile` always carries `pickup` (a delta
+  can't say "back to the default" by leaving a field out). That field is the only thing that moved the golden frame
+  hash (world hashes and message counts unchanged), so it was re-pinned.
 - **Fly-to-ship**: the server gives at once and the client draws the existing tractor effect; pods are not split and
   re-pulled (that would cost anchors and time for no gameplay).
 - **Wreck salvage "refined materials"**: only refined-category inputs of the bill; components are dropped.

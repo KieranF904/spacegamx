@@ -112,6 +112,8 @@ function loseShip(self: Pilots, p: Session['profile'], rec: ShipRecord): void {
   delete rec.owed;
   delete rec.unbuilt;
   delete rec.free;
+  // (Its hold's ghosts go with it: docs/design/loot-pickup-2026-11.md D)
+  delete rec.wants;
   if (rec.field) {
     const { fabOn, refOn, packs, recipe } = rec.field;
     rec.field = { ...(fabOn ? { fabOn } : {}), ...(refOn ? { refOn } : {}), ...(packs ? { packs } : {}), ...(recipe ? { recipe } : {}) };
