@@ -7,3 +7,6 @@ server/stats/
 
 # Review board answers and its access key (scripts/review-board)
 review/board/
+
+# Weapons lab drafts, key and model config (scripts/weapons-lab)
+/lab/
