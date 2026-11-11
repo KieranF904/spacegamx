@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, onTestFinished } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Position, Velocity, ServerMessage, Station as StationComp, Blueprint, countOf, partItemId, migrateProfile, ghostBill, planOrders,
-  addTo, orderRanking, buildableGhosts,
+  addTo, orderRanking, buildableGhosts, unlockTable, setUnlockTable,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -253,10 +253,15 @@ describe('hangar slots', () => {
     const { server, t, pid, profile, clock } = world();
     dock(server, pid);
     emptyStorage(server, pid, { iron_ore: 40, nickel_ore: 40 });
+    // One refinery slot: the queue runs in series (with more, jobs run side by side: stationLanes.test.ts)
+    const table = unlockTable();
+    setUnlockTable({ refinerySlots: { ...table.refinerySlots, base: 1 } });
+    onTestFinished(() => setUnlockTable(table));
     const ids = [...server.econ.recipes.refining.values()].filter((r) => Object.keys(r.inputs).every((k) => k === 'iron_ore' || k === 'nickel_ore')).map((r) => r.id).slice(0, 2);
     expect(ids.length).toBe(2);
     t.send({ type: 'refine', recipe: ids[0], batches: 3 } as any);
-    t.send({ type: 'refine', recipe: ids[1], batches: 1 } as any);
+    // (the screen's queue is as long as the slots, so the second comes by the hangar's way, which isn't capped)
+    server.services.refineFor(server.pilots.connOf(pid)!, 'sol_station_central', ids[1], 1);
     const [a, b] = profile().jobs;
     expect(b.startedAt).toBe(a.readyAt);
     t.send({ type: 'job', id: a.id, action: 'pause' } as any);

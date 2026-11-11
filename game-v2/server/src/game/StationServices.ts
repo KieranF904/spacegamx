@@ -5,11 +5,15 @@
  *
  * Inputs come from cargo and storage; outputs go to storage (shared between
  * stations). Refining always takes a while (recipes.json `time` per batch);
- * fabricating does for anything bigger than a small part. Jobs run one after
- * another, a queue each for the refinery and the fabricator at the station
+ * fabricating does for anything bigger than a small part. Jobs run in
+ * parallel lanes, a queue each for the refinery and the fabricator at the station
  * they were started at, and each finished run goes straight to storage,
  * wherever the pilot is. The fabricator needs its refined materials on hand:
  * refine them first (the hangar's build orders do both for you: Hangar.ts).
+ *
+ * Each queue runs as many jobs side by side as the pilot has slots for (the
+ * fabricator's: unlocks, skills and the station's fabSlots perk; the
+ * refinery's: unlocks); a job past that waits for the first lane to free up.
  *
  * Any job can be held (the rest of its queue moves up; it keeps the progress
  * of the run it was on), resumed (back into its place), moved to the front of
@@ -19,7 +23,7 @@
 import {
   Economy, StationData, Bag, CraftRecipe, ServerMessage, CraftJob,
   canCraft, sellPrice, buyPrice, queueSlots, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
-  stationPerks, stationLearned, armouryRound, stationTable, type Outpost,
+  stationPerks, stationLearned, type PlayerProfile, armouryRound, stationTable, type Outpost,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import { PayoutDice, type Dice } from './payoutDice.js';
@@ -230,7 +234,8 @@ export class StationServices {
     // Your station's refinery and fabricator tracks speed the work up
     const perks = stationPerks(p.outpost);
     unitMs = Math.max(250, Math.round(unitMs * (refinery ? perks.refineTime : perks.fabTime)));
-    const last = p.jobs.filter((j) => j.station === stationId && isRefineJob(j) === refinery && !j.paused).reduce((t, j) => Math.max(t, j.readyAt), now);
+    // It takes the first lane to come free (all of them are free now when the queue is shorter than the slots)
+    const last = Math.min(...this.lanes(p, stationId, refinery, now));
     p.jobs.push({
       id: p.jobs.reduce((m, j) => Math.max(m, j.id), 0) + 1, recipe, station: stationId, out: { ...out }, count: n, done: 0, unitMs, startedAt: last, readyAt: last + unitMs * n,
       ...(tag ? { for: tag.for, slot: tag.slot } : {}),
@@ -273,7 +278,7 @@ export class StationServices {
   }
 
   /** Hold jobs: each keeps the progress of its current run; the rest of its queue moves up */
-  hold(p: { jobs: CraftJob[] }, jobs: CraftJob[]): void {
+  hold(p: PlayerProfile, jobs: CraftJob[]): void {
     const now = this.host.now();
     for (const j of jobs) {
       if (j.paused) continue;
@@ -284,7 +289,7 @@ export class StationServices {
   }
 
   /** Resume held jobs, in their place in the queue */
-  release(p: { jobs: CraftJob[] }, jobs: CraftJob[]): void {
+  release(p: PlayerProfile, jobs: CraftJob[]): void {
     for (const j of jobs) j.paused = false;
     for (const j of jobs) this.reschedule(p, j);
   }
@@ -305,18 +310,34 @@ export class StationServices {
     this.pilots.markDirty(conn);
   }
 
-  /** Lay a queue out again (the one `like` is in): running jobs back to back from now, held ones aside */
-  private reschedule(p: { jobs: CraftJob[] }, like: CraftJob): void {
+  /** How many jobs a queue runs at once: the fabricator's slots, or the refinery's */
+  private slots(p: PlayerProfile, refinery: boolean): number {
+    return Math.max(1, refinery ? unlocks(p).refinerySlots : queueSlots(p));
+  }
+
+  /** When each lane of a queue comes free, jobs given the first free lane in their order (held ones aside) */
+  private lanes(p: PlayerProfile, stationId: string, refinery: boolean, now: number): number[] {
+    const free = new Array<number>(this.slots(p, refinery)).fill(now);
+    for (const j of p.jobs) {
+      if (j.station !== stationId || isRefineJob(j) !== refinery || j.paused) continue;
+      free[free.indexOf(Math.min(...free))] = Math.max(now, j.readyAt);
+    }
+    return free;
+  }
+
+  /** Lay a queue out again (the one `like` is in): running jobs side by side from now, one to a lane, held ones aside */
+  private reschedule(p: PlayerProfile, like: CraftJob): void {
     const now = this.host.now();
-    let cursor = now;
+    const free = new Array<number>(this.slots(p, isRefineJob(like))).fill(now);
     for (const j of p.jobs) {
       if (!sameQueue(j, like) || j.paused) continue;
+      const lane = free.indexOf(Math.min(...free)), cursor = free[lane];
       const partial = j.heldMs ?? Math.max(0, Math.min(j.unitMs, now - j.startedAt - j.done * j.unitMs));
       delete j.heldMs;
       // A run under way can't have finished already (deliver() took those)
       j.startedAt = cursor - j.done * j.unitMs - Math.min(partial, j.unitMs - 1);
       j.readyAt = j.startedAt + j.unitMs * j.count;
-      cursor = j.readyAt;
+      free[lane] = j.readyAt;
     }
   }
 
