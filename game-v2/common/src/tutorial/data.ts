@@ -18,7 +18,7 @@ export interface TutorialRefs {
 }
 
 const KINDS = ['drone', 'ring', 'zone', 'exit'];
-const TRIGGERS = ['ack', 'rings', 'zoneStop', 'objectsBroken', 'collect', 'panel', 'docked', 'refined', 'partPlaced', 'powered', 'jumped', 'graduate'];
+const TRIGGERS = ['ack', 'rings', 'zoneStop', 'objectsBroken', 'collect', 'panel', 'docked', 'refined', 'partPlaced', 'powered', 'fieldPlanned', 'fieldBuilt', 'jumped', 'graduate'];
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -61,9 +61,11 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
       const list = Array.isArray(t.panels) ? t.panels : [t.panel];
       if (!list.length || list.some((x) => !TUTORIAL_PANELS.includes(x as never))) err(`${p}.trigger.panel`, `expected one of ${TUTORIAL_PANELS.join(', ')} (or a list in panels)`);
     }
-    for (const [k, n] of Object.entries(isObj(s.grant) ? s.grant : {})) {
-      if (!isNum(n) || n <= 0) err(`${p}.grant.${k}`, 'expected a positive number');
-      else if (refs.item && !refs.item(k)) err(`${p}.grant.${k}`, `unknown item "${k}"`);
+    for (const key of ['grant', 'holdGrant'] as const) {
+      for (const [k, n] of Object.entries(isObj(s[key]) ? s[key] : {})) {
+        if (!isNum(n) || n <= 0) err(`${p}.${key}.${k}`, 'expected a positive number');
+        else if (refs.item && !refs.item(k)) err(`${p}.${key}.${k}`, `unknown item "${k}"`);
+      }
     }
   });
   if (steps.length && isObj(steps[0]) && steps[0].id !== 'welcome') err('steps[0].id', 'the first step must be "welcome" (TUTORIAL_FIRST_STEP)');

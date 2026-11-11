@@ -340,6 +340,7 @@ export class GameServer implements ServerCtx {
     this.tutorial = setupTutorial(this, opts);
     // (The field machines tell the bank which parts they hold, and a death empties them into the wreck)
     const field = this.features.get('machines') as unknown as FieldShips | undefined;
+    if (field) field.hooks = { planned: (eid, n) => this.tutorial?.fieldPlanned(eid, n), built: (eid, fn) => this.tutorial?.fieldBuilt(eid, fn) };
     if (field) this.pilots.fieldHooks = { isClaimed: (eid, uid) => field.isClaimed(eid, uid), machineContents: (eid) => field.machineContents(eid, true) };
     this.market = new Market(marketDeps(this, opts, stationAtConn(this)), this.econ, this.pilots, this.gameData.questsFile.reputations);
     this.services = new StationServices(servicesDeps(this, opts), this.pilots, this.econ, this.market, this.payout);

@@ -40,6 +40,8 @@ export type TutorialTriggerKind =
   | 'refined'        // refined `item` once
   | 'partPlaced'     // placed one part in the hangar
   | 'powered'        // a generator is wired and the ship is powered
+  | 'fieldPlanned'   // saved a world build plan that adds a part
+  | 'fieldBuilt'     // the fabricator finished a part onto the ship
   | 'jumped'         // finished a jump inside the `objects[0]` exit marker
   | 'graduate';      // grant the pack and leave
 
@@ -74,6 +76,8 @@ export interface TutorialStepDef {
   targets?: string[];
   /** Items granted when the step starts (so the lesson has what it needs) */
   grant?: Record<string, number>;
+  /** Items put straight in the hold when the step starts (the field fabricator builds from the hold; `grant` goes to storage) */
+  holdGrant?: Record<string, number>;
   /**
    * UI controls the step needs, in the order the pilot meets them: each entry is a CSS selector (list) the client makes glow
    * until clicked (prefer the stable data-tab / data-key / data-tut attributes). Of the entries not yet clicked, the last one whose
@@ -144,9 +148,12 @@ export type TutorialEvent =
   | { kind: 'refined'; item: string }
   | { kind: 'partPlaced'; fn?: string }
   | { kind: 'powered' }
+  /** A world build plan was saved with `n` new parts / the field fabricator put a part onto the ship */
+  | { kind: 'fieldPlanned'; n: number }
+  | { kind: 'fieldBuilt'; fn: string }
   // ---- engine to itself
   | { kind: 'graduate' };
 
 /** Panels the client may report opening (tutorialReport) */
-export const TUTORIAL_PANELS = ['hold', 'hangar', 'bank', 'guide', 'map', 'refinery', 'fabricator'] as const;
+export const TUTORIAL_PANELS = ['hold', 'hangar', 'bank', 'guide', 'map', 'refinery', 'fabricator', 'build'] as const;
 export type TutorialPanel = (typeof TUTORIAL_PANELS)[number];

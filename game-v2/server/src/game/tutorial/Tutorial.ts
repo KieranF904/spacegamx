@@ -208,6 +208,14 @@ export class Tutorial {
     this.pilots.sendItems(conn);
   }
 
+  /** Put a step's holdGrant in the pilot's hold (what the field fabricator builds from); what does not fit goes to storage */
+  grantHold(conn: PilotConn, items: Bag): void {
+    const left = this.pilots.give(conn, { ...items }, { source: 'tutorial', quiet: true });
+    if (Object.keys(left).length) this.pilots.give(conn, left, { toStorage: true, source: 'tutorial', quiet: true });
+    this.pilots.toast(conn, Object.keys(left).length ? 'Training gear added (some to your storage: your hold is full).' : 'Training gear added to your hold.', 'info');
+    this.pilots.sendItems(conn);
+  }
+
   /** The server tick (the step engine's timers) */
   nowTick(): number { return this.host.tick(); }
 
@@ -245,6 +253,14 @@ export class Tutorial {
     this.onEvent(conn.playerId, { kind: 'partPlaced', fn: parts[0].fn });
     if (parts.some((q) => q.built && (registeredFunction(q.fn)?.produce ?? 0) > 0)) this.onEvent(conn.playerId, { kind: 'powered' });
   }
+
+  /** A world build plan was saved (field fabrication): `added` parts are new in the design */
+  fieldPlanned(eid: number, added: number): void {
+    if (added > 0) this.onEvent(eid, { kind: 'fieldPlanned', n: added });
+  }
+
+  /** The pilot's field fabricator finished a part onto their ship */
+  fieldBuilt(eid: number, fn: string): void { this.onEvent(eid, { kind: 'fieldBuilt', fn }); }
 
   // ------------------------------------------------------------ leaving
 
