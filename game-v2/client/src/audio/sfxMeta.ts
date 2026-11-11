@@ -40,7 +40,6 @@ export const SFX_TABLE: Record<string, readonly [variants: number, reverb: numbe
   ui_close: [1, 0.15],
   jump_ready: [1, 0.35],
   tutorial_step: [1, 0.25],
-  tutorial_one: [1, 0.25],
   tutorial_two: [1, 0.25],
 };
 

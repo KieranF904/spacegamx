@@ -82,11 +82,6 @@ export function targetGained(prev: State | null, next: State, data: TutorialData
   return doneTargets(next, step).length > doneTargets(prev, step).length;
 }
 
-/** The part of the step chime one more target plays: one note, then two once only the last is left (the step's own chime is the full run) */
-export function partChime(done: number, total: number): 'tutorial_one' | 'tutorial_two' {
-  return done >= total - 1 ? 'tutorial_two' : 'tutorial_one';
-}
-
 /** Does this step point at the yard station (the dock step: the station is no training object, so the data has no target for it)? */
 export function pointsAtStation(step: TutorialStepDef | undefined): boolean {
   return step?.trigger.kind === 'docked';

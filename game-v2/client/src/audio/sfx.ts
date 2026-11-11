@@ -598,10 +598,9 @@ const RECIPES: Record<string, Recipe> = {
     burst(ctx, out, r, 0.12, 0.12, 0.002, 0.3, [filter(ctx, 'bandpass', 5000, 1.5)]);
   } },
   // A new training card: three bright rising bell tones, clear over engine noise. Progress on a step (a ring, a drone)
-  // plays the start of the same run, one note, then two, so the step's finish completes it
+  // plays its first two, so the step's finish completes the run
   tutorial_step: { duration: 0.8, build(ctx, out) { bells(ctx, out, 3, 0.45); } },
-  tutorial_one: { duration: 0.35, build(ctx, out) { bells(ctx, out, 1, 0.22); } },
-  tutorial_two: { duration: 0.45, build(ctx, out) { bells(ctx, out, 2, 0.22); } },
+  tutorial_two: { duration: 0.7, build(ctx, out) { bells(ctx, out, 2, 0.45); } },
 };
 
 /** One-pole lowpass made cyclic (run twice), so loops have no seam */

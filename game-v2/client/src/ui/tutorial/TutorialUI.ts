@@ -17,7 +17,7 @@ import { Glow, domGlowHost } from './glow';
 import { domFind, findAnchor } from './placement';
 import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
 import { guideMarks, setGuideMarks } from '../../state/guideMarks';
-import { counterOf, markerStyle, lookFor, newlyDone, partChime, targetGained, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
+import { markerStyle, lookFor, newlyDone, targetGained, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 import { clearTrainingBodies, setTrainingBody } from '../../state/trainingBodies';
 
 export interface TutorialUIDeps {
@@ -101,10 +101,8 @@ export class TutorialUI {
     // (When the next step comes up with it, its chime is the one sound)
     const next = !!prev && prev.step !== s.step;
     for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t, next);
-    if (targetGained(prev, s, tutorialData)) {
-      const c = counterOf(s, tutorialData.steps.find((x) => x.id === s.step));
-      this.d.sound(c ? partChime(c.done, c.total) : 'tutorial_one', 0.7);
-    }
+    // (one more ring or drone: the first two notes of the step chime)
+    if (targetGained(prev, s, tutorialData)) this.d.sound('tutorial_two', 0.7);
     // A new step: whatever panel is already open counts again
     if (!prev || prev.step !== s.step) this.prevPanels = {};
     this.refresh();
