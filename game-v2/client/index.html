@@ -156,48 +156,6 @@
     }
 
     /* ============================================
-       Boost Indicator - Bottom Right
-       ============================================ */
-    #boostHud {
-      position: absolute;
-      right: 20px;
-      bottom: 20px;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      z-index: 25;
-      pointer-events: none;
-    }
-
-    #boostBar {
-      width: 8px;
-      height: 100px;
-      border-radius: 4px;
-      border: 2px solid rgba(100, 180, 255, 0.7);
-      background: rgba(100, 180, 255, 0.1);
-      position: relative;
-      overflow: hidden;
-    }
-
-    #boostFill {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 100%;
-      background: rgba(100, 180, 255, 0.8);
-      transition: height 0.1s ease-out;
-    }
-
-    #boostLabel {
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(100, 180, 255, 0.8);
-    }
-
-    /* ============================================
        Minimap - Bottom Right
        ============================================ */
     /* ============================================
@@ -482,13 +440,7 @@
 
       <!-- Inventory and Equipment Panels are created dynamically by InventoryUI.ts -->
 
-      <!-- Boost Indicator -->
-      <div id="boostHud">
-        <div id="boostBar">
-          <div id="boostFill"></div>
-        </div>
-        <span id="boostLabel">ENERGY</span>
-      </div>
+      <!-- (The power readout, bottom right, is ui/hud/PowerMargin.ts) -->
 
       <!-- Quest Tracker -->
       <div id="questTracker">

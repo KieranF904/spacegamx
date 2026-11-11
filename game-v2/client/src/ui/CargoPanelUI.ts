@@ -11,8 +11,8 @@
  * clear of the side panel and the pilot readout above: `ceiling`), or folds
  * down to just the fill bar. The side panel (ui/hub) sits on top of it and
  * shares the column: `column()` tells it the room, `relayout()` re-places it.
- * Hidden while docked (the station's storage screen has the hold then); I
- * opens the full window.
+ * Hidden while docked (the station's storage screen has the hold then). In
+ * flight it is the hold view: right-click also has the item's own actions (use, quick bar).
  */
 
 import { RARITY_COLOR, cargoEffect, isOre, reservedSpace, type ClientMessage } from '@space-game/common';
@@ -20,6 +20,7 @@ import type { PilotState } from '../econ/clientEcon';
 import { injectWindowStyles, itemTipHtml, showTip, hideTip, openMenu, closeMenu, sortStacks } from './windowKit';
 import { itemIcon } from './itemIcons';
 import { holdTag } from './storeControls';
+import { itemUseActions } from './itemActions';
 
 const FOLD_KEY = 'sg.cargoPanel.collapsed';
 const HEIGHT_KEY = 'sg.cargoPanel.height';
@@ -304,7 +305,7 @@ export class CargoPanelUI {
       if (d) nm.style.color = RARITY_COLOR[d.rarity];
       const extra = (tag ? `<div class="t-h" style="color:${tag.cls === 'load' ? '#5eead4' : '#c4b5fd'}">${tag.tip}</div>` : '')
         + '<div class="t-h" style="color:#fca5a5">Goes in your wreck if your ship is lost</div>';
-      it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click: jettison, or auto-pickup' }), e.clientX, e.clientY));
+      it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click: use, quick bar, jettison, or auto-pickup' }), e.clientX, e.clientY));
       it.addEventListener('mouseleave', hideTip);
       it.addEventListener('contextmenu', (e) => { e.preventDefault(); hideTip(); this.jettisonMenu(s.id, e); });
       this.grid.appendChild(it);
@@ -318,7 +319,9 @@ export class CargoPanelUI {
     const p = this.pilot;
     const have = p.cargo.find((s) => s.id === id)?.n ?? 0;
     if (!have) return;
-    const items = [{ label: have > 1 ? `Jettison all (${have})` : 'Jettison', bad: true, run: () => { this.send({ type: 'itemJettison', id, n: have }); this.sound('ui_click'); } }];
+    // (The item's own actions first: use, ammo first, the quick bar: they were the in-flight hold window's)
+    const items: { label: string; bad: boolean; run: () => void }[] = itemUseActions(p, this.send, id).map((it) => ({ ...it, bad: false }));
+    items.push({ label: have > 1 ? `Jettison all (${have})` : 'Jettison', bad: true, run: () => { this.send({ type: 'itemJettison', id, n: have }); this.sound('ui_click'); } });
     if (have > 1) items.push({ label: 'Jettison one', bad: true, run: () => { this.send({ type: 'itemJettison', id, n: 1 }); this.sound('ui_click'); } });
     const white = p.ghosts.some((g) => g.item === id);
     items.push(white

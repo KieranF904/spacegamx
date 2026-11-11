@@ -68,6 +68,12 @@ import { makeComponentGuide, makeStationWindow, makeTutorialUI, makeGunRangeHud 
 import { inGunRange } from '../ui/gunRange/rangeState';
 import { wreckLive, type WreckMark } from '../ui/wreckMark';
 import { backupPicker } from '../ui/BackupPicker';
+import { ShipWindow } from '../ui/ship/ShipWindow';
+import { shipTabs } from '../ui/ship/tabs';
+import { FooterBar } from '../ui/hud/FooterBar';
+import { PowerMargin } from '../ui/hud/PowerMargin';
+import { StatusTray } from '../ui/hud/StatusTray';
+import { groupSelection } from '../ships/weaponGroups/selection';
 
 /** What the windows read from the game (Game supplies it as getters, so later-built state resolves at use) */
 export interface WindowHost {
@@ -149,6 +155,13 @@ export interface WindowSet {
   buildSites: BuildSites | null;
   /** The gun range's banner, target bar, door prompt and weapon picker (ui/gunRange) */
   gunRangeHud: Lazy<GunRangeHud>;
+  /** The Ship window (ui/ship): Status, Power, Weapons, Pickup, Refiner, Fabricator, Kills. Open: fly, but no fire */
+  shipWindow: ShipWindow;
+  /** The HUD's shortcut buttons along the bottom (ui/hud/FooterBar.ts) */
+  footer: FooterBar;
+  /** The power readout, bottom right, and the status effect icons above the jump drive bar (ui/hud) */
+  powerMargin: PowerMargin;
+  statusTray: StatusTray;
 }
 
 export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSet {
@@ -373,6 +386,44 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.systemMapUI.pings = () => w.pingUI.markers();
     w.gunRangeHud = makeGunRangeHud(host, w);
     w.systemMapUI.onPing = (x, y) => w.pingUI.pingAt(x, y);
+    buildShipHud(host, w);
 
   return w;
+}
+
+const keyOf = (a: string): string => boundKeyName(a, settings.data.bindings);
+
+/** The Ship window, the footer's shortcut buttons, the power readout and the status icons */
+function buildShipHud(host: WindowHost, w: WindowSet): void {
+  w.shipWindow = new ShipWindow({
+    pilot: host.pilot,
+    send: (m) => host.network.send(m),
+    sound: (id) => host.audio.playUI(id, 0.4),
+    ship: () => host.shipClient.myShip(),
+    geometry: (ship) => host.shipClient.store.geometry(ship),
+    statusInput: () => host.shipClient.statusInput(),
+    charge: () => host.state.charge,
+    groups: () => host.shipClient.ringGroups(),
+    selection: () => ({ left: groupSelection.leftGroup, right: groupSelection.rightGroup }),
+    fnName: (fn) => host.pilot.econ.ships.functions.get(fn)?.name ?? fn,
+    keyName: keyOf,
+    docked: () => host.stationOpen,
+    openStation: () => w.stationWindow.value?.showTab('bank'),
+    openTab: (id) => w.shipWindow.open(id),
+  }, shipTabs(() => w.pickup.auto));
+  // (The cargo panel's Auto-pickup chip opens the Pickup tab)
+  w.pickup.openLists = () => w.shipWindow.open('pickup');
+  w.powerMargin = new PowerMargin();
+  w.powerMargin.onClick = () => w.shipWindow.toggle('power');
+  w.statusTray = new StatusTray();
+  w.footer = new FooterBar([
+    { id: 'ship', label: 'Ship', action: 'inventory', title: 'Your ship: status, power, weapons, pickup, refiner, fabricator, kills', run: () => w.shipWindow.toggle('status'), on: () => w.shipWindow.isOpen },
+    { id: 'build', label: 'Build', action: 'fieldBuild', title: 'Build view: edit your ship in flight', run: () => { host.shipClient.onKey('Digit7'); } },
+    { id: 'jobs', label: 'Jobs', action: 'log', title: 'Pilot log: your jobs', run: () => w.quests.log.toggle('jobs'), on: () => w.quests.log.isOpen },
+    { id: 'map', label: 'Map', action: 'map', title: 'Galaxy and system map', run: () => { w.systemMapUI.toggle(); host.audio.playUI('ui_open', 0.6); } },
+    { id: 'station', label: 'Station', action: 'dock', title: 'Dock at the station', run: () => { host.shipClient.onKey('KeyH'); }, shown: () => !!host.shipClient.dockableStationName() },
+    { id: 'social', label: 'Social', action: 'party', title: 'Friends and party (the side panel)', run: () => w.hub.toggle('social') },
+    { id: 'guide', label: 'Guide', action: '', title: 'The field guide', run: () => host.menu.openGuide('progress') },
+    { id: 'settings', label: 'Settings', action: 'menu', title: 'Settings', run: () => host.menu.open('settings') },
+  ], keyOf);
 }

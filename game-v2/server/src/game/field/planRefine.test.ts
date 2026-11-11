@@ -150,4 +150,15 @@ describe("the refiner's choice", () => {
     expect(pickRefine(econ, 0, undefined, { steel_plate: 1 }, have({ iron_ore: 40, nickel_ore: 40 }))).toEqual({ blocked: 'grade' });
     expect(pickRefine(econ, 0, undefined, { alloy_plate: 1 }, have({}))).toEqual({ blocked: 'idle' });
   });
+
+  it("on auto, once the plan needs nothing it can make, it runs the pilot's list in order (FieldRecord.refine)", () => {
+    const ore = have({ iron_ore: 2, nickel_ore: 1 });
+    expect(pickRefine(econ, 0, undefined, {}, ore, ['alloy_plate'])).toMatchObject({ recipe: 'alloy_plate' });
+    // (Past the grade: skipped for the next one; nothing the hold can make: waiting for materials)
+    expect(pickRefine(econ, 0, undefined, {}, ore, ['steel_plate', 'alloy_plate'])).toMatchObject({ recipe: 'alloy_plate' });
+    expect(pickRefine(econ, 0, undefined, {}, have({}), ['alloy_plate'])).toEqual({ blocked: 'materials' });
+    expect(pickRefine(econ, 0, undefined, {}, have({ iron_ore: 40, nickel_ore: 40 }), ['steel_plate'])).toEqual({ blocked: 'grade' });
+    // (A chosen recipe still wins, and so does what the plan is short of)
+    expect(pickRefine(econ, 0, 'alloy_plate', {}, ore, ['steel_plate'])).toMatchObject({ recipe: 'alloy_plate' });
+  });
 });

@@ -24,6 +24,7 @@
   "fabOrderCancel",
   "feedSwitch",
   "fieldCancel",
+  "fieldOrder",
   "fieldPlan",
   "fieldPlanClear",
   "fieldRecycle",

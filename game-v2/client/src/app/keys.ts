@@ -10,6 +10,7 @@
  */
 import type { Lazy } from '../lazy';
 import type { InventoryWindow } from '../ui/InventoryWindow';
+import type { ShipWindow } from '../ui/ship/ShipWindow';
 import type { PickupWindows } from '../ui/pickup';
 import type { HubPanel } from '../ui/hub/HubPanel';
 import type { StationWindow } from '../ui/StationWindow';
@@ -48,6 +49,8 @@ export interface KeyHost {
   /** The side panel on the HUD (Social, Party, Pilot, Components) */
   readonly hub: HubPanel;
   readonly inventoryWindow: InventoryWindow;
+  /** The Ship window (not modal: only Esc is its; the flight keys pass on) */
+  readonly shipWindow: Pick<ShipWindow, 'onKey' | 'toggle' | 'isOpen'>;
   /** The pickup panel (F), the auto-pickup panel and its catalogue (ui/pickup) */
   readonly pickup: PickupWindows;
   readonly tradeWindow: TradeWindow;
@@ -105,6 +108,8 @@ export const MODAL_CHAIN: readonly KeyFn[] = [
   },
   // The pickup windows: the catalogue owns the keyboard while open; Esc closes the pickup or auto-pickup panel
   (h, code) => h.loggedIn && h.pickup.onKey(code),
+  // The Ship window: Esc closes it; every other key passes on (it is not modal: the pilot flies with it open)
+  (h, code) => h.shipWindow.onKey(code),
   (h, code) => {
     if (!h.inventoryWindow.isOpen) return false;
     if (code === 'Escape' || code === 'KeyI') h.inventoryWindow.close();
@@ -157,8 +162,8 @@ const quick = (n: number): KeyFn => flying((h) => h.quickBar.use(n));
 
 /** Global keys that run after the ship's own keys */
 export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
-  // I: cargo and storage
-  KeyI: flying((h) => h.inventoryWindow.open()),
+  // I: the Ship window (docked, the station's entry in the chain opens cargo and storage instead)
+  KeyI: flying((h) => h.shipWindow.toggle()),
   // F: the pickup panel, the loot in reach (after the ship's keys: the build overlay flips a part with F)
   KeyF: flying((h) => h.pickup.panel.toggle()),
   // 1-5: the quick bar

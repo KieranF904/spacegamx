@@ -1,8 +1,11 @@
 /**
  * @contract client.ui.auto-pickup-panel
- * owns:       the auto-pickup panel the cargo panel opens: mining mode (mirrored from the cargo panel), the hold's whitelist (icons, a target or unlimited, right-click to set or remove), the pilot's ore blacklist (icons, right-click to remove), + Whitelist / + Blacklist (the catalogue), and the whitelist's templates (save as, load, delete)
+ * owns:       the auto-pickup lists, drawn in the Ship window's Pickup tab (the cargo panel's chip opens it there): mining
+ *             mode's switch, a search box, the hold's whitelist as an icon grid (a target or unlimited, right-click to set or
+ *             remove), the pilot's ore blacklist (right-click to remove), + Whitelist / + Blacklist (the catalogue), and the
+ *             whitelist's templates (save as, load, delete)
  * needs:      PilotState (the whitelist, mining mode, templates), CataloguePicker, askBox, windowKit (tips, menus), itemIcons; the server's ghost, ghostTemplate, pickupPrefs and oreBlacklist; npm: @space-game/common
- * invariants: every change is one message the server checks; the panel only shows what the server last said (no local copies) — server/src/game/pickup.test.ts
+ * invariants: every change is one message the server checks; the view only shows what the server last said (no local copies) — server/src/game/pickup.test.ts
  * extend:     a new list is one more block in render() with its message
  */
 
@@ -20,24 +23,22 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.sgap { position: fixed; left: 352px; bottom: 150px; width: 300px; z-index: 870; box-sizing: border-box; padding: 9px 11px 10px; display: none;
-  background: rgba(8, 14, 26, 0.92); border: 1px solid rgba(125, 211, 252, 0.3); border-radius: 10px; color: #c9d4e5; font: 12px 'Segoe UI', system-ui, sans-serif; user-select: none; }
-.sgap.on { display: block; }
-.sgap-head { display: flex; align-items: center; gap: 8px; }
-.sgap-head b { font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2px; color: #7dd3fc; }
-.sgap-head .x { all: unset; cursor: pointer; margin-left: auto; color: #8394ad; font-size: 15px; }
-.sgap h5 { margin: 9px 0 4px; font: 700 9.5px 'Segoe UI', sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #6f8099; display: flex; align-items: center; gap: 6px; }
-.sgap h5 .sub { font-weight: 400; letter-spacing: 0; text-transform: none; color: #56657c; }
-.sgap-icons { display: flex; flex-wrap: wrap; gap: 4px; }
-.sgap-ic { position: relative; width: 34px; height: 34px; border-radius: 7px; background: rgba(4, 8, 16, 0.55); border: 1px solid rgba(140, 170, 220, 0.2); display: flex; align-items: center; justify-content: center; cursor: context-menu; }
-.sgap-ic img { width: 26px; height: 26px; }
-.sgap-ic .t { position: absolute; right: 1px; bottom: -1px; font: 700 9px 'Segoe UI', sans-serif; color: #fbbf24; text-shadow: 0 0 2px #000; }
+.sgap { color: #c9d4e5; font: 12px 'Segoe UI', system-ui, sans-serif; user-select: none; }
+.sgap-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sgap-top input[type=search] { flex: 1; min-width: 140px; }
+.sgap h5 { margin: 12px 0 5px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #7dd3fc; display: flex; align-items: center; gap: 6px; }
+.sgap h5 .sub { font-weight: 400; letter-spacing: 0; text-transform: none; color: #56657c; font-size: 11px; }
+.sgap-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 5px; }
+.sgap-ic { position: relative; aspect-ratio: 1; border-radius: 8px; background: rgba(4, 8, 16, 0.55); border: 1px solid rgba(140, 170, 220, 0.2); display: flex; align-items: center; justify-content: center; cursor: context-menu; }
+.sgap-ic[hidden] { display: none; }
+.sgap-ic img { width: 72%; height: 72%; }
+.sgap-ic .t { position: absolute; right: 2px; bottom: 0; font: 700 10px 'Segoe UI', sans-serif; color: #fbbf24; text-shadow: 0 0 2px #000; }
 .sgap-ic.black { border-color: rgba(248, 113, 113, 0.5); }
-.sgap-ic.black::after { content: ''; position: absolute; left: 4px; right: 4px; top: 50%; height: 2px; background: rgba(248, 113, 113, 0.85); transform: rotate(-35deg); }
-.sgap-add { all: unset; cursor: pointer; width: 34px; height: 34px; box-sizing: border-box; border-radius: 7px; border: 1px dashed rgba(125, 211, 252, 0.4); color: #7dd3fc; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.sgap-ic.black::after { content: ''; position: absolute; left: 5px; right: 5px; top: 50%; height: 2px; background: rgba(248, 113, 113, 0.85); transform: rotate(-35deg); }
+.sgap-add { all: unset; cursor: pointer; aspect-ratio: 1; box-sizing: border-box; border-radius: 8px; border: 1px dashed rgba(125, 211, 252, 0.4); color: #7dd3fc; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .sgap-add:hover { background: rgba(125, 211, 252, 0.12); }
 .sgap-none { color: #56657c; font-size: 11px; padding: 2px 0; }
-.sgap-mode { display: flex; align-items: center; gap: 7px; margin-top: 7px; cursor: pointer; }
+.sgap-mode { display: flex; align-items: center; gap: 7px; cursor: pointer; }
 .sgap-mode input { accent-color: #86efac; }
 .sgap-tpl { display: flex; flex-wrap: wrap; gap: 5px; }
 .sgap-tpl button { all: unset; cursor: pointer; padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(125, 211, 252, 0.35); color: #bae6fd; font-size: 11px; }
@@ -49,51 +50,50 @@ function injectStyles(): void {
 export class AutoPickupPanel {
   private root: HTMLDivElement;
   private body: HTMLDivElement;
+  private searchEl: HTMLInputElement;
   private key = '';
+  private host: HTMLElement | null = null;
 
   constructor(private pilot: PilotState, private picker: CataloguePicker, private send: (m: ClientMessage) => void, private sound: (id: string) => void) {
     injectWindowStyles();
     injectStyles();
     this.root = document.createElement('div');
     this.root.className = 'sgap';
-    this.root.dataset.hudAvoid = '1';
-    this.root.innerHTML = '<div class="sgap-head"><b>AUTO-PICKUP</b><button type="button" class="x" aria-label="Close">×</button></div><div class="sgap-body"></div>';
+    this.root.innerHTML = '<div class="sgap-top"><label class="sgap-mode"><input type="checkbox"><span>Mining mode: every ore but the blacklisted</span></label><input type="search" placeholder="Search…"></div><div class="sgap-body"></div>';
     this.body = this.root.querySelector('.sgap-body') as HTMLDivElement;
-    (this.root.querySelector('.x') as HTMLElement).onclick = () => this.close();
+    this.searchEl = this.root.querySelector('input[type=search]') as HTMLInputElement;
+    this.searchEl.oninput = () => this.filter();
+    (this.root.querySelector('.sgap-mode input') as HTMLInputElement).onchange = (e) => { this.send({ type: 'pickupPrefs', mining: (e.target as HTMLInputElement).checked }); this.sound('ui_click'); };
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
-    document.body.appendChild(this.root);
     pilot.onChange(() => this.render());
   }
 
-  get isOpen(): boolean { return this.root.classList.contains('on'); }
+  get isOpen(): boolean { return this.host !== null; }
 
-  toggle(): void { if (this.isOpen) this.close(); else this.open(); }
-
-  open(): void {
-    this.root.classList.add('on');
-    this.key = '';
+  /** Draw into the Pickup tab's body */
+  mountIn(body: HTMLElement): void {
+    this.host = body;
+    if (this.root.parentElement !== body) body.appendChild(this.root);
     this.render();
-    this.sound('ui_open');
   }
 
-  close(): void {
-    if (!this.isOpen) return;
-    this.root.classList.remove('on');
+  unmount(): void {
+    this.host = null;
+    this.root.remove();
     hideTip();
-    this.sound('ui_close');
   }
 
-  /** Next to the cargo panel, whatever its size */
-  placeBy(rect: DOMRect | null): void {
-    if (!rect) return;
-    this.root.style.left = `${Math.round(rect.right + 10)}px`;
-    this.root.style.bottom = `${Math.round(innerHeight - rect.bottom)}px`;
+  /** The search box hides icons whose name doesn't match (no redraw while typing) */
+  private filter(): void {
+    const q = this.searchEl.value.trim().toLowerCase();
+    for (const el of this.body.querySelectorAll<HTMLElement>('.sgap-ic')) el.hidden = !!q && !(el.dataset.name ?? '').includes(q);
   }
 
   private icon(id: string, cls: string, badge: string, tip: string, menu: (e: MouseEvent) => void): HTMLElement {
     const econ = this.pilot.econ;
     const d = document.createElement('div');
     d.className = `sgap-ic ${cls}`;
+    d.dataset.name = econ.items.name(id).toLowerCase();
     d.innerHTML = `<img src="${itemIcon(econ, id)}" alt="">${badge ? `<span class="t">${esc(badge)}</span>` : ''}`;
     d.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, id, { hint: tip }), e.clientX, e.clientY));
     d.addEventListener('mouseleave', hideTip);
@@ -118,17 +118,12 @@ export class AutoPickupPanel {
     const key = JSON.stringify([p.ghosts, mode, templates]);
     if (key === this.key) return;
     this.key = key;
+    (this.root.querySelector('.sgap-mode input') as HTMLInputElement).checked = !!mode.on;
     this.body.replaceChildren();
-    // Mining mode (the cargo panel's switch, mirrored)
-    const m = document.createElement('label');
-    m.className = 'sgap-mode';
-    m.innerHTML = `<input type="checkbox"${mode.on ? ' checked' : ''}><span>Mining mode: pick up every ore but the blacklisted</span>`;
-    (m.querySelector('input') as HTMLInputElement).onchange = (e) => { this.send({ type: 'pickupPrefs', mining: (e.target as HTMLInputElement).checked }); this.sound('ui_click'); };
-    this.body.appendChild(m);
 
     // The whitelist: this hold's
     const wh = document.createElement('h5');
-    wh.innerHTML = 'Whitelist <span class="sub">this ship\'s hold</span>';
+    wh.innerHTML = 'Whitelist <span class="sub">this ship\'s hold picks these up</span>';
     const wl = document.createElement('div');
     wl.className = 'sgap-icons';
     for (const g of p.ghosts) {
@@ -183,5 +178,6 @@ export class AutoPickupPanel {
       tl.appendChild(n);
     }
     this.body.append(th, tl);
+    this.filter();
   }
 }

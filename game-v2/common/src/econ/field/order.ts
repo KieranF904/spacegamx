@@ -93,6 +93,24 @@ export function nextFieldTarget(n: number, root: number, joins: readonly (readon
 }
 
 /**
+ * The job part `i` would be now, by the same rules as nextFieldTarget, or null when there is nothing the machine can do
+ * with it yet (whole, not makeable, waiting on a recycle, joined to nothing standing, or holding others on). The pilot's
+ * priority list (FieldRecord.first) asks this of each of its parts, in order, before the usual pick
+ */
+export function fieldTargetOf(i: number, n: number, root: number, joins: readonly (readonly [number, number])[], view: readonly FieldPartView[]): FieldTarget {
+  const v = view[i];
+  if (!v || !v.makeable) return null;
+  if (v.alive && !v.recycle && v.missing > 1e-6) return { kind: 'repair', part: i };
+  if (v.alive && v.recycle) {
+    const rc = recycleCandidates(n, root, joins, view.map((x) => x.alive), view.map((x) => x.recycle));
+    return rc.includes(i) ? { kind: 'recycle', part: i } : null;
+  }
+  if (v.alive || !v.wanted || v.blocked) return null;
+  if (joinDepths(n, root, joins)[i] < 0) return null;
+  return adjacency(n, joins)[i].some((j) => view[j].alive) ? { kind: 'build', part: i } : null;
+}
+
+/**
  * Rearming (docs/design/groups-mines-docking.md, "Field fabrication hook"): what the fabricator does once no repair,
  * recycle or build is left for it to start. The Mine Bay that lacks the most mines (ties: the first in part order) gets
  * a job of up to `perJob` mines (rules.ts REARM.perJob). `bays`: the ship's working bays (fx.minebay.bays), `loaded`

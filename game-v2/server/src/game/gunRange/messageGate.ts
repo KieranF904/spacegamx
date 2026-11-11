@@ -30,7 +30,7 @@ export const RANGE_GATE = {
   // Building, the hangar and the station (there is none in the range, and nothing built here may last)
   shipEdit: 'refuse', dock: 'refuse', undock: 'refuse', stationOpen: 'refuse', slotBuild: 'refuse', slotClear: 'refuse', slotFly: 'refuse',
   slotLoadout: 'refuse', slotOrder: 'refuse', slotSave: 'refuse', designSave: 'refuse', designDelete: 'refuse', shareDesign: 'refuse',
-  fieldPlan: 'refuse', fieldPlanClear: 'refuse', fieldCancel: 'refuse', fieldRecycle: 'refuse', machine: 'refuse',
+  fieldPlan: 'refuse', fieldPlanClear: 'refuse', fieldCancel: 'refuse', fieldRecycle: 'refuse', fieldOrder: 'refuse', machine: 'refuse',
   clampDock: 'refuse', clampSwap: 'refuse', clampUndock: 'refuse', tow: 'refuse', mineDrop: 'refuse',
   // Items, money and trade
   itemMove: 'refuse', itemStore: 'refuse', itemJettison: 'refuse', itemUse: 'refuse', scrapItem: 'refuse', quickbarSet: 'refuse',

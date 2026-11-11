@@ -1,6 +1,7 @@
 /**
  * @contract client.app.hud-readouts
- * owns:       the top-HUD readouts each frame: boost bar, XP bar and level (with their gain glow), credits, system name
+ * owns:       the top-HUD readouts each frame: XP bar and level (with their gain glow), credits, system name (the pool-era
+ *             energy bar went: ui/hud/PowerMargin.ts is the power readout)
  * needs:      HudHost (state, pilot, ship client, system names), domWrite setText and setStyle
  * invariants: each element is written only when its value changes (domWrite) — client/src/app/appInvariants.test.ts
  * extend:     a new readout is a cached element below and one more write in update()
@@ -24,7 +25,6 @@ export class HudReadouts {
   private xpBarEl = document.getElementById('xpBar');
   /** The XP bar as last shown (to glow when it grows) */
   private xpSeen: { level: number; into: number } | null = null;
-  private boostFillEl = document.getElementById('boostFill');
   private levelEl = document.getElementById('level');
   private xpEl = document.getElementById('xp');
   private xpToNextEl = document.getElementById('xpToNext');
@@ -37,12 +37,6 @@ export class HudReadouts {
   private creditsShown = -1;
 
   update(): void {
-    // Boost Bar (vertical)
-    if (this.boostFillEl) {
-      const boostPercent = (this.h.state.boostFuel / this.h.state.maxBoostFuel) * 100;
-      setStyle(this.boostFillEl, 'height', `${boostPercent.toFixed(1)}%`);
-    }
-    
     // XP bar: progress through the current level (from the pilot's profile)
     const prof = this.h.pilot.profile;
     const into = prof ? prof.xp - prof.xpLevel : 0;
