@@ -148,5 +148,5 @@ export type TutorialEvent =
   | { kind: 'graduate' };
 
 /** Panels the client may report opening (tutorialReport) */
-export const TUTORIAL_PANELS = ['hold', 'hangar', 'bank', 'guide', 'map', 'refinery', 'fabricator'] as const;
+export const TUTORIAL_PANELS = ['hold', 'hangar', 'bank', 'guide', 'map', 'refinery', 'fabricator', 'pickup'] as const;
 export type TutorialPanel = (typeof TUTORIAL_PANELS)[number];

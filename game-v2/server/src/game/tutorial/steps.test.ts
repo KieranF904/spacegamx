@@ -77,10 +77,10 @@ function mineChunk(w: World, p: Pilot, bag: Record<string, number>): void {
 }
 
 describe('the step engine', () => {
-  it('has fourteen steps, each with a real binding name and one or two short lines', () => {
+  it('has fifteen steps, each with a real binding name and one or two short lines', () => {
     const w = yard();
-    expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
-    const actions = new Set(['forward', 'backward', 'left', 'right', 'wasd', 'powerFlow', 'fire', 'inventory', 'dock', 'components', 'map', 'jump']);
+    expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'pickup', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
+    const actions = new Set(['forward', 'backward', 'left', 'right', 'wasd', 'powerFlow', 'fire', 'inventory', 'pickup', 'dock', 'components', 'map', 'jump']);
     for (const s of w.data.steps) {
       expect(s.lines.length).toBeGreaterThanOrEqual(1);
       expect(s.lines.length).toBeLessThanOrEqual(2);
@@ -152,6 +152,10 @@ describe('the step engine', () => {
 
     // 6 hold
     a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'hold' } as never);
+    w.step(1);
+    expectStep('pickup');
+    // 6b the pickup panel (docs/design/loot-pickup-2026-11.md F)
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'pickup' } as never);
     w.step(1);
     expectStep('dock');
 

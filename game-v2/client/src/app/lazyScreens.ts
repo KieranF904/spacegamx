@@ -59,7 +59,7 @@ export function makeTutorialUI(host: WindowHost, w: WindowSet): Lazy<TutorialUI>
         const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';
         return {
           hold: w.inventoryWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
-          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator',
+          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator', pickup: w.pickup.panel.isOpen,
         };
       },
     })));

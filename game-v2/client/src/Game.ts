@@ -303,7 +303,8 @@ this.boostHudEl = document.getElementById('boostHud');
     this.chat = new ChatPanel({
       send: (m) => this.network.send(m),
       setGameInput: (on) => this.input.setEnabled(on),
-      canFocus: () => !this.menu.isOpen && this.network.isConnected(),
+      // (Not while the pickup panel is open: Enter takes all there)
+      canFocus: () => !this.menu.isOpen && this.network.isConnected() && !this.w.pickup?.takesEnter,
       ensureShown: () => { if (!settings.data.ui.chat) settings.update((d) => { d.ui.chat = true; }); },
       onFocusChange: (f) => { this.chatFocused = f; },
       openFriends: () => this.w.hub.open('social'),
@@ -713,6 +714,7 @@ this.boostHudEl = document.getElementById('boostHud');
       get dialogue() { return g.w.dialogue; },
       get hub() { return g.w.hub; },
       get inventoryWindow() { return g.w.inventoryWindow; },
+      get pickup() { return g.w.pickup; },
       get tradeWindow() { return g.w.tradeWindow; },
       get social() { return g.w.social; },
       get quests() { return g.w.quests; },
@@ -914,6 +916,7 @@ this.boostHudEl = document.getElementById('boostHud');
       // (In the gun range the weapon picker has its place: ui/gunRange)
       this.w.hub.update(!this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen ? 'off' : blocked || this.stationOpen || !me || inGunRange() ? 'covered' : 'on');
       this.w.cargoPanel.update(blocked || this.stationOpen || !me || inGunRange(), !!me && !inSafeSpace(this.world.currentSystem(), me.renderX, me.renderY));
+      this.w.pickup.update(blocked || this.stationOpen || !me || inGunRange());
     }
     this.chargeGauge.update(this.shipClient.laserCharge(), this.loggedIn && !this.shipClient.hangarOpen);
     // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo

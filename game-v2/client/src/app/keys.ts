@@ -10,6 +10,7 @@
  */
 import type { Lazy } from '../lazy';
 import type { InventoryWindow } from '../ui/InventoryWindow';
+import type { PickupWindows } from '../ui/pickup';
 import type { HubPanel } from '../ui/hub/HubPanel';
 import type { StationWindow } from '../ui/StationWindow';
 import type { TradeWindow } from '../ui/TradeWindow';
@@ -47,6 +48,8 @@ export interface KeyHost {
   /** The side panel on the HUD (Social, Party, Pilot, Components) */
   readonly hub: HubPanel;
   readonly inventoryWindow: InventoryWindow;
+  /** The pickup panel (F), the auto-pickup panel and its catalogue (ui/pickup) */
+  readonly pickup: PickupWindows;
   readonly tradeWindow: TradeWindow;
   readonly social: SocialUI;
   readonly quests: QuestClient;
@@ -100,6 +103,8 @@ export const MODAL_CHAIN: readonly KeyFn[] = [
     }
     return false;
   },
+  // The pickup windows: the catalogue owns the keyboard while open; Esc closes the pickup or auto-pickup panel
+  (h, code) => h.loggedIn && h.pickup.onKey(code),
   (h, code) => {
     if (!h.inventoryWindow.isOpen) return false;
     if (code === 'Escape' || code === 'KeyI') h.inventoryWindow.close();
@@ -154,6 +159,8 @@ const quick = (n: number): KeyFn => flying((h) => h.quickBar.use(n));
 export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
   // I: cargo and storage
   KeyI: flying((h) => h.inventoryWindow.open()),
+  // F: the pickup panel, the loot in reach (after the ship's keys: the build overlay flips a part with F)
+  KeyF: flying((h) => h.pickup.panel.toggle()),
   // 1-5: the quick bar
   Digit1: quick(0), Digit2: quick(1), Digit3: quick(2), Digit4: quick(3), Digit5: quick(4),
   // P: invite the pilot under the cursor, or the side panel's Social tab (again: fold it)

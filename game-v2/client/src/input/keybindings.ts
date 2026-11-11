@@ -46,7 +46,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'dock', label: 'Dock / open hangar', category: 'Ship & world', key: 'KeyH', hint: "Inside a station's docking ring" },
   { id: 'interact', label: 'Use jump gate / descend to a planet', category: 'Ship & world', key: 'KeyX', hint: 'In orbit close to a planet you can land on' },
   { id: 'autopilot', label: 'Autopilot to the job you follow', category: 'Ship & world', key: 'KeyG', hint: 'Or click a place on the map (M). Any flight key takes back control' },
-  { id: 'pickup', label: 'Tractor beam pickup', category: 'Ship & world', key: 'KeyF' },
+  { id: 'pickup', label: 'Pickup panel: the loot in reach', category: 'Ship & world', key: 'KeyF', hint: 'Click an item to take it; Enter takes everything. Ore comes in by itself in mining mode' },
   { id: 'contextMenu', label: 'Action menu (hold, then right-click)', category: 'Ship & world', key: 'KeyZ', hint: 'What you can do with what is under the cursor: dock, travel, land, hail, target, fly or jump there. A plain right-click fires' },
   { id: 'respawn', label: 'Respawn', category: 'Ship & world', key: 'KeyR', hint: 'After being destroyed' },
   { id: 'menu', label: 'Menu', category: 'Interface', key: 'Escape', rebindable: false },

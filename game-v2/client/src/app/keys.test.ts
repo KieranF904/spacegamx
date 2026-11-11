@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { handleKey, MODAL_CHAIN, PRE_KEYS, POST_KEYS, type KeyHost } from './keys';
+import { PickupWindows } from '../ui/pickup';
 
 /** A host whose windows are all shut, logged in, recording what it was asked to do */
 function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: string[] } {
@@ -11,6 +12,7 @@ function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: stri
     dialogue: { onKey: () => false },
     hub: { dismiss: () => false, toggle: (id: string) => { calls.push('hub:' + id); } },
     inventoryWindow: { isOpen: false, open: rec('inv.open'), close: rec('inv.close') },
+    pickup: { onKey: () => false },
     tradeWindow: { isOpen: false, close: rec('trade.close') },
     social: { isMember: () => false, invite: rec('invite') },
     quests: { log: { isOpen: false, close: rec('log.close'), toggle: rec('log.toggle'), open: rec('log.open') } },
@@ -39,7 +41,7 @@ function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: stri
 
 describe('keys: the modal chain and tables', () => {
   it('has the chain in its fixed order (menu first, station last)', () => {
-    expect(MODAL_CHAIN.length).toBe(8);
+    expect(MODAL_CHAIN.length).toBe(9);
   });
 
   it('P opens the side panel on Social, or invites the pilot under the cursor', () => {
@@ -78,6 +80,32 @@ describe('keys: the modal chain and tables', () => {
     expect(calls).toEqual([]);
     handleKey(h, 'Escape');
     expect(calls).toEqual(['trade.close']);
+  });
+
+  it('the pickup windows: Esc closes the top one, the open catalogue swallows keys; F (after the ship) toggles the pickup panel', () => {
+    const log: string[] = [];
+    const w = (panel: boolean, auto: boolean, picker: boolean) => ({
+      panel: { isOpen: panel, toggle: () => log.push('panel.toggle'), close: () => log.push('panel.close') },
+      auto: { isOpen: auto, close: () => log.push('auto.close') },
+      picker: { isOpen: picker, close: () => log.push('picker.close') },
+    });
+    const onKey = (o: ReturnType<typeof w>, code: string) => PickupWindows.prototype.onKey.call(o as never, code);
+    expect(onKey(w(false, false, false), 'KeyF')).toBe(false);
+    expect(onKey(w(false, false, false), 'KeyW')).toBe(false);
+    expect(onKey(w(true, true, false), 'Escape')).toBe(true);
+    expect(onKey(w(false, true, false), 'Escape')).toBe(true);
+    expect(onKey(w(true, false, false), 'KeyW')).toBe(false);
+    expect(onKey(w(true, false, true), 'KeyW')).toBe(true);
+    expect(onKey(w(true, false, true), 'Escape')).toBe(true);
+    expect(log).toEqual(['panel.close', 'auto.close', 'picker.close']);
+    // In the chain: it gets the key before the inventory window
+    const { h, calls } = fakeHost({ pickup: { onKey: (c: string) => { calls.push(`pickup:${c}`); return true; } }, inventoryWindow: { isOpen: true, close: () => calls.push('inv.close') } });
+    handleKey(h, 'Escape');
+    expect(calls).toEqual(['pickup:Escape']);
+    // F after the ship's own keys: the panel when the ship doesn't take it
+    const f = fakeHost({ pickup: { onKey: () => false, panel: { toggle: () => f.calls.push('pickup.toggle') } } });
+    handleKey(f.h, 'KeyF');
+    expect(f.calls).toEqual(['pickup.toggle']);
   });
 
   it('Esc opens the menu when nothing else wants it', () => {

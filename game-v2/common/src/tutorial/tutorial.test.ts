@@ -11,8 +11,8 @@ describe('data/tutorial.json', () => {
     expect(validateTutorialData(data)).toEqual([]);
   });
 
-  it('has the fourteen steps, in order, ending in graduate', () => {
-    expect(stepIds(data)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
+  it('has the fifteen steps, in order, ending in graduate', () => {
+    expect(stepIds(data)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'pickup', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
     expect(nextStep(data, 'welcome')).toBe('rings');
     expect(nextStep(data, 'graduate')).toBeUndefined();
   });

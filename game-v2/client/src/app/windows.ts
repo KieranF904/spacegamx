@@ -16,6 +16,7 @@ import { itemIcon } from '../ui/itemIcons';
 import { InventoryWindow } from '../ui/InventoryWindow';
 import { PilotHud, ToastUI } from '../ui/PilotHud';
 import { CargoPanelUI } from '../ui/CargoPanelUI';
+import { PickupWindows } from '../ui/pickup';
 import { RegionUI } from '../ui/RegionUI';
 import { BuildSites } from '../rendering/BuildSites';
 import { KillFeedUI } from '../ui/KillFeedUI';
@@ -113,6 +114,8 @@ export interface WindowSet {
   stationWindow: Lazy<StationWindow>;
   pilotHud: PilotHud;
   cargoPanel: CargoPanelUI;
+  /** The pickup panel (F), the auto-pickup panel and its catalogue (ui/pickup; docs/design/loot-pickup-2026-11.md) */
+  pickup: PickupWindows;
   quests: QuestClient;
   toasts: ToastUI;
   dialogue: DialogueUI;
@@ -158,6 +161,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.cargoPanel.ceiling = () => w.hub?.cargoCeiling() || Math.max(w.pilotHud.bottom(), w.social?.hudBottom() ?? 0);
     // (The load is weighed against the ship you fly: common/src/ships/load.ts)
     w.cargoPanel.ship = () => host.shipClient.myShip()?.derived ?? null;
+    w.pickup = new PickupWindows(host.pilot, (m) => host.network.send(m), (id) => host.audio.playUI(id, 0.4), w.cargoPanel);
     host.shipClient.ownAmmo = (kind) => {
       // (The gun range: every gun fires its kind's standard crate, as the server's Ammo.setFree does)
       if (inGunRange()) { const std = cratesFor(shipTuning as ShipTuning, kind)[0]; return std ? ammoByCode(ammoCode(std))?.mods : undefined; }

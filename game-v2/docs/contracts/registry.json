@@ -152,7 +152,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 500,
+      "lines": 502,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -243,19 +243,19 @@
           "name": "TABLE",
           "kind": "const",
           "start": 302,
-          "end": 490
+          "end": 492
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 492,
-          "end": 493
+          "start": 494,
+          "end": 495
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 495,
-          "end": 500
+          "start": 497,
+          "end": 502
         }
       ]
     },
@@ -8443,6 +8443,343 @@
           "kind": "class",
           "start": 47,
           "end": 75
+        }
+      ]
+    },
+    {
+      "id": "client.ui.auto-pickup-panel",
+      "path": "client/src/ui/pickup/AutoPickupPanel.ts",
+      "group": "client/ui/pickup",
+      "lines": 187,
+      "owns": "the auto-pickup panel the cargo panel opens: mining mode (mirrored from the cargo panel), the hold's whitelist (icons, a target or unlimited, right-click to set or remove), the pilot's ore blacklist (icons, right-click to remove), + Whitelist / + Blacklist (the catalogue), and the whitelist's templates (save as, load, delete)",
+      "needs": "PilotState (the whitelist, mining mode, templates), CataloguePicker, askBox, windowKit (tips, menus), itemIcons; the server's ghost, ghostTemplate, pickupPrefs and oreBlacklist; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every change is one message the server checks; the panel only shows what the server last said (no local copies)",
+          "test": "server/src/game/pickup.test.ts"
+        }
+      ],
+      "extend": "a new list is one more block in render() with its message",
+      "exports": [
+        "AutoPickupPanel"
+      ],
+      "sections": [
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 18,
+          "end": 47
+        },
+        {
+          "name": "AutoPickupPanel",
+          "kind": "class",
+          "start": 49,
+          "end": 187
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-picker",
+      "path": "client/src/ui/pickup/CataloguePicker.ts",
+      "group": "client/ui/pickup",
+      "lines": 194,
+      "owns": "the item catalogue window the auto-pickup panel opens: a search box, section chips (Mining, Enemy drops, Components, Refined materials, Salvage, Templates), icon tiles saying where each item comes from, locked tiles above the pilot's level; a click whitelists an item for this hold or (+ Blacklist) toggles an ore on the blacklist",
+      "needs": "catalogue.ts (the contents), PilotState (level, the whitelist, mining mode, templates), itemIcons, the field guide's category icons and lock rule (resources/categoryIcons, resources/levels); npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "search and chips only hide tiles (no re-render while typing); a click is one message (ghost or oreBlacklist)",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        }
+      ],
+      "extend": "a new section is one in catalogue.ts SECTIONS (its chip and tiles follow)",
+      "exports": [
+        "CataloguePicker",
+        "PickMode"
+      ],
+      "sections": [
+        {
+          "name": "PickMode",
+          "kind": "type",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "SECTION_ICON",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 23,
+          "end": 61
+        },
+        {
+          "name": "CataloguePicker",
+          "kind": "class",
+          "start": 63,
+          "end": 194
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-panel",
+      "path": "client/src/ui/pickup/PickupPanelUI.ts",
+      "group": "client/ui/pickup",
+      "lines": 148,
+      "owns": "the pickup panel: everything in pickup reach grouped by item with amounts, wrecks with their keeping, click to take one item, Take all (and Enter while it is open); F opens and closes it, Esc closes it; it never stops the ship flying",
+      "needs": "PilotState (near, cargo, the whitelist), pickupModel (the rows), windowKit (tips), itemIcons; the server's lootTake; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a take is one lootTake message (the server checks reach, keeping and room); rows that won't fit are greyed \"Hold full\"",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        }
+      ],
+      "extend": "a new row action is a button in renderRow sending one message",
+      "exports": [
+        "PickupPanelUI"
+      ],
+      "sections": [
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 17,
+          "end": 46
+        },
+        {
+          "name": "clock",
+          "kind": "const",
+          "start": 48,
+          "end": 48
+        },
+        {
+          "name": "PickupPanelUI",
+          "kind": "class",
+          "start": 50,
+          "end": 148
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-catalogue",
+      "path": "client/src/ui/pickup/catalogue.ts",
+      "group": "client/ui/pickup",
+      "lines": 127,
+      "owns": "the auto-pickup catalogue's contents: its sections (Mining, Enemy drops by enemy, Components, Refined materials, Salvage), each item's one-line \"where it comes from\", its level gate, and the search over them",
+      "needs": "the field guide's resource data (resourceData: entries, source index, levels), drops.ts (the loot tables' chances), tiers; no DOM; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every ore, component and refined material is in its section once; an enemy's drops list only items it can drop, by tier word, never a number",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        },
+        {
+          "text": "an item found only outside Sol says \"Not in Sol\"; a den's own table names the den",
+          "test": "client/src/ui/pickup/catalogue.test.ts"
+        }
+      ],
+      "extend": "a new section is one entry in SECTIONS and its filter; a new kind of source is one step in whereFrom",
+      "exports": [
+        "CatalogueGroup",
+        "CatalogueItem",
+        "CatalogueSection",
+        "SECTIONS",
+        "SectionId",
+        "catalogue",
+        "matches",
+        "whereFrom"
+      ],
+      "sections": [
+        {
+          "name": "SectionId",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "SECTIONS",
+          "kind": "const",
+          "start": 16,
+          "end": 22
+        },
+        {
+          "name": "CatalogueItem",
+          "kind": "interface",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "CatalogueGroup",
+          "kind": "interface",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "CatalogueSection",
+          "kind": "interface",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "RARITY_WORD",
+          "kind": "const",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "ORE_CATEGORIES",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "inSol",
+          "kind": "const",
+          "start": 33,
+          "end": 34
+        },
+        {
+          "name": "dropperCache",
+          "kind": "let",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "droppers",
+          "kind": "function",
+          "start": 37,
+          "end": 72
+        },
+        {
+          "name": "whereFrom",
+          "kind": "function",
+          "start": 74,
+          "end": 96
+        },
+        {
+          "name": "item",
+          "kind": "const",
+          "start": 98,
+          "end": 101
+        },
+        {
+          "name": "cached",
+          "kind": "let",
+          "start": 103,
+          "end": 103
+        },
+        {
+          "name": "catalogue",
+          "kind": "function",
+          "start": 104,
+          "end": 121
+        },
+        {
+          "name": "matches",
+          "kind": "function",
+          "start": 123,
+          "end": 127
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup",
+      "path": "client/src/ui/pickup/index.ts",
+      "group": "client/ui/pickup",
+      "lines": 49,
+      "owns": "the pickup windows built and wired as one set (docs/design/loot-pickup-2026-11.md): the pickup panel (F), the auto-pickup panel (the cargo panel's chip), the catalogue picker; their per-frame show/hide and their keys (F, Esc, Enter)",
+      "needs": "PickupPanelUI, AutoPickupPanel, CataloguePicker, CargoPanelUI (the chip, its place), PilotState; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "none of them holds a key the ship flies with: Esc closes the top one, the catalogue swallows keys only while it is open; F (after the ship's own keys: the build overlay flips a part with it) toggles the pickup panel",
+          "test": "client/src/app/keys.test.ts"
+        }
+      ],
+      "extend": "a new pickup window is built here and given its place in update() and onKey()",
+      "exports": [
+        "PickupWindows"
+      ],
+      "sections": [
+        {
+          "name": "PickupWindows",
+          "kind": "class",
+          "start": 17,
+          "end": 49
+        }
+      ]
+    },
+    {
+      "id": "client.ui.pickup-model",
+      "path": "client/src/ui/pickup/pickupModel.ts",
+      "group": "client/ui/pickup",
+      "lines": 43,
+      "owns": "what the pickup panel lists from the loot in reach: one row per item (all pods summed) with how much would fit and whether it eats whitelist-reserved space, and one row per wreck with its keeping",
+      "needs": "common econ/holdGhosts.ts (manualRoom: the server's own room rule), LootNearPod; no DOM",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a locked wreck's items are not offered until its lock has run out; a row that cannot fit any is marked full",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        },
+        {
+          "text": "rows sum an item over every takeable pod",
+          "test": "client/src/ui/pickup/pickupModel.test.ts"
+        }
+      ],
+      "extend": "a new row fact is one field on PickupRow, worked out in pickupRows",
+      "exports": [
+        "PickupRow",
+        "WreckRow",
+        "lockLeft",
+        "pickupRows"
+      ],
+      "sections": [
+        {
+          "name": "PickupRow",
+          "kind": "interface",
+          "start": 12,
+          "end": 20
+        },
+        {
+          "name": "WreckRow",
+          "kind": "interface",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "lockLeft",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "pickupRows",
+          "kind": "function",
+          "start": 26,
+          "end": 43
         }
       ]
     },
