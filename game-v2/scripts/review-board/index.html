@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Review board</title>
+<style>
+:root {
+  --bg: #0b1220; --card: #131c2e; --line: #26324a; --ink: #e6ecf6; --dim: #8b98b0;
+  --accent: #fbbf24; --accent-ink: #1a1205; --ok: #4ade80; --chip: #1c2740;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+h1 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin: 0; flex: 1; }
+select, button, textarea { font: inherit; color: inherit; }
+select { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%; }
+.prog { color: var(--dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.meta { color: var(--dim); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
+.card h2 { font-size: 19px; margin: 6px 0 8px; text-wrap: balance; }
+.body { white-space: pre-wrap; color: #cfd8e6; margin: 0 0 12px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.opts button { background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; }
+.opts button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+textarea { width: 100%; min-height: 120px; background: #0e1626; border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical; }
+textarea:focus, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.saved { font-size: 13px; color: var(--dim); min-height: 1.4em; margin-top: 6px; }
+.saved.ok { color: var(--ok); }
+nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(11, 18, 32, 0.96); border-top: 1px solid var(--line); }
+nav button { flex: 1; padding: 12px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--chip); }
+nav button.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+nav button:disabled { opacity: 0.4; }
+.list { margin-top: 16px; display: grid; gap: 6px; }
+.list button { text-align: left; background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; gap: 10px; align-items: baseline; }
+.list button.cur { border-color: var(--accent); }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--line); transform: translateY(-1px); }
+.dot.done { background: var(--ok); }
+.empty { color: var(--dim); text-align: center; padding: 40px 0; }
+label.tog { color: var(--dim); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Review board</h1>
+  <span class="prog" id="prog"></span>
+</header>
+<header>
+  <select id="batch" aria-label="Batch"></select>
+  <label class="tog"><input type="checkbox" id="showDone"> show answered</label>
+</header>
+<main id="main"></main>
+<div class="list" id="list"></div>
+<nav>
+  <button id="prev">Back</button>
+  <button id="next" class="go">Next</button>
+</nav>
+<script>
+const key = new URLSearchParams(location.search).get('k') ?? '';
+let board = { batches: [], items: [] }, batchId = '', curId = '', saveTimer = 0;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const api = (p, body) => fetch(`${p}?k=${encodeURIComponent(key)}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}).then((r) => r.json());
+
+function visible() {
+  return board.items.filter((i) => !i.archived && (!batchId || i.batch === batchId) && ($('showDone').checked || !i.answer || i.id === curId));
+}
+
+function render() {
+  const live = board.batches.filter((b) => board.items.some((i) => i.batch === b.id && !i.archived));
+  $('batch').innerHTML = `<option value="">All batches</option>` + live.map((b) => {
+    const n = board.items.filter((i) => i.batch === b.id && !i.archived && !i.answer).length;
+    return `<option value="${b.id}"${b.id === batchId ? ' selected' : ''}>${esc(b.title)} (${n} left)</option>`;
+  }).join('');
+  const all = board.items.filter((i) => !i.archived && (!batchId || i.batch === batchId));
+  $('prog').textContent = all.length ? `${all.filter((i) => i.answer).length} / ${all.length} answered` : '';
+  const items = visible();
+  if (!items.find((i) => i.id === curId)) curId = (items.find((i) => !i.answer) ?? items[0])?.id ?? '';
+  const it = items.find((i) => i.id === curId);
+  if (!it) {
+    $('main').innerHTML = `<div class="empty">${all.length ? 'All answered. Tick "show answered" to review.' : 'Nothing here yet. Claude posts questions here.'}</div>`;
+  } else {
+    const idx = items.indexOf(it), b = board.batches.find((x) => x.id === it.batch);
+    const a = it.answer ?? {};
+    $('main').innerHTML = `<article class="card">
+      <div class="meta"><span>${esc(b?.title ?? '')}</span><span>${idx + 1} / ${items.length}</span></div>
+      <h2>${esc(it.title)}</h2>
+      ${it.body ? `<p class="body">${esc(it.body)}</p>` : ''}
+      ${it.options ? `<div class="opts">${it.options.map((o) => `<button type="button" data-o="${esc(o)}" class="${a.choice === o ? 'on' : ''}">${esc(o)}</button>`).join('')}</div>` : ''}
+      <textarea id="text" placeholder="Your feedback">${esc(a.text ?? '')}</textarea>
+      <div class="saved${it.answer ? ' ok' : ''}" id="saved">${it.answer ? 'Saved' : ''}</div>
+    </article>`;
+    $('main').querySelectorAll('.opts button').forEach((btn) => btn.onclick = () => {
+      const o = btn.dataset.o, on = btn.classList.contains('on');
+      $('main').querySelectorAll('.opts button').forEach((x) => x.classList.remove('on'));
+      if (!on) btn.classList.add('on');
+      save();
+    });
+    $('text').oninput = () => { $('saved').textContent = 'Editing...'; $('saved').className = 'saved'; clearTimeout(saveTimer); saveTimer = setTimeout(save, 800); };
+    $('prev').disabled = idx <= 0;
+    $('next').textContent = idx >= items.length - 1 ? 'Done' : 'Next';
+  }
+  $('list').innerHTML = items.map((i) => `<button type="button" data-id="${i.id}" class="${i.id === curId ? 'cur' : ''}"><span class="dot${i.answer ? ' done' : ''}"></span><span>${esc(i.title)}</span></button>`).join('');
+  $('list').querySelectorAll('button').forEach((btn) => btn.onclick = () => { flush(); curId = btn.dataset.id; render(); scrollTo(0, 0); });
+}
+
+async function save() {
+  clearTimeout(saveTimer); saveTimer = 0;
+  const it = board.items.find((i) => i.id === curId);
+  if (!it || !$('text')) return;
+  const choice = $('main').querySelector('.opts button.on')?.dataset.o ?? '';
+  const text = $('text').value.trim();
+  try {
+    const out = await api('/api/answer', { id: it.id, choice, text });
+    Object.assign(it, out); if (!out.answer) delete it.answer;
+    $('saved').textContent = out.answer ? 'Saved' : ''; $('saved').className = 'saved ok';
+  } catch { $('saved').textContent = 'Not saved: is the board server still running?'; $('saved').className = 'saved'; }
+}
+function flush() { if (saveTimer) save(); }
+
+function step(d) {
+  flush();
+  const items = visible(), idx = items.findIndex((i) => i.id === curId);
+  const n = items[idx + d];
+  if (n) { curId = n.id; render(); scrollTo(0, 0); }
+}
+$('prev').onclick = () => step(-1);
+$('next').onclick = () => step(1);
+$('batch').onchange = () => { flush(); batchId = $('batch').value; curId = ''; render(); };
+$('showDone').onchange = () => render();
+document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); else refresh(); });
+
+async function refresh() {
+  if (saveTimer || document.activeElement?.id === 'text') return;
+  try { board = await api('/api/board'); render(); } catch {}
+}
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

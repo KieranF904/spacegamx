@@ -4,3 +4,6 @@ prototypes/energy-lab/evolved/
 
 # Player-bot stats (server/src/bots): JSON lines and summaries, one file per bot per run
 server/stats/
+
+# Review board answers and its access key (scripts/review-board)
+review/board/

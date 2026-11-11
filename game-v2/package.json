@@ -34,6 +34,8 @@
     "cycles:check": "node scripts/cycles/check.mjs",
     "slideshow": "node scripts/slideshow/build.mjs",
     "sounds:review": "node scripts/sound-review/server.mjs",
+    "board": "node scripts/review-board/server.mjs",
+    "board:new": "node scripts/review-board/cli.mjs new",
     "det:engines": "node scripts/det/engines.mjs",
     "net:inputs": "node scripts/net/inputs.mjs"
   },
