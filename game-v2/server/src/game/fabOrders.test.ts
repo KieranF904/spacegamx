@@ -35,7 +35,9 @@ describe('fabrication orders', () => {
     // No ore: it waits, and goes on when the ore turns up
     server.hangar.orderItem(conn, 'cannon_hv', 1);
     run(5);
-    expect(p.fabOrders?.length).toBe(1);
+    // (The order is all queued; its jobs wait for the ore, taking nothing: no limit on the queue, no materials needed to place it)
+    expect(p.jobs.filter((j) => j.for?.startsWith('order:')).length).toBeGreaterThan(0);
+    expect(p.jobs.every((j) => (j.taken ?? j.count) === 0)).toBe(true);
     server.pilots.give(conn, { iron_ore: 4, nickel_ore: 2, copper_ore: 1 }, { toStorage: true, quiet: true });
     run(30);
     expect(countOf(p.storage, 'cannon_hv')).toBe(4);

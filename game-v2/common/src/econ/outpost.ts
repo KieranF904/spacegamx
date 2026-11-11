@@ -20,7 +20,6 @@ export interface TrackTier {
   /** Traces × this */
   traceMul?: number;
   /** Added to the unlocks */
-  fabSlots?: number;
   hangarSlots?: number;
   /** Taken off a gem cut's fail chance */
   cutFail?: number;
@@ -45,10 +44,10 @@ export interface Outpost {
 
 export interface StationPerks {
   refineTime: number; fabTime: number; refineYield: number; traceMul: number;
-  fabSlots: number; hangarSlots: number; cutFail: number; rounds: string[]; rumours: boolean;
+  hangarSlots: number; cutFail: number; rounds: string[]; rumours: boolean;
 }
 
-const NONE: StationPerks = { refineTime: 1, fabTime: 1, refineYield: 0, traceMul: 1, fabSlots: 0, hangarSlots: 0, cutFail: 0, rounds: [], rumours: false };
+const NONE: StationPerks = { refineTime: 1, fabTime: 1, refineYield: 0, traceMul: 1, hangarSlots: 0, cutFail: 0, rounds: [], rumours: false };
 
 /** A track's colour, and the kind of plating that marks it */
 const LOOK: Record<string, { paint: string; fn: string }> = {
@@ -102,7 +101,6 @@ export function stationPerks(o: Outpost | undefined, file: StationFile | null = 
       if (r.refineYield !== undefined) out.refineYield = r.refineYield;
       if (r.traceMul !== undefined) out.traceMul = r.traceMul;
       if (r.cutFail !== undefined) out.cutFail = r.cutFail;
-      out.fabSlots += r.fabSlots ?? 0;
       out.hangarSlots += r.hangarSlots ?? 0;
       out.rounds.push(...(r.rounds ?? []));
       if (r.rumours) out.rumours = true;

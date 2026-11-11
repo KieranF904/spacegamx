@@ -149,7 +149,7 @@ Gems come from gem seams: each unit has a 30% chance of being a gem, and a seam 
 
 ## Refining
 
-Ore is useless in a hull until it is refined. Dock at a station with a **refinery** and put a batch in the queue. Refining takes time, carries on while you are away, and finished batches go to your storage. You have **8 queue slots**.
+Ore is useless in a hull until it is refined. Dock at a station with a **refinery** and put a batch in the queue. Refining takes time, carries on while you are away, and finished batches go to your storage. The queue has no limit, and you can order a batch before you have the ore: it starts when the ore reaches storage, and a batch short of ore never holds up the ones behind it.
 
 | Plate | Inputs | Time per batch | Needs |
 |---|---|---|---|

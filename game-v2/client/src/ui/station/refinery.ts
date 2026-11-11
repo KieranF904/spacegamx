@@ -7,7 +7,7 @@
  */
 
 import {
-  unlocks, jobLanes,
+  jobLanes,
 } from '@space-game/common';
 import { costHtml } from '../windowKit';
 import { itemIcon } from '../itemIcons';
@@ -40,21 +40,21 @@ export class RefineryTab {
       const acts = document.createElement('div');
       acts.style.cssText = 'width:200px; display:flex; justify-content:flex-end; align-items:center; gap:8px;';
       row.appendChild(acts);
-      for (const n of [1, 10, max]) {
-        if (n <= 0 || (n === max && (max === 1 || max === 10))) continue;
+      // Orders go in whatever ore is in hand: a batch starts when its ore is in storage (the queue has no limit)
+      for (const n of locked ? [] : [1, 10, 100, max]) {
+        if (n <= 0 || (n === max && (max === 1 || max === 10 || max === 100))) continue;
         const btn = document.createElement('button');
         btn.className = 'sgw-btn' + (n === max ? ' primary' : '');
         btn.dataset.key = `refine:${r.id}:${n === max ? 'max' : n}`;
         btn.textContent = n === max ? `Max (${max})` : `×${n}`;
-        if (n > max) btn.classList.add('off');
-        btn.title = `${n * r.out} × ${econ.items.name(r.id)}: ${fmt((r.time ?? 2) * n)}`;
+        btn.title = `${n * r.out} × ${econ.items.name(r.id)}: ${fmt((r.time ?? 2) * n)}${n > max ? ' (waits for ore: it starts as the ore reaches storage)' : ''}`;
         btn.onclick = () => { this.d.send({ type: 'refine', recipe: r.id, batches: n }); this.d.sound('ui_click', 0.4); };
         acts.appendChild(btn);
       }
-      if (max <= 0) {
+      if (locked) {
         const no = document.createElement('span');
         no.style.cssText = 'color:#56657c; font-size:12px; width:70px; text-align:right';
-        no.textContent = locked ? `level ${r.level}` : 'need ore';
+        no.textContent = `level ${r.level}`;
         acts.appendChild(no);
       }
       col.appendChild(row);
@@ -62,7 +62,7 @@ export class RefineryTab {
     const side = document.createElement('div');
     side.className = 'sgw-col';
     const lanes = jobLanes({ skills: this.d.pilot.profile?.skills });
-    side.innerHTML = `<h4>Refining <span class="r" title="Jobs lined up / queue slots; the refinery runs ${lanes} at once">${this.st!.jobs.filter((j) => j.recipe.startsWith('refine:')).length} / ${unlocks({ level, skills: this.d.pilot.profile?.skills }).refinerySlots} · runs ${lanes} at once</span></h4>`;
+    side.innerHTML = `<h4>Refining <span class="r" title="No limit on orders; the refinery works ${lanes} at once, and an order short of ore waits without holding up the rest">runs ${lanes} at once</span></h4>`;
     side.style.overflowY = 'auto';
     const jobs = document.createElement('div');
     jobs.dataset.jobs = 'refine';

@@ -153,6 +153,8 @@ export interface CraftJob {
   unitMs: number;
   startedAt: number;
   readyAt: number;
+  /** Runs whose inputs have been taken: a lane starts a run, and takes its inputs, once they are in storage. Absent: all of them (jobs saved before that). startedAt/readyAt cover the runs taken so far */
+  taken?: number;
   /** Queued by a hangar order: the ship it's for, and its slot */
   for?: string;
   slot?: number;

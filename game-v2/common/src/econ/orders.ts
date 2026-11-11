@@ -8,7 +8,7 @@
  * plate structure is built from), the materials the missing modules are
  * fabricated from, and the ore the missing materials are refined from. Each
  * says how much is ready in storage, how much is being made, how much is
- * still to make (waiting on its inputs, or a free queue), and how much can't
+ * still to make (waiting on its inputs, or a free lane), and how much can't
  * be made at all (gather or buy it).
  */
 
@@ -30,13 +30,13 @@ export interface OrderLine {
   ready: number;
   /** Being refined or fabricated */
   coming: number;
-  /** Still to make: it can be, once its inputs (or a queue slot) are there */
+  /** Still to make: it can be, once its inputs (or a lane) are there */
   waiting: number;
   /** Can't be made: gather or buy it (or, with `blocked: 'schematic'`, it opens at a later level: the name is old) */
   short: number;
   /** What it's for: item names, or 'structure' */
   for: string[];
-  /** Why what's waiting hasn't started: its inputs are short, or the queue is full */
+  /** Why what's waiting hasn't started: its inputs are short, or the lanes are busy */
   blocked?: 'inputs' | 'queue' | 'schematic';
 }
 

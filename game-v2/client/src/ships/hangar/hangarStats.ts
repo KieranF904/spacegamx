@@ -79,9 +79,9 @@ export function buildHtml(host: HangarHost): string {
         <div style="${font} font-size:11px; white-space:normal; margin-bottom:6px">${costHtml(econ, materials, (id) => host.deps.have(id))}</div>`;
     }
     html += rec.auto
-      ? `<div style="${font} font-size:11px; color:#7dd3fc; line-height:1.5; margin-bottom:10px">On order: the refinery and fabricator work through it, and parts go in as they're ready.${blocked ? ' <span style="color:#f87171">Some parts need a licence first.</span>' : ''}</div>`
+      ? `<div style="${font} font-size:11px; color:#7dd3fc; line-height:1.5; margin-bottom:10px">On order: every part is queued; the refinery and fabricator start each as its materials arrive, and parts go in as they're ready.${blocked ? ' <span style="color:#f87171">Some parts need a licence first.</span>' : ''}</div>`
       : `<div style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px">
-          <button data-act="all" style="${btnCss('#2f6f4f')}" title="Refine your ore, fabricate the modules and fit everything, as far as your materials go">Put it on order</button></div>`;
+          <button data-act="all" style="${btnCss('#2f6f4f')}" title="Queue every missing part, materials in hand or not: refining and fabrication start as the materials arrive, and parts go in as they are made">Queue all parts</button></div>`;
   }
   if (host.slot !== hs.active) {
     const core = coreOf(rec.blueprint.parts);

@@ -12669,7 +12669,7 @@
       "id": "protocol.econ",
       "path": "common/src/network/econProtocol.ts",
       "group": "common/network",
-      "lines": 463,
+      "lines": 469,
       "owns": "the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and builds; every action is a request the server checks",
       "needs": "type-only imports of econ/stacks, econ/quests and other econ shapes",
       "events": "",
@@ -12892,241 +12892,241 @@
           "name": "JobView",
           "kind": "interface",
           "start": 279,
-          "end": 288
+          "end": 293
         },
         {
           "name": "ServerHangarMessage",
           "kind": "interface",
-          "start": 290,
-          "end": 307
+          "start": 295,
+          "end": 312
         },
         {
           "name": "ClientSlotSaveMessage",
           "kind": "interface",
-          "start": 309,
-          "end": 310
+          "start": 314,
+          "end": 315
         },
         {
           "name": "ClientSlotFlyMessage",
           "kind": "interface",
-          "start": 311,
-          "end": 312
+          "start": 316,
+          "end": 317
         },
         {
           "name": "ClientSlotClearMessage",
           "kind": "interface",
-          "start": 313,
-          "end": 314
+          "start": 318,
+          "end": 319
         },
         {
           "name": "ClientScrapItemMessage",
           "kind": "interface",
-          "start": 315,
-          "end": 316
+          "start": 320,
+          "end": 321
         },
         {
           "name": "ClientSlotBuildMessage",
           "kind": "interface",
-          "start": 317,
-          "end": 318
+          "start": 322,
+          "end": 323
         },
         {
           "name": "ClientSlotOrderMessage",
           "kind": "interface",
-          "start": 319,
-          "end": 320
+          "start": 324,
+          "end": 325
         },
         {
           "name": "ClientJobMessage",
           "kind": "interface",
-          "start": 321,
-          "end": 322
+          "start": 326,
+          "end": 327
         },
         {
           "name": "ClientMarketSellAllMessage",
           "kind": "interface",
-          "start": 323,
-          "end": 328
+          "start": 328,
+          "end": 333
         },
         {
           "name": "ServerQuestsMessage",
           "kind": "interface",
-          "start": 330,
-          "end": 346
+          "start": 335,
+          "end": 351
         },
         {
           "name": "ServerQuestBoardMessage",
           "kind": "interface",
-          "start": 348,
-          "end": 358
+          "start": 353,
+          "end": 363
         },
         {
           "name": "ServerTalkMessage",
           "kind": "interface",
-          "start": 360,
-          "end": 364
+          "start": 365,
+          "end": 369
         },
         {
           "name": "ServerPeopleMessage",
           "kind": "interface",
-          "start": 366,
-          "end": 370
+          "start": 371,
+          "end": 375
         },
         {
           "name": "ServerCodexMessage",
           "kind": "interface",
-          "start": 372,
-          "end": 381
+          "start": 377,
+          "end": 386
         },
         {
           "name": "ServerQuestStepMessage",
           "kind": "interface",
-          "start": 383,
-          "end": 392
+          "start": 388,
+          "end": 397
         },
         {
           "name": "ClientQuestBoardMessage",
           "kind": "interface",
-          "start": 394,
-          "end": 395
+          "start": 399,
+          "end": 400
         },
         {
           "name": "ClientQuestAcceptMessage",
           "kind": "interface",
-          "start": 396,
-          "end": 396
+          "start": 401,
+          "end": 401
         },
         {
           "name": "ClientQuestAbandonMessage",
           "kind": "interface",
-          "start": 397,
-          "end": 397
+          "start": 402,
+          "end": 402
         },
         {
           "name": "ClientQuestSeenMessage",
           "kind": "interface",
-          "start": 398,
-          "end": 399
+          "start": 403,
+          "end": 404
         },
         {
           "name": "ClientCodexReadMessage",
           "kind": "interface",
-          "start": 400,
-          "end": 401
+          "start": 405,
+          "end": 406
         },
         {
           "name": "ClientTalkMessage",
           "kind": "interface",
-          "start": 402,
-          "end": 403
+          "start": 407,
+          "end": 408
         },
         {
           "name": "ClientSkillUpMessage",
           "kind": "interface",
-          "start": 404,
-          "end": 409
+          "start": 409,
+          "end": 414
         },
         {
           "name": "ServerStationMessage",
           "kind": "interface",
-          "start": 411,
-          "end": 434
+          "start": 416,
+          "end": 440
         },
         {
           "name": "ClientStationOpenMessage",
-          "kind": "interface",
-          "start": 436,
-          "end": 437
-        },
-        {
-          "name": "ClientRefineMessage",
-          "kind": "interface",
-          "start": 438,
-          "end": 439
-        },
-        {
-          "name": "ClientCraftMessage",
-          "kind": "interface",
-          "start": 440,
-          "end": 441
-        },
-        {
-          "name": "ClientGemCutMessage",
           "kind": "interface",
           "start": 442,
           "end": 443
         },
         {
-          "name": "ClientGemSocketMessage",
+          "name": "ClientRefineMessage",
           "kind": "interface",
           "start": 444,
           "end": 445
         },
         {
-          "name": "ClientGemUnsocketMessage",
+          "name": "ClientCraftMessage",
           "kind": "interface",
           "start": 446,
-          "end": 446
+          "end": 447
         },
         {
-          "name": "ClientDesignSaveMessage",
+          "name": "ClientGemCutMessage",
           "kind": "interface",
-          "start": 447,
-          "end": 448
-        },
-        {
-          "name": "ClientDesignDeleteMessage",
-          "kind": "interface",
-          "start": 449,
+          "start": 448,
           "end": 449
         },
         {
-          "name": "ClientOutpostCharterMessage",
+          "name": "ClientGemSocketMessage",
           "kind": "interface",
           "start": 450,
           "end": 451
         },
         {
-          "name": "ClientOutpostUpgradeMessage",
+          "name": "ClientGemUnsocketMessage",
           "kind": "interface",
           "start": 452,
           "end": 452
         },
         {
-          "name": "ClientFabOrderMessage",
+          "name": "ClientDesignSaveMessage",
           "kind": "interface",
           "start": 453,
           "end": 454
         },
         {
-          "name": "ClientFabOrderCancelMessage",
+          "name": "ClientDesignDeleteMessage",
           "kind": "interface",
           "start": 455,
           "end": 455
         },
         {
-          "name": "ClientDevStationMessage",
+          "name": "ClientOutpostCharterMessage",
           "kind": "interface",
           "start": 456,
           "end": 457
         },
         {
-          "name": "ClientAmmoPreferMessage",
+          "name": "ClientOutpostUpgradeMessage",
           "kind": "interface",
           "start": 458,
-          "end": 459
+          "end": 458
+        },
+        {
+          "name": "ClientFabOrderMessage",
+          "kind": "interface",
+          "start": 459,
+          "end": 460
+        },
+        {
+          "name": "ClientFabOrderCancelMessage",
+          "kind": "interface",
+          "start": 461,
+          "end": 461
+        },
+        {
+          "name": "ClientDevStationMessage",
+          "kind": "interface",
+          "start": 462,
+          "end": 463
+        },
+        {
+          "name": "ClientAmmoPreferMessage",
+          "kind": "interface",
+          "start": 464,
+          "end": 465
         },
         {
           "name": "ClientMarketSellMessage",
           "kind": "interface",
-          "start": 460,
-          "end": 461
+          "start": 466,
+          "end": 467
         },
         {
           "name": "ClientMarketBuyMessage",
           "kind": "interface",
-          "start": 462,
-          "end": 463
+          "start": 468,
+          "end": 469
         }
       ]
     },

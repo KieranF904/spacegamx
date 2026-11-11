@@ -176,9 +176,13 @@ describe('station services', () => {
     clock.t = job.readyAt + 1;
     for (let i = 0; i < 61; i++) server.step();
     expect(countOf(profile().storage, 'alloy_plate')).toBe(plate + 5);
-    // Too many batches: nothing happens
+    // Far more batches than ore: queued all the same (no limit), taking only what it can start; the rest waits for ore
+    const ore = countOf(profile().storage, 'iron_ore');
     t.send({ type: 'refine', recipe: 'alloy_plate', batches: 500 });
-    expect(profile().jobs.length).toBe(0);
+    const big = profile().jobs.find((j) => j.count === 500)!;
+    expect(big).toBeDefined();
+    expect(big.taken).toBe(Math.floor(ore / 2));
+    expect(countOf(profile().storage, 'iron_ore')).toBeLessThan(2);
   });
 
   it('small modules fabricate at once, big ones queue; structure isn\'t fabricated at all', () => {

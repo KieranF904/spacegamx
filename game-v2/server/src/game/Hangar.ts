@@ -390,6 +390,8 @@ export class Hangar {
     // New orders go after the ones already running
     rec.rank = p.hangar.reduce((m, r, i) => (r?.auto && i !== slot ? Math.max(m, r.rank ?? 0) : m), 0) + 1;
     const r = this.work(conn, slot);
+    // What can start does now
+    this.services.deliver(conn);
     const doing: string[] = [];
     if (r.refining) doing.push(`refining ${r.refining}`);
     if (r.fabricating) doing.push(`fabricating ${r.fabricating}`);
@@ -488,7 +490,7 @@ export class Hangar {
     const tag = { for: rec.blueprint.name, slot };
     const need = ghostBill(this.econ, rec.blueprint, this.buildable(rec));
     const avail = (id: string) => countOf(p.storage, id) + (this.coming(p)[id] ?? 0);
-    // Materials wanted in all: structure's own, plus the inputs of modules still to fabricate
+    // Materials wanted in all: structure's own, plus the inputs of small modules made at once (the timed ones' are the jobs': supply() reads them off the queue)
     const materials: Bag = {};
     for (const [id, n] of Object.entries(need)) {
       if (this.econ.recipes.refining.has(id)) { materials[id] = (materials[id] ?? 0) + n; continue; }
@@ -497,6 +499,7 @@ export class Hangar {
       const r = this.econ.recipes.recipeFor(id);
       if (!r || !canCraft(r, this.services.learned(p), p.level)) { out.short.push(this.econ.items.name(id)); continue; }
       const fab = this.services.workshop(conn, 'fabricator');
+      // Queued whole (it starts as its materials arrive); instant ones as far as storage goes
       const k = fab ? this.services.makeFor(conn, fab, id, left, tag) : 0;
       out.fabricating += k;
       if (k < left) for (const [m, q] of Object.entries(r.inputs)) materials[m] = (materials[m] ?? 0) + q * (left - k);
@@ -517,32 +520,37 @@ export class Hangar {
   private supply(conn: PilotConn, materials: Bag, tag: JobTag): { refining: number; fabricating: number; short: string[] } {
     const p = this.pilots.get(conn)!;
     const out = { refining: 0, fabricating: 0, short: [] as string[] };
-    const coming = this.coming(p);
-    const avail = (id: string) => countOf(p.storage, id) + (coming[id] ?? 0);
-    let wanted = materials;
-    for (let depth = 0; depth < 3 && Object.keys(wanted).length; depth++) {
-      const next: Bag = {};
-      for (const [id, n] of Object.entries(wanted)) {
-        const left = n - avail(id);
+    const short = new Set<string>();
+    // What's wanted: the materials asked for, plus what this order's queued jobs have yet to take. Each pass queues what's lacking
+    // (refining, or components' fabrication, whose own inputs then show up as wanted the next pass): all of it at once, ore in hand or not
+    for (let depth = 0; depth < 4; depth++) {
+      const coming = this.coming(p);
+      const pend = this.services.pendingInputs(p, tag);
+      let queued = false;
+      for (const id of new Set([...Object.keys(materials), ...Object.keys(pend)])) {
+        const left = (materials[id] ?? 0) + (pend[id] ?? 0) - countOf(p.storage, id) - (coming[id] ?? 0);
         if (left <= 0) continue;
         if (this.econ.recipes.refining.has(id)) {
           const ref = this.services.workshop(conn, 'refinery');
           const k = ref ? this.services.refineFor(conn, ref, id, left, tag) : 0;
           out.refining += k;
-          if (k < left) out.short.push(`ore for ${this.econ.items.name(id)}`);
+          queued ||= k > 0;
+          if (!k) short.add(`${this.econ.items.name(id)}`);
           continue;
         }
         const r = this.econ.recipes.recipeFor(id);
-        if (!r || !canCraft(r, this.services.learned(p), p.level)) { out.short.push(this.econ.items.name(id)); continue; }
-        const per = r.out[id] ?? 1;
-        const runs = Math.ceil(left / per);
+        // Not made from anything (ore, drops): the job waits for it to be gathered or bought
+        if (!r || !canCraft(r, this.services.learned(p), p.level)) { short.add(this.econ.items.name(id)); continue; }
+        const runs = Math.ceil(left / Math.max(1, r.out[id] ?? 1));
         const fab = this.services.workshop(conn, 'fabricator');
         const k = fab ? this.services.makeFor(conn, fab, id, runs, tag) : 0;
         out.fabricating += k;
-        if (k < runs) for (const [m, q] of Object.entries(r.inputs)) next[m] = (next[m] ?? 0) + q * (runs - k);
+        queued ||= k > 0;
+        if (!k) short.add(this.econ.items.name(id));
       }
-      wanted = next;
+      if (!queued) break;
     }
+    out.short.push(...short);
     return out;
   }
 
@@ -560,11 +568,10 @@ export class Hangar {
     if (!p || !r || !Number.isFinite(n) || n < 1) return;
     if (!canCraft(r, this.services.learned(p), p.level)) return this.pilots.toast(conn, "You don't know how to make that yet", 'warn');
     const orders = (p.fabOrders ??= []);
-    if (orders.length >= 20) return this.pilots.toast(conn, 'Order limit reached (20). Wait for some to finish.', 'warn');
     const id = orders.reduce((m, o) => Math.max(m, o.id), 0) + 1;
     orders.push({ id, item, n: Math.min(999, Math.floor(n)), made: 0 });
     this.pilots.markDirty(conn);
-    this.pilots.toast(conn, `Ordered ${Math.floor(n)} × ${this.econ.items.name(item)}. Missing materials are refined as ore arrives, then it is made.`, 'info');
+    this.pilots.toast(conn, `Ordered ${Math.floor(n)} × ${this.econ.items.name(item)}. It is queued whatever you have in hand: missing materials are refined as ore arrives, then it is made.`, 'info');
     this.workOrders(conn);
     this.send(conn);
   }
@@ -575,7 +582,8 @@ export class Hangar {
     const o = p?.fabOrders?.find((x) => x.id === id);
     if (!p || !o) return;
     const tag = `order:${o.id}`;
-    this.services.cancelJobs(conn, p.jobs.filter((j) => j.for === tag && j.done < j.count && j.recipe.startsWith('refine:')));
+    // Everything it queued that hasn't finished (what's started is refunded, what hasn't took nothing)
+    this.services.cancelJobs(conn, p.jobs.filter((j) => j.for === tag && j.done < j.count));
     p.fabOrders = p.fabOrders!.filter((x) => x !== o);
     if (!p.fabOrders.length) delete p.fabOrders;
     this.pilots.markDirty(conn);
@@ -584,10 +592,11 @@ export class Hangar {
   }
 
   /**
-   * One step of each order, first come first: fabricate as many as storage
-   * allows now; for the rest, refine the materials it's short of from the ore
-   * in storage (what's already being refined counts). What it can't make yet
-   * from anything it has, it waits for.
+   * One step of each order, first come first: queue all of it at the
+   * fabricator (it starts as its materials reach storage), and queue the
+   * refining (or component fabrication) the materials it's short of need, ore
+   * in hand or not (what's already queued counts). What can't be made from
+   * anything (ore to mine) is what the order waits for.
    */
   private workOrders(conn: PilotConn): boolean {
     const p = this.pilots.get(conn);
@@ -605,21 +614,26 @@ export class Hangar {
       const waits: string[] = [];
       let refining = false;
       if (left > 0) {
+        // Not made at once (a fabricator job is queued: its inputs are in `supply`'s reckoning of what's pending); instant ones need theirs now
         const coming = this.coming(p);
         for (const id of Object.keys(r.inputs)) if ((coming[id] ?? 0) > 0) refining = true;
-        // Its inputs: refined from ore, or fabricated if they're components
         const want: Bag = {};
         for (const [id, q] of Object.entries(r.inputs)) want[id] = q * left;
         const got = this.supply(conn, want, tag);
         if (got.refining || got.fabricating) { changed = true; refining = true; }
         waits.push(...got.short);
-        if (!waits.length && k === 0 && !refining) waits.push(fab ? 'a free fabricator queue slot' : 'a fabricator');
+        if (!waits.length && k === 0 && !refining) waits.push(fab ? 'materials' : 'a fabricator');
+      } else {
+        // Its job(s) are queued: refine what they will need that isn't there
+        const got = this.supply(conn, {}, tag);
+        if (got.refining || got.fabricating) changed = true;
+        waits.push(...got.short);
       }
       const key = `${conn.playerId}:${o.id}`;
       if (o.made >= o.n) {
         p.fabOrders = p.fabOrders!.filter((x) => x !== o);
         this.orderWaits.delete(key);
-        this.pilots.toast(conn, `Order done: ${o.n} × ${this.econ.items.name(o.item)} (into storage as each finishes)`, 'good');
+        this.pilots.toast(conn, `Order queued: ${o.n} × ${this.econ.items.name(o.item)} (each is made as its materials arrive, into storage as it finishes)`, 'good');
         changed = true;
         continue;
       }
@@ -657,6 +671,8 @@ export class Hangar {
       }
     });
     if (!changed) return;
+    // Jobs just queued start now if they can, not at the next second
+    this.services.deliver(conn);
     this.pilots.markDirty(conn);
     this.pilots.sendItems(conn);
     this.fill(conn);

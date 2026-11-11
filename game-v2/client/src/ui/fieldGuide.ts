@@ -219,7 +219,7 @@ function progress(d: GuideDeps): string {
   const bars = levels.map((l) => ({ level: l, need: xpToReach(l) - xpToReach(l - 1), total: xpToReach(l) }));
   return `${me}
     <h3>Unlock track</h3>
-    <p>What each level opens: new modules to fabricate (by family), structure materials, and room (build points, hangar bays, fabricator queue slots). Everything you can make opens at its level and never earlier: modules, structure materials (the special ones at the level their plate can be refined) and fabricator recipes. A boss's legendary also needs that boss's rare part to make, and a job's kit needs its job.</p>
+    <p>What each level opens: new modules to fabricate (by family), structure materials, and room (build points, hangar bays). Everything you can make opens at its level and never earlier: modules, structure materials (the special ones at the level their plate can be refined) and fabricator recipes. A boss's legendary also needs that boss's rare part to make, and a job's kit needs its job.</p>
     ${unlockTrackHtml(d, level)}
     <h3>The tiers</h3>
     <p>Each tier is a grade of material and gear, Mk I to Mk V. Its structure material opens at its level, and not before. Higher tiers take far more ore per plate, longer to refine and fabricate, and mining lasers of the tier below barely scratch their rock.</p>

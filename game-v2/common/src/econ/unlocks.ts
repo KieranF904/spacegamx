@@ -8,7 +8,7 @@
 import { stationPerks, type Outpost } from './outpost.js';
 import { engineeringSlots } from './quests.js';
 
-export const UNLOCK_KEYS = ['hangarSlots', 'fabSlots', 'refinerySlots', 'partySize', 'complexity', 'blueprintSlots'] as const;
+export const UNLOCK_KEYS = ['hangarSlots', 'partySize', 'complexity', 'blueprintSlots'] as const;
 export type UnlockKey = typeof UNLOCK_KEYS[number];
 export type Unlocks = Record<UnlockKey, number>;
 
@@ -25,8 +25,6 @@ export type UnlockTable = Record<UnlockKey, UnlockDef>;
 /** Until data/unlocks.json is loaded (and what it falls back to) */
 export const DEFAULT_UNLOCKS: UnlockTable = {
   hangarSlots: { base: 5, label: 'Hangar bay' },
-  fabSlots: { base: 4, label: 'Fabricator slot' },
-  refinerySlots: { base: 8, label: 'Refinery queue slot' },
   partySize: { base: 4, label: 'Party place' },
   complexity: { base: 255, label: 'Ship complexity' },
   blueprintSlots: { base: 10, label: 'Design slot' },
@@ -52,10 +50,8 @@ export function unlocks(p: { level: number; skills?: Record<string, number>; out
     for (const [lv, add] of Object.entries(table[k].levels ?? {})) if (p.level >= Number(lv)) n += add;
     out[k] = n;
   }
-  out.fabSlots += engineeringSlots(p.skills?.engineering ?? 0);
   if (p.outpost) {
     const s = stationPerks(p.outpost);
-    out.fabSlots += s.fabSlots;
     out.hangarSlots += s.hangarSlots;
   }
   return out;
