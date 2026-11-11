@@ -4,7 +4,7 @@
     "scrapborn": {
       "name": "Scrapborn",
       "color": "#c9a46a",
-      "description": "Feral machines heaping greyseam into nests in Sol's outer Drift. A fault that happens to some cores, rarely, the yards say; every pilot has a theory. Heavy, slow and half blind. Good practice, fair pay.",
+      "description": "Feral machines that build nests of scrap and rock in Sol's outer Drift. A fault that happens to some cores, rarely, the yards say; every pilot has a theory. Heavy, slow and half blind. Good practice, fair pay.",
       "hpScale": 0.3,
       "behaviour": {
         "aggro": 1700,

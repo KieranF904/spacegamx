@@ -264,7 +264,7 @@
         "main_01"
       ],
       "starter": true,
-      "intro": "Past Nereid there's a ring of junk we call the Drift, and it's crawling with Scrapborn: feral machines with cores gone wrong, heaping greyseam into nests. Thin them out. While you're there, one of their relay drones came down in the north-west of the Drift. Bring me its core. The yard wants a look at one that hasn't been shot to pieces.",
+      "intro": "Past Nereid there's a ring of junk we call the Drift, and it's crawling with Scrapborn: feral machines with cores gone wrong, heaping scrap into nests. Thin them out. While you're there, one of their relay drones came down in the north-west of the Drift. Bring me its core. The yard wants a look at one that hasn't been shot to pieces.",
       "steps": [
         {
           "type": "kill",
@@ -362,7 +362,7 @@
       "requires": [
         "drift_02"
       ],
-      "intro": "Every drone out there comes from one place, the old hands say: a nest the size of a station, welded together out of everything that ever drifted past Nereid, round the richest greyseam in the Drift. We call her the Scrap Mother, and nobody has ever brought her core home in one piece. She's slow, but she isn't alone. Bring a friend if you can, and bring spare materials for your repair bank either way.",
+      "intro": "Every drone out there comes from one place, the old hands say: a nest the size of a station, welded together out of everything that ever drifted past Nereid. We call her the Scrap Mother, and nobody has ever brought her core home in one piece. She's slow, but she isn't alone. Bring a friend if you can, and bring spare materials for your repair bank either way.",
       "steps": [
         {
           "type": "boss",
@@ -2087,10 +2087,10 @@
               "say": "Listen. Slowed down, it isn't a broadcast at all."
             },
             {
-              "say": "It beats, like a heart. Now listen to this: a grain of greyseam off my bench, under the same probe."
+              "say": "It beats, like a heart. Steady as anything, with Sol gone out of it."
             },
             {
-              "say": "The same shape. Quieter by more zeros than I can count, but the same shape."
+              "say": "Forty years I've heard it through Sol's noise. This is the first time I've heard it clean."
             }
           ]
         }
@@ -3340,7 +3340,7 @@
               "say": "Give them here. Output per tonne, every dock, every week... there. Look at it."
             },
             {
-              "say": "The curve bends. Up. The more greyseam we put on the rail, the better each tonne does. Efficiencies compounding. It's bedding in, like a good engine."
+              "say": "The curve bends. Up. Each tonne does a little better than the month before. It's bedding in, like a good engine."
             },
             {
               "say": "And the design software agrees: every pass it asks for the crystals a little closer together. Optimisation. It finds the slope and walks up it."
@@ -3408,10 +3408,10 @@
           "text": "Bring the recorder back to Sabine Kerr (her hab, past the Lagrange Shipyard)",
           "lines": [
             {
-              "say": "Let's hear it. Collectors, couplings, a drone going by. The array's hum. Ordinary."
+              "say": "Let's hear it. Collectors, couplings, a drone going by. Ordinary."
             },
             {
-              "say": "Now under it. Slowed down, there's a shape. Very faint. It isn't there at the start of the recording, and by the end it is. It creeps in."
+              "say": "Now under it, slowed down. Something very faint, maybe. Not there at the start of the recording, there by the end. Or my ears are tired."
             },
             {
               "say": "I'll say what I hear, pilot. That's all I'll say."
@@ -3510,7 +3510,7 @@
       "requires": [
         "kerr_02"
       ],
-      "intro": "Greyseam hums. I've proved that much to myself. Now I want to know what it does with current running through it. Bring me six scrap electronics, parts with greyseam in them that have had current through them for years, and a cell to drive them. A boost cell will do; current is current.",
+      "intro": "The yards have a theory about every core and a test for none of them. I want to see what greyseam does with current running through it. Bring me six scrap electronics, parts with greyseam in them that have had current through them for years, and a cell to drive them. A boost cell will do; current is current.",
       "steps": [
         {
           "type": "talk",
@@ -3553,7 +3553,7 @@
               "say": "Under the scope. See them? Threads through the grey, finer than hair. They weren't there when you brought the parts in."
             },
             {
-              "say": "And listen. The bench's hum while the current ran, slowed right down. There's a shape in it. The faintest shape."
+              "say": "And the bench logged a frequency while the current ran that I can't place. Very fine. Probably the cell."
             },
             {
               "say": "Again. The other half of the parts, the same cell, the same bench. Hold steady for me one more time."
@@ -3581,7 +3581,7 @@
           "text": "Hear what the second run showed",
           "lines": [
             {
-              "say": "Nothing. No threads. No shape. Same parts, same cell, same bench, same pilot sitting outside."
+              "say": "Nothing. No threads, and the bench read clean. Same parts, same cell, same bench, same pilot sitting outside."
             },
             {
               "say": "I don't know what it means. Don't let anyone tell you they do."

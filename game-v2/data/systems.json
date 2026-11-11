@@ -449,7 +449,7 @@
             "phase": 0.6,
             "period": 14
           },
-          "description": "A Scrapborn nest built around a greyseam deposit in Nereid's orbit. Mites, and occasionally hulks."
+          "description": "A Scrapborn nest in Nereid's orbit. Mites, and occasionally hulks."
         },
         {
           "id": "sol_dock_helios_east",
@@ -510,7 +510,7 @@
             "phase": 0.2,
             "period": 4000
           },
-          "description": "A Scrapborn nest built around a greyseam deposit in the Drift. Mites and crawlers."
+          "description": "A Scrapborn nest in the Drift. Mites and crawlers."
         },
         {
           "id": "sol_nest_grey_hour",
@@ -1039,7 +1039,7 @@
             "phase": 4.4,
             "period": 2400
           },
-          "description": "A Scrapborn nest built around a greyseam vein. Non-hostile unless attacked."
+          "description": "A Scrapborn nest. Non-hostile unless attacked."
         }
       ],
       "lodestones": [

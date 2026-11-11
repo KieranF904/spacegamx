@@ -16,7 +16,7 @@
       "tab": "records",
       "title": "Greyseam",
       "source": "Shipyard inspection notes, Sol Central",
-      "body": "Greyseam is the dull grey rock that turns up in nearly everything we cut. The refinery takes it out with the rest, and it goes into plate, shielding, superconductors, sensor crystal and drive lattices. In all of those, these notes have never once had cause to fault it.\n\nCores are the exception. Now and then a core fails for no reason we can find, and now and then one flies better than it has any right to. Under the microscope we often find a fine whiskering through the grey, threads too small to see by eye, usually harmless.\n\nThe yard's verdict is impurities, or the firmware, or the maker, depending on who you ask. Keep each batch together, and log it.",
+      "body": "Greyseam is the dull grey rock that turns up in nearly everything we cut. The refinery takes it out with the rest, and it goes into plate, shielding, superconductors, sensor crystal and drive lattices. In all of those, these notes have never once had cause to fault it.\n\nCores are the exception. Now and then a core fails for no reason we can find, and now and then one tests a little above its spec. Separately, under the microscope we often find a fine whiskering in the material, threads too small to see by eye, usually harmless.\n\nThe yard's verdict is impurities, or the firmware, or the maker, depending on who you ask. Keep each batch together, and log it.",
       "unlock": {
         "level": 5
       }
@@ -199,7 +199,7 @@
       "tab": "records",
       "title": "The Shattered Bell's manifest",
       "source": "Cargo manifest of the Shattered Bell, and the Halcyon foreman's day-books",
-      "body": "When the Halcyon foundry closed, its drawings, assay books and the foreman's day-books were crated up and consigned to the Meridian Institute aboard the freighter Shattered Bell. The Bell never made it home.\n\nThe foreman wrote everything down. By his books, the foundry ran the same stock for years, ore off a single seam unusually thick with greyseam, and the yield rose month after month. \"Process settling in,\" the chemists initialled in the margin, more than once. One name recurs throughout: Pell, a crucible hand.\n\nThe last pages concern the furnace, which, the foreman writes, went on burning after the fuel was cut. The Institute's closure notice is pinned inside the back cover. It cites residual heat in the lining, and observes that a sealed furnace is a safe furnace."
+      "body": "When the Halcyon foundry closed, its drawings, assay books and the foreman's day-books were crated up and consigned to the Meridian Institute aboard the freighter Shattered Bell. The Bell never made it home.\n\nThe foreman wrote everything down. By his books, the foundry ran the same stock for years, ore off a single seam, and the yield rose month after month. \"Process settling in,\" the chemists initialled in the margin, more than once. One name recurs throughout: Pell, a crucible hand.\n\nThe last pages concern the furnace, which, the foreman writes, went on burning after the fuel was cut. The Institute's closure notice is pinned inside the back cover. It cites residual heat in the lining, and observes that a sealed furnace is a safe furnace."
     },
     {
       "id": "halvard_log",
@@ -213,14 +213,14 @@
       "tab": "records",
       "title": "The Grey Hour's log",
       "source": "Maintenance log of the Ark Tender Grey Hour",
-      "body": "The Grey Hour was a leestone-lined tender of the Ark, and her log is the core regimen kept to the letter. Every few weeks for years the core was stripped, cleaned, reseated and logged, with every tolerance written out in full, and parts were changed long before they were due. The same hand, in the same order, every time.\n\nThe last regimen entry reads like all the others: \"Core logged. Tolerances nominal.\" Beneath it, dated the following day: \"Drive fault, cause not found. Crew to the Guild tug. Core sealed in its cradle, per regimen.\" There is nothing after that.\n\nShe lies in the Drift now with a Scrapborn nest heaped around her. Lieutenant Achebe says her core woke. Keeper Vey says the Scrapborn heap themselves round any hull with grey in its plate, and always have."
+      "body": "The Grey Hour was a leestone-lined tender of the Ark, and her log is the core regimen kept to the letter. Every few weeks for years the core was stripped, cleaned, reseated and logged, with every tolerance written out in full, and parts were changed long before they were due. The same hand, in the same order, every time.\n\nThe last regimen entry reads like all the others: \"Core logged. Tolerances nominal.\" Beneath it, dated the following day: \"Drive fault, cause not found. Crew to the Guild tug. Core sealed in its cradle, per regimen.\" There is nothing after that.\n\nShe lies in the Drift now with a Scrapborn nest heaped around her. Lieutenant Achebe says her core woke. Keeper Vey says the Scrapborn heap themselves round any hull left drifting long enough, and always have."
     },
     {
       "id": "helios_performance",
       "tab": "records",
       "title": "The curve",
       "source": "Engineer Tove Rask's performance chart, the Helios Seat",
-      "body": "A chart of the Helios Array's output per tonne of greyseam on the rail, week by week, compiled from every service dock. Rask's own note says a flat line would be the normal result: a tonne of greyseam in, a tonne's worth of output out.\n\nHer line is not flat. It climbs, and the climb grows steeper. Her annotation, underlined twice, reads \"Efficiencies compounding.\" Her explanation is that the array is bedding in, the way a good engine does, and that the more greyseam there is on the rail, the harder each tonne of it works.\n\nA smaller note at the foot of the chart records that the design software keeps recommending a tighter crystal spacing, a little tighter with every pass. Rask calls this optimisation: the software finds the slope and walks up it."
+      "body": "A chart of the Helios Array's output per tonne of greyseam on the rail, week by week, compiled from every service dock. Rask's own note says a flat line would be the normal result: a tonne of greyseam in, a tonne's worth of output out.\n\nHer line is not flat. It climbs, a little each month. Her annotation, underlined twice, reads \"Efficiencies compounding.\" Her explanation is that the array is bedding in, the way a good engine does.\n\nA smaller note at the foot of the chart records that the design software keeps recommending a tighter crystal spacing, a little tighter with every pass. Rask calls this optimisation: the software finds the slope and walks up it."
     },
     {
       "id": "helios_drone_logs",
@@ -234,7 +234,7 @@
       "tab": "signal",
       "title": "The array, slowed down",
       "source": "Sabine Kerr's recording of the Helios Array, with Dr. Quinn's reply",
-      "body": "Half a minute recorded beside the Array's inner rail. At full speed it is the ordinary noise of the place: collectors, couplings, drones passing.\n\nKerr slowed it down and listened underneath. Her note says there is a shape in it, very faint, which is not there at the start of the recording and is there by the end. \"It creeps in,\" she writes. \"I will say what I hear. That is all I will say.\"\n\nDr. Quinn's reply is pinned to the copy. The recorder warms as it runs and its response shifts, so anything faint will seem to creep in over the course of a recording. Instrument drift, in other words, and Quinn notes that she has told Kerr this before."
+      "body": "Half a minute recorded beside the Array's inner rail. At full speed it is the ordinary noise of the place: collectors, couplings, drones passing.\n\nKerr slowed it down and listened underneath. Her note says she hears something very faint underneath, which is not there at the start of the recording and is there by the end. \"It may be my ears,\" she writes. \"I will say what I hear. That is all I will say.\"\n\nDr. Quinn's reply is pinned to the copy. The recorder warms as it runs and its response shifts, so anything faint will seem to creep in over the course of a recording. Instrument drift, in other words, and Quinn notes that she has told Kerr this before."
     },
     {
       "id": "ark_minute",
@@ -248,14 +248,14 @@
       "tab": "signal",
       "title": "The filaments",
       "source": "Sabine Kerr's notebooks",
-      "body": "The experiment, as she records it: six scrap cores, a boost cell and the bench dish. Current was run through half of the parts for most of a minute.\n\nAfterwards, she writes, there were threads through the grey under the microscope, finer than hair, that she had not seen before. The yard would call it whiskering. And in the hum of the bench while the current ran, slowed down, she heard the faintest shape.\n\nShe repeated the run with the other half of the parts, the same cell and the same bench. No threads. No shape.\n\nOn the facing page, underlined: \"I don't know what it means. Don't let anyone tell you they do.\" And beneath that, smaller: \"Quinn will say electrochemistry. Quinn may be right.\""
+      "body": "The experiment, as she records it: six scrap cores, a boost cell and the bench dish. Current was run through half of the parts for most of a minute.\n\nAfterwards, she writes, there were threads through the grey under the microscope, finer than hair, that she had not seen before. The yard would call it whiskering. Her bench log for the run notes a fine frequency she could not place, and beside it: \"probably the cell.\"\n\nShe repeated the run with the other half of the parts, the same cell and the same bench. No threads, and a clean bench log.\n\nOn the facing page, underlined: \"I don't know what it means. Don't let anyone tell you they do.\" And beneath that, smaller: \"Quinn will say electrochemistry. Quinn may be right.\""
     },
     {
       "id": "quiet_seam",
       "tab": "places",
       "title": "The Quiet Seam",
       "source": "Miners' Guild survey of outer Sol",
-      "body": "The Quiet Seam lies along the outer edge of the shoal, short of Thule. It is the largest field of greyseam in Sol and the cleanest the Guild has ever assayed. Instruments read flat across the whole of it.\n\nThere are no Scrapborn nests in the Seam. Not one heap, though the Scrapborn build round greyseam everywhere else in the system. The Guild's explanation is that it is too cold and too far out for the drones to bother with.\n\nOld Brannoch calls it the best kind of rock there is: boring."
+      "body": "The Quiet Seam lies along the outer edge of the shoal, short of Thule. It is the largest field of greyseam in Sol and the cleanest the Guild has ever assayed. It is also one of the quietest: the Guild's explanation is that it is too cold and too far out for most crews to bother with.\n\nOld Brannoch calls it the best kind of rock there is: boring."
     },
     {
       "id": "trace_ledger",

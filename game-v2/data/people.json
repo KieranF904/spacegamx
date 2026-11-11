@@ -205,10 +205,10 @@
               "say": "Out past the shoal, short of Thule. The Quiet Seam, we call it. Biggest field of grey in Sol, and the cleanest I've ever had assayed."
             },
             {
-              "say": "Not a nest on it. Not one heap. Scrapborn build round grey everywhere else you go, and they've never touched that field. Too cold and too far out for 'em, the Guild says."
+              "say": "Too cold and too far out for most crews to bother with, so it's quiet out there. Suits me."
             },
             {
-              "say": "Instruments read flat as a table out there. No odd readings, nothing. The best kind of rock: boring. Mind the Redtooth round Thule."
+              "say": "The best kind of rock: boring. Mind the Redtooth round Thule."
             },
             {
               "codex": "quiet_seam"
@@ -313,10 +313,10 @@
               "say": "Near enough. Every maker I've had under the scope, sooner or later. Except Thule Works."
             },
             {
-              "say": "Small outfit out on the rim. I've cracked a dozen of their cores and never found a thread in one. Their supplier's seam is boring, they say: the cleanest grey in Sol."
+              "say": "Small outfit out on the rim. I've cracked a dozen of their cores and never found a thread in one."
             },
             {
-              "say": "Or they run them cool and only sell to careful buyers. Pricey, and you'll wait a year for one. Good cores, though. Dull as ditchwater."
+              "say": "They run them cool, they say, and only sell to careful buyers. Pricey, and you'll wait a year for one. Good cores, though. Dull as ditchwater."
             }
           ]
         }
@@ -455,7 +455,7 @@
           "label": "What are the Scrapborn?",
           "lines": [
             {
-              "say": "Machines gone feral: drones, tugs, anything with a core in it. It happens to some cores, rarely, and nobody can tell you why. Then they go off and heap greyseam into nests."
+              "say": "Machines gone feral: drones, tugs, anything with a core in it. It happens to some cores, rarely, and nobody can tell you why. Then they go off and heap scrap and rock into nests."
             },
             {
               "say": "Every pilot on this station has a theory, and the yard has folklore. I have a quota."
@@ -634,7 +634,7 @@
               "say": "What I do know: it drifts. Forty years of my notebooks, and every older record I can beg, and its period has moved by a hair. And it has stopped before, for a moment, and started again."
             },
             {
-              "say": "And greyseam hums. A grain of it on my bench, faint as anything, and the same shape as the heartbeat. I think they're related. Everyone else has an answer for that. I have notebooks."
+              "say": "Everyone else has an answer for what it is. I have notebooks."
             }
           ]
         },
@@ -652,7 +652,7 @@
               "say": "Six years, near enough. One winter the hab lost power and the cold got into the drives, and when I had them running again there was nothing on them. Six years of nothing."
             },
             {
-              "say": "Quinn says a record with a hole in it isn't a record, so my drift is noise, and my grain only hums because my own gear hears the heartbeat. Maybe. I'm not sure what any of it means. I never said I was."
+              "say": "Quinn says a record with a hole in it isn't a record, so my drift is noise. Maybe. I'm not sure what any of it means. I never said I was."
             }
           ]
         }
@@ -711,7 +711,7 @@
               "say": "Hot. Loud. The best years of my life. We poured steel there that'd turn a railgun slug."
             },
             {
-              "say": "We ran the same stock through her for years, ore off one seam, thicker with greyseam than anything else in the cluster, and the yield got better every month. The process settling in, the chemists said."
+              "say": "We ran the same stock through her for years, ore off one seam, and the yield got better every month. The process settling in, the chemists said."
             },
             {
               "say": "Then the furnace got... strange. Kept burning after we cut the fuel. The Institute sealed it and sent us home."
@@ -817,7 +817,7 @@
               "say": "7-K is the famous one, strongest near Terra Nova. Some read it as aimed at the planet. It's just the closest world to it, and people like to feel looked at."
             },
             {
-              "say": "And Sabine Kerr? Her humming grain of greyseam is her own gear picking up the heartbeat, and her drift is noise in a broken record. Ask her about the years missing from her notebooks, while you're there."
+              "say": "And Sabine Kerr? Her instruments are picking up the heartbeat itself, and her drift is noise in a broken record. Ask her about the years missing from her notebooks, while you're there."
             }
           ]
         },
@@ -865,7 +865,7 @@
               "say": "Current through a metal-silicate glass, in a damp hab, off a boost cell? Electrochemistry. You grow dendrites: threads. Every first-year lab grows them, usually by accident."
             },
             {
-              "say": "And nothing the second time because the first run used up whatever was on the surface. The shape in the hum is her own gear hearing its own cell. I'm sorry. I'd like it to be more interesting too."
+              "say": "And nothing the second time because the first run used up whatever was on the surface. And the odd reading on her bench is her own gear hearing its own cell. I'm sorry. I'd like it to be more interesting too."
             }
           ]
         }
@@ -988,7 +988,7 @@
           "label": "What's aurora rime?",
           "lines": [
             {
-              "say": "Ice that grew in the aurora's light, out in the Shoal. It's shot through with greyseam, same as any rock, but quiet. Scan a floe and it barely hums."
+              "say": "Ice that grew in the aurora's light, out in the Shoal. Odd stuff: it scans quieter than any rock I know."
             },
             {
               "say": "Press it into panes and a receiver behind one hears nothing but hiss. Maya's people buy all we make. So does Rustjaw, I hear, which I don't like."
@@ -1286,7 +1286,7 @@
               "say": "The Grey Hour was a good tender with a good crew, and her log is in order to the last line. I have the countersigned copy."
             },
             {
-              "say": "A drive fault, a crew that followed the book, and a hull left in the Drift. The Scrapborn heap round any hull with grey in its plate; they always have. Her core is sealed in its cradle, where the log says it is."
+              "say": "A drive fault, a crew that followed the book, and a hull left in the Drift. The Scrapborn heap round any hull left drifting long enough; they always have. Her core is sealed in its cradle, where the log says it is."
             },
             {
               "say": "Lieutenant Achebe says it woke. Lieutenant Achebe hasn't been inside to look. Neither, I grant you, have I."
@@ -1644,7 +1644,7 @@
               "say": "Output per tonne of greyseam on the rail, week on week. It ought to be flat: a tonne of greyseam in, a tonne's worth of output out."
             },
             {
-              "say": "It isn't flat. It climbs, and the climb gets steeper. Efficiencies compounding. The array's bedding in, the way a good engine does."
+              "say": "It isn't flat. It climbs, a little every month. Efficiencies compounding, I call it. The array's bedding in, the way a good engine does."
             },
             {
               "say": "The Director likes one number, and that's the losses. I like this one. They'll both come right with Bellwether on."
@@ -1671,7 +1671,7 @@
               "say": "Some. We scope every core on the rail once a month. A few threads, usually harmless."
             },
             {
-              "say": "The ones running above spec show it a little more often, as it happens. Heat, the yard says: work a core hard and it shows. We work ours very hard."
+              "say": "The hard-worked ones show it a little more often. Heat, the yard says: work a core hard and it shows. We work ours very hard."
             }
           ]
         }

@@ -40,7 +40,7 @@
         "leash": 8000,
         "accuracy": 0.85
       },
-      "intro": "Something huge and patched together heaves up out of the scrap heap at the heart of the rock, grey veins glinting in the walls around it. The Scrap Mother wakes, and the nest hums with drones.",
+      "intro": "Something huge and patched together heaves up out of the scrap heap at the heart of the rock. The Scrap Mother wakes, and the nest swarms with drones.",
       "phases": [
         {
           "at": 0.667,
