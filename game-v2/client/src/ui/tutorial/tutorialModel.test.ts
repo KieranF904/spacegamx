@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { TutorialData } from '@space-game/common';
 import tutorialJson from '../../../../data/tutorial.json';
-import { LeaveFlow, arrowTargets, counterOf, distLabel, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, phaseOf, pointsAtBelt, pointsAtStation, ringArrow, risingPanels, targetGained } from './tutorialModel';
+import { LeaveFlow, arrowTargets, counterOf, distLabel, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, phaseOf, pointsAtBelt, pointsAtStation, ringArrow, risingPanels, targetGained, partChime } from './tutorialModel';
 import { clearTrainingBodies, inertBody, isTrainingBody, setTrainingBody } from '../../state/trainingBodies';
 
 const data = tutorialJson as unknown as TutorialData;
@@ -248,6 +248,8 @@ describe('tutorial multi-target progress', () => {
     expect(targetGained(st('rings', [], [], ['ring_1']), st('rings', [], [], ['ring_1']), data)).toBe(false);
     expect(targetGained(st('rings', [], [], ['ring_1', 'ring_2']), st('brake', ['rings']), data)).toBe(false);
     expect(targetGained(st('drones'), st('drones', [], ['drone_2']), data)).toBe(true);
+    // (a ring of three: one note, then two; the third finishes the step and its card plays the whole run)
+    expect([partChime(1, 3), partChime(2, 3), partChime(1, 2)]).toEqual(['tutorial_one', 'tutorial_two', 'tutorial_two']);
   });
   it('only the dock step points at the station', () => {
     expect(pointsAtStation(data.steps.find((x) => x.id === 'dock'))).toBe(true);

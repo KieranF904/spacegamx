@@ -10259,7 +10259,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 224,
+      "lines": 227,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "npm: @space-game/common; tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
@@ -10298,7 +10298,7 @@
           "name": "TutorialUI",
           "kind": "class",
           "start": 46,
-          "end": 224
+          "end": 227
         }
       ]
     },
@@ -10489,7 +10489,7 @@
       "id": "client.ui.tutorial.model",
       "path": "client/src/ui/tutorial/tutorialModel.ts",
       "group": "client/ui/tutorial",
-      "lines": 222,
+      "lines": 227,
       "owns": "the lesson UI's decisions, as pure functions of the server's tutorialState and data/tutorial.json: what the instruction panel shows, which training objects are drawn ghosted (and how), which markers light up, where a screen-edge arrow sits, the leave-confirm flow, the step-done toast, the graduate screen's pack list",
       "needs": "common ServerTutorialStateMessage, TutorialData and the object defs (types only)",
       "events": "",
@@ -10519,6 +10519,7 @@
         "newlyDone",
         "packLines",
         "panelModel",
+        "partChime",
         "phaseOf",
         "pointsAtBelt",
         "pointsAtStation",
@@ -10600,100 +10601,106 @@
           "end": 83
         },
         {
-          "name": "pointsAtStation",
+          "name": "partChime",
           "kind": "function",
           "start": 85,
           "end": 88
         },
         {
-          "name": "pointsAtBelt",
+          "name": "pointsAtStation",
           "kind": "function",
           "start": 90,
           "end": 93
         },
         {
-          "name": "arrowTargets",
+          "name": "pointsAtBelt",
           "kind": "function",
           "start": 95,
-          "end": 107
+          "end": 98
+        },
+        {
+          "name": "arrowTargets",
+          "kind": "function",
+          "start": 100,
+          "end": 112
         },
         {
           "name": "FIXED_KEYS",
           "kind": "const",
-          "start": 109,
-          "end": 110
+          "start": 114,
+          "end": 115
         },
         {
           "name": "KEY_GROUPS",
           "kind": "const",
-          "start": 111,
-          "end": 112
+          "start": 116,
+          "end": 117
         },
         {
           "name": "fillKeys",
           "kind": "function",
-          "start": 114,
-          "end": 118
+          "start": 119,
+          "end": 123
         },
         {
           "name": "lineText",
           "kind": "function",
-          "start": 120,
-          "end": 123
+          "start": 125,
+          "end": 128
         },
         {
           "name": "PanelModel",
           "kind": "interface",
-          "start": 125,
-          "end": 141
+          "start": 130,
+          "end": 146
         },
         {
           "name": "panelModel",
           "kind": "function",
-          "start": 143,
-          "end": 160
+          "start": 148,
+          "end": 165
         },
         {
           "name": "newlyDone",
           "kind": "function",
-          "start": 162,
-          "end": 166
+          "start": 167,
+          "end": 171
         },
         {
           "name": "packLines",
           "kind": "function",
-          "start": 168,
-          "end": 175
+          "start": 173,
+          "end": 180
         },
         {
           "name": "LeaveFlow",
           "kind": "class",
-          "start": 177,
-          "end": 190
+          "start": 182,
+          "end": 195
         },
         {
           "name": "edgeArrow",
           "kind": "function",
-          "start": 192,
-          "end": 202
+          "start": 197,
+          "end": 207
         },
         {
           "name": "ringArrow",
           "kind": "function",
-          "start": 204,
-          "end": 212
+          "start": 209,
+          "end": 217
         },
         {
           "name": "distLabel",
           "kind": "function",
-          "start": 214,
-          "end": 217
+          "start": 219,
+          "end": 222
         },
         {
           "name": "risingPanels",
           "kind": "function",
-          "start": 219,
-          "end": 222
+          "start": 224,
+          "end": 227
         }
       ]
     },

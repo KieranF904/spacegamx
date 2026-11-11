@@ -83,6 +83,16 @@ function drive(ctx: OfflineAudioContext, k: number): WaveShaperNode {
   return s;
 }
 
+/** The training chime's first `n` bell tones (of three, rising), each ringing out over `decay` s */
+function bells(ctx: OfflineAudioContext, out: AudioNode, n: number, decay: number): void {
+  for (const [t, f] of ([[0, 784], [0.09, 988], [0.18, 1319]] as const).slice(0, n)) {
+    const o = osc(ctx, 'sine', f), h = osc(ctx, 'sine', f * 2);
+    chain(o, env(ctx, t, 0.16, 0.004, decay), out);
+    chain(h, env(ctx, t, 0.04, 0.004, decay * 0.55), out);
+    o.start(t); h.start(t);
+  }
+}
+
 function chain(...nodes: AudioNode[]): void {
   for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
 }
@@ -587,15 +597,11 @@ const RECIPES: Record<string, Recipe> = {
     }
     burst(ctx, out, r, 0.12, 0.12, 0.002, 0.3, [filter(ctx, 'bandpass', 5000, 1.5)]);
   } },
-  // A new training card: three bright rising bell tones, clear over engine noise
-  tutorial_step: { duration: 0.8, build(ctx, out) {
-    for (const [t, f] of [[0, 784], [0.09, 988], [0.18, 1319]] as const) {
-      const o = osc(ctx, 'sine', f), h = osc(ctx, 'sine', f * 2);
-      chain(o, env(ctx, t, 0.16, 0.004, 0.45), out);
-      chain(h, env(ctx, t, 0.04, 0.004, 0.25), out);
-      o.start(t); h.start(t);
-    }
-  } },
+  // A new training card: three bright rising bell tones, clear over engine noise. Progress on a step (a ring, a drone)
+  // plays the start of the same run, one note, then two, so the step's finish completes it
+  tutorial_step: { duration: 0.8, build(ctx, out) { bells(ctx, out, 3, 0.45); } },
+  tutorial_one: { duration: 0.35, build(ctx, out) { bells(ctx, out, 1, 0.22); } },
+  tutorial_two: { duration: 0.45, build(ctx, out) { bells(ctx, out, 2, 0.22); } },
 };
 
 /** One-pole lowpass made cyclic (run twice), so loops have no seam */
