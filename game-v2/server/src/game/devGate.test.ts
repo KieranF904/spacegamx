@@ -114,7 +114,7 @@ describe('dev message gate', () => {
     toast.mockClear();
     t.send({ type: 'feedSwitch' } as never);
     gs.step(1);
-    expect(toast).toHaveBeenCalledWith(conn, 'No Selector fitted: nothing to switch', 'warn');
+    expect(toast).toHaveBeenCalledWith(conn, 'No Selector fitted. Nothing to switch.', 'warn');
     toast.mockClear();
     (gs.ships.get(conn.playerId)!.derived as { ports?: unknown }).ports = undefined;
     t.send({ type: 'feedSwitch' } as never);
