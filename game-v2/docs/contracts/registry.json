@@ -19477,7 +19477,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 705,
+      "lines": 714,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -19565,7 +19565,7 @@
           "name": "Pilots",
           "kind": "class",
           "start": 156,
-          "end": 705
+          "end": 714
         }
       ]
     },
@@ -20460,9 +20460,9 @@
       "id": "server.pilots.convert",
       "path": "server/src/game/pilots/convert.ts",
       "group": "server/game/pilots",
-      "lines": 105,
+      "lines": 106,
       "owns": "a guest registering: their whole profile (in play, or kept past their 3 days) moves to the new account's profile, once; the kept guest record is consumed",
-      "needs": "Pilots (sessions, store, guests, converting, now, host), pilots/{persist, session, lease}; npm: @space-game/common",
+      "needs": "Pilots (sessions, store, guests, converting, now, host), pilots/{persist, lease}; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -20470,7 +20470,7 @@
           "test": "server/src/game/pilots/convert.test.ts"
         },
         {
-          "text": "a guest past their 3 days is registered from the kept record, never played",
+          "text": "a guest past their 3 days is registered from the kept record, never played: no ship of theirs is in the world and their messages are dropped till then",
           "test": "server/src/game/pilots/convert.test.ts"
         }
       ],
@@ -20502,7 +20502,7 @@
           "name": "run",
           "kind": "function",
           "start": 43,
-          "end": 105
+          "end": 106
         }
       ]
     },
@@ -21927,7 +21927,7 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 387,
+      "lines": 391,
       "owns": "connecting, creating and placing a player, logging a pilot in, a guest back by their key, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
@@ -22036,43 +22036,43 @@
           "name": "resumeGuest",
           "kind": "function",
           "start": 283,
-          "end": 302
+          "end": 306
         },
         {
           "name": "claimProfile",
           "kind": "function",
-          "start": 304,
-          "end": 314
+          "start": 308,
+          "end": 318
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 316,
-          "end": 326
+          "start": 320,
+          "end": 330
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 328,
-          "end": 342
+          "start": 332,
+          "end": 346
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 344,
-          "end": 357
+          "start": 348,
+          "end": 361
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 359,
-          "end": 374
+          "start": 363,
+          "end": 378
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 376,
-          "end": 387
+          "start": 380,
+          "end": 391
         }
       ]
     },
@@ -23359,7 +23359,7 @@
       "id": "server.net.dispatch",
       "path": "server/src/net/dispatch.ts",
       "group": "server/net",
-      "lines": 72,
+      "lines": 76,
       "owns": "client message dispatch: the drops and limits every message passes, and the one handler per message type",
       "needs": "@space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only), the gun range's message gate (game/gunRange/messageGate.ts); nothing from GameServer at runtime",
       "events": "",
@@ -23369,7 +23369,7 @@
           "test": "server/src/net/dispatch.test.ts"
         },
         {
-          "text": "non-messages, pre-join and rate-limited messages are dropped; a second handler for a type is refused",
+          "text": "non-messages, pre-join and rate-limited messages are dropped, and an expired guest's all but registering; a second handler for a type is refused",
           "test": "server/src/net/dispatch.test.ts"
         },
         {
@@ -23379,6 +23379,7 @@
       ],
       "extend": "a new client message is a handler registered with t.on(type, ...) in an area file under net/handlers; PRE_JOIN is the only list to touch here",
       "exports": [
+        "EXPIRED_GUEST_OK",
         "Handler",
         "HandlerRegistry",
         "HandlerTable",
@@ -23397,52 +23398,58 @@
           "end": 30
         },
         {
-          "name": "MAX_INPUTS_PER_TICK",
+          "name": "EXPIRED_GUEST_OK",
           "kind": "const",
           "start": 31,
           "end": 32
         },
         {
-          "name": "MessageType",
-          "kind": "type",
-          "start": 34,
+          "name": "MAX_INPUTS_PER_TICK",
+          "kind": "const",
+          "start": 33,
           "end": 34
         },
         {
-          "name": "MessageOf",
-          "kind": "type",
-          "start": 35,
-          "end": 35
-        },
-        {
-          "name": "Handler",
+          "name": "MessageType",
           "kind": "type",
           "start": 36,
           "end": 36
         },
         {
-          "name": "HandlerTable",
+          "name": "MessageOf",
           "kind": "type",
           "start": 37,
+          "end": 37
+        },
+        {
+          "name": "Handler",
+          "kind": "type",
+          "start": 38,
           "end": 38
+        },
+        {
+          "name": "HandlerTable",
+          "kind": "type",
+          "start": 39,
+          "end": 40
         },
         {
           "name": "HandlerRegistry",
           "kind": "class",
-          "start": 40,
-          "end": 53
+          "start": 42,
+          "end": 55
         },
         {
           "name": "registerHandlers",
           "kind": "function",
-          "start": 55,
-          "end": 58
+          "start": 57,
+          "end": 60
         },
         {
           "name": "dispatch",
           "kind": "function",
-          "start": 60,
-          "end": 72
+          "start": 62,
+          "end": 76
         }
       ]
     },
@@ -23612,9 +23619,9 @@
       "id": "server.net.handlers.guest-account",
       "path": "server/src/net/handlers/guestAccount.ts",
       "group": "server/net/handlers",
-      "lines": 56,
-      "owns": "the convertGuest message: a guest registers, the lobby-made account takes their pilot, and the connection is the account's from then on",
-      "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx (userDB, pilots, social, contrib), ClientConnection, net/auth setRanks; @space-game/common",
+      "lines": 74,
+      "owns": "the convertGuest message: a guest registers, the lobby-made account takes their pilot, and the connection is the account's from then on (an expired guest, who had no ship, is given one)",
+      "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx (userDB, pilots, social, contrib), ClientConnection, net/auth setRanks; @space-game/common, bitecs",
       "events": "",
       "invariants": [
         {
@@ -23634,26 +23641,32 @@
         {
           "name": "TOKEN_MAX",
           "kind": "const",
-          "start": 21,
-          "end": 22
+          "start": 24,
+          "end": 25
         },
         {
           "name": "registerGuestAccountHandlers",
           "kind": "function",
-          "start": 24,
-          "end": 29
+          "start": 27,
+          "end": 32
         },
         {
           "name": "fail",
           "kind": "function",
-          "start": 31,
-          "end": 33
+          "start": 34,
+          "end": 36
+        },
+        {
+          "name": "bringShip",
+          "kind": "function",
+          "start": 38,
+          "end": 49
         },
         {
           "name": "convert",
           "kind": "function",
-          "start": 35,
-          "end": 56
+          "start": 51,
+          "end": 74
         }
       ]
     },

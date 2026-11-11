@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import type { ServerMessage } from '@space-game/common';
+import { hasComponent } from 'bitecs';
+import { Dead, Input, Position, type ServerMessage } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
@@ -173,8 +174,31 @@ describe('a guest registering', () => {
     await settle();
     const again = await joinAs(gs, 'Guest_6', { guestKey: KEY });
     expect(again.last('guestStatus')).toMatchObject({ state: 'expired' });
+    // (No ship of theirs in the world: it is dead to every system, so unseen, unhit and unflown; their controls are not heard)
+    const ghost = again.t.getPlayerId();
+    expect(hasComponent(gs.world, Dead, ghost)).toBe(true);
+    expect(gs.flying(ghost)).toBe(false);
+    const px = Position.x[ghost];
+    again.t.send({ type: 'input', seq: 1, forward: true, fireLeft: true, fireRight: true } as never);
+    again.t.send({ type: 'chat', text: 'hello' } as never);
+    gs.step(); gs.step();
+    expect(Input.forward[ghost]).toBe(0);
+    expect(Input.fireLeft[ghost]).toBe(0);
+    expect(Position.x[ghost]).toBeCloseTo(px, 1);
+    // (Nor does anyone else hear them)
+    const watcher = await joinAs(gs, 'Watcher');
+    again.t.send({ type: 'chat', text: 'hello' } as never);
+    await settle();
+    expect(watcher.got.some((m) => m.type === 'chat')).toBe(false);
     await again.convert('tokAlice');
     expect(again.last('guestConverted')).toMatchObject({ success: true });
+    // (A ship now, as after a respawn, with their pilot on it: and they fly it)
+    const ship = again.t.getPlayerId();
+    expect(ship).not.toBe(ghost);
+    expect(gs.flying(ship)).toBe(true);
+    again.t.send({ type: 'input', seq: 2, tick: 0, forward: true } as never);
+    gs.step();
+    expect(Input.forward[ship]).toBe(1);
     expect(again.profile().credits).toBe(credits);
     expect(again.profile().tutorial.step).toBe('rings');
     expect(((await store.load(7)) as { credits: number }).credits).toBe(credits);

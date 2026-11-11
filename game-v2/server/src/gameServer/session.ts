@@ -299,6 +299,10 @@ export async function resumeGuest(gs: GameServer, conn: ClientConnection): Promi
   }
   if (!gs.clients.has(conn.ws)) return; // (left meanwhile)
   await gs.pilots.resumeGuest(conn);
+  // A guest past their 3 days has no ship in the world till they register (net/handlers/guestAccount.ts brings one): dead, as a
+  // leaving pilot's is, so it isn't shown to anyone, hit, or flown (and their messages are dropped: net/dispatch.ts)
+  const eid = conn.playerId;
+  if (gs.pilots.isExpiredGuest(conn) && hasComponent(gs.world, Player, eid) && !hasComponent(gs.world, Dead, eid)) addComponent(gs.world, Dead, eid);
 }
 
 /** One game server per account: refused (and signed out) while another region still holds this pilot */

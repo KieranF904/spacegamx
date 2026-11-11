@@ -2,10 +2,11 @@
  * @contract server.pilots.convert
  * owns:       a guest registering: their whole profile (in play, or kept past their 3 days) moves to the new account's profile,
  *             once; the kept guest record is consumed
- * needs:      Pilots (sessions, store, guests, converting, now, host), pilots/{persist, session, lease}; npm: @space-game/common
+ * needs:      Pilots (sessions, store, guests, converting, now, host), pilots/{persist, lease}; npm: @space-game/common
  * invariants: the profile goes only to an account that has none (never merged), and only once: the kept record is gone with
  *             it, and a second try, or two guests into one account, are refused — server/src/game/pilots/convert.test.ts
- *             a guest past their 3 days is registered from the kept record, never played — server/src/game/pilots/convert.test.ts
+ *             a guest past their 3 days is registered from the kept record, never played: no ship of theirs is in the world and
+ *             their messages are dropped till then — server/src/game/pilots/convert.test.ts
  * extend:     none: what a profile holds is not looked at (it is moved whole); the account itself is the lobby's
  */
 
@@ -13,7 +14,6 @@ import { migrateProfile, cloneJson, type PlayerProfile } from '@space-game/commo
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
 import * as persist from './persist.js';
 import * as lease from './lease.js';
-import { takeKept } from './session.js';
 
 export type Converted = { ok: true } | { ok: false; error: string };
 
@@ -97,9 +97,10 @@ async function run(self: Pilots, s: Session, userId: number, username: string): 
   s.dirty = false;
   s.lastSave = self.now();
   if (s.loading) {
-    // (The pilot kept past their 3 days takes the place of the empty one this connection was given)
+    // (The pilot kept past their 3 days takes the place of the empty one this connection was given: in the world once the
+    // connection has a ship again, Pilots.enterRegistered)
     s.loading = false;
-    if (!takeKept(self, s, moving)) s.loading = true;
+    s.profile = moving;
   }
   return { ok: true };
 }

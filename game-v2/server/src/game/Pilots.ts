@@ -275,6 +275,15 @@ export class Pilots {
    */
   convertGuest(conn: PilotConn, userId: number, username: string): Promise<{ ok: true } | { ok: false; error: string }> { return convert.convertGuest(this, conn, userId, username); }
 
+  /** A guest past their 3 days: no ship of theirs is in the world and none of their messages but registering is heard */
+  isExpiredGuest(conn: PilotConn): boolean { return !!this.sessions.get(conn)?.guestBlocked; }
+
+  /** A registered expired guest's pilot, kept as it was, goes into the world on their new ship (the connection is the account's by now) */
+  enterRegistered(conn: PilotConn): void {
+    const s = this.sessions.get(conn);
+    if (s && !session.takeKept(this, s, s.profile)) s.loading = true;
+  }
+
   /** Is someone connected as this guest id (a guest in play is never wiped as idle) */
   private guestLive(id: string): boolean {
     for (const c of this.sessions.keys()) if (c.guestId === id) return true;
