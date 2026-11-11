@@ -3,7 +3,7 @@
  * owns:       a pilot's saved tutorial progress: a fresh one, a tolerant copy of a saved one, and "is this object live for
  *             them"
  * needs:      types (TutorialProfile, TutorialObjectDef, TutorialData)
- * invariants: an existing profile (one saved before the tutorial) is always `left` — common/src/tutorial/tutorial.test.ts
+ * invariants: an existing profile (one saved before the tutorial) is always `left` (and `unseen` until it has been through the yard) — common/src/tutorial/tutorial.test.ts
  * extend:     a new per-pilot field goes in TutorialProfile, cleanTutorial and (if the client shows it) the tutorialState message
  */
 
@@ -22,17 +22,18 @@ export function leftTutorial(done: string[] = []): TutorialProfile {
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
 /**
- * A saved tutorial block made safe. Absent (a profile from before the tutorial): the pilot has left, so existing
- * pilots never enter the yard. Junk: the same.
+ * A saved tutorial block made safe. Absent (a profile from before the tutorial): the pilot has left but is `unseen`: their
+ * next login sends them to the yard as a returner (server/src/game/pilots/returners.ts). Junk: left, never sent.
  */
 export function cleanTutorial(v: unknown): TutorialProfile {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return leftTutorial();
+  if (v === undefined || v === null) return { ...leftTutorial(), unseen: true };
+  if (typeof v !== 'object' || Array.isArray(v)) return leftTutorial();
   const r = rec(v);
   const done = [...new Set(Array.isArray(r.done) ? r.done.filter((x): x is string => typeof x === 'string') : [])];
-  if (r.left !== false) return leftTutorial(done);
+  if (r.left !== false) return { ...leftTutorial(done), ...(r.unseen === true ? { unseen: true } : {}) };
   const hits: Record<string, number> = {};
   for (const [k, n] of Object.entries(rec(r.hits))) if (typeof n === 'number' && Number.isFinite(n) && n > 0) hits[k] = n;
-  return { step: typeof r.step === 'string' && r.step ? r.step : TUTORIAL_FIRST_STEP, done, left: false, ...(Object.keys(hits).length ? { hits } : {}) };
+  return { step: typeof r.step === 'string' && r.step ? r.step : TUTORIAL_FIRST_STEP, done, left: false, ...(Object.keys(hits).length ? { hits } : {}), ...(r.returner === true ? { returner: true } : {}) };
 }
 
 /** The pilot is in the tutorial now */

@@ -338,14 +338,14 @@ describe('the training yard', () => {
     expect(a.profile().tutorial.hits).toBeUndefined();
   });
 
-  it('existing profiles are marked left; a fresh one is not', async () => {
+  it('existing profiles are marked left (and unseen, so the yard takes them as returners); a fresh one is not', async () => {
     const { migrateProfile, newProfile, starterKit } = await import('@space-game/common');
     const kit = starterKit(server_bp());
     const fresh = newProfile(kit);
     expect(fresh.tutorial.left).toBe(false);
     const saved = JSON.parse(JSON.stringify(fresh));
     delete saved.tutorial;
-    expect(migrateProfile(saved, kit).tutorial).toEqual({ step: '', done: [], left: true });
+    expect(migrateProfile(saved, kit).tutorial).toEqual({ step: '', done: [], left: true, unseen: true });
     saved.tutorial = { step: 'rings', done: ['welcome'], left: false, hits: { drone_1: 40, junk: 'x' } };
     expect(migrateProfile(saved, kit).tutorial).toEqual({ step: 'rings', done: ['welcome'], left: false, hits: { drone_1: 40 } });
     saved.tutorial = 'junk';

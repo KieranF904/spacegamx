@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots.session
  * owns:       a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest (and tell them how long they have), detach (save, release), adopt (a lingering session moves to a new connection)
- * needs:      Pilots (sessions, store, bank, banking, guests, frozen, devStash, opts, host), pilots/{cargo, death, persist, lease}; npm: @space-game/common
+ * needs:      Pilots (sessions, store, bank, banking, guests, frozen, away, devStash, opts, host), pilots/{cargo, death, persist, lease, returners}; npm: @space-game/common
  * invariants: a profile that fails to load or migrate is never saved over (the session stays `loading`) — server/src/game/pilots/guests.test.ts
  *             a disconnect saves twice if the first try fails, and keeps the lease if a save failed — server/src/game/pilots/lease.test.ts
  * extend:     none: the rules each step applies live in pilots/*.ts and profile/; this is the order they run in
@@ -13,6 +13,7 @@ import * as cargo from './cargo.js';
 import * as death from './death.js';
 import * as persist from './persist.js';
 import * as lease from './lease.js';
+import * as returners from './returners.js';
 
 /** A new connection plays as a guest until it logs in */
 export function attach(self: Pilots, conn: PilotConn): void {
@@ -68,6 +69,8 @@ export async function login(self: Pilots, conn: PilotConn, userId: number): Prom
   s.dirty = !raw || (raw as { version?: unknown }).version !== profile.version;
   if (cargo.structureToMaterials(self, s.profile)) s.dirty = true;
   if (refundRetiredSkills(s.profile)) s.dirty = true;
+  // (A pilot from before the yard goes in as a returner: their own profile set aside, a training one in play)
+  returners.arrive(self, s);
   // The repair bank: made full at a first login, refilled to now (it pays nothing at a login: parts an old save still has
   // owed are plain ghosts, for the hangar or a fabricator)
   if (!s.profile.bank) s.dirty = true;
@@ -125,6 +128,7 @@ export function takeKept(self: Pilots, s: Session, raw: unknown): boolean {
   s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
   if (cargo.structureToMaterials(self, s.profile)) s.dirty = true;
   if (refundRetiredSkills(s.profile)) s.dirty = true;
+  returners.arrive(self, s);
   self.bank.ensure(s.profile, self.now());
   persist.applyProfile(self, s, true);
   self.sendBank(s, true);
@@ -147,6 +151,7 @@ export async function detach(self: Pilots, conn: PilotConn): Promise<void> {
   await persist.save(self, s);
   if (s.dirty && userId !== null) await persist.save(self, s);
   self.devStash.delete(conn);
+  self.away.delete(conn);
   // (A save that failed keeps the lease: it runs out by itself, and no other server loads the stale profile meanwhile)
   if (userId !== null && !s.dirty) await lease.release(self, userId);
 }
@@ -163,6 +168,9 @@ export function adopt(self: Pilots, from: PilotConn, to: PilotConn): boolean {
   const frozen = self.frozen.get(from);
   self.frozen.delete(from);
   if (frozen) self.frozen.set(to, frozen);
+  const away = self.away.get(from);
+  self.away.delete(from);
+  if (away) self.away.set(to, away);
   s.conn = to;
   s.loading = false;
   s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;

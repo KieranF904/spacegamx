@@ -188,13 +188,17 @@ export function mirror(self: Pilots, s: Session): void {
 
 /**
  * What's written to disk: their profile, with the real ship back if a library ship's borrowed (devSwapShip); in the gun
- * range, the real profile frozen as it was when they went in (pilots/freeze.ts), never the copy in play
+ * range, the real profile frozen as it was when they went in (pilots/freeze.ts), never the copy in play; on a returner's visit to the
+ * yard, the real profile with the training one under `yard` (pilots/returners.ts)
  */
 export function persistable(self: Pilots, conn: PilotConn, p: PlayerProfile): PlayerProfile {
   return keepSavedShip(self, chosen(self, conn, p));
 }
 
 function chosen(self: Pilots, conn: PilotConn, p: PlayerProfile): PlayerProfile {
+  // (A returner in the yard: the document is their real profile whole, with the training profile under it: pilots/returners.ts)
+  const away = self.away.get(conn);
+  if (away) return { ...away, yard: p, updatedAt: p.updatedAt };
   const real = self.frozen.get(conn);
   if (real) return real;
   // (A cheat ship never goes to disk, however it got here: the starter in its place)

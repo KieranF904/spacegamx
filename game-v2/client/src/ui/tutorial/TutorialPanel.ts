@@ -187,15 +187,17 @@ export class TutorialPanel {
 
   private render(): void {
     const m = this.model;
-    const key = m ? `${m.stepId}|${this.flow.phase}|${m.progress}|${m.counter ? m.counter.done : ''}|${m.lines.join('~')}|${this.pack.map((l) => `${l.count ?? ''}${l.label}`).join('~')}` : '';
+    const key = m ? `${m.returner ? 'r' : ''}${m.stepId}|${this.flow.phase}|${m.progress}|${m.counter ? m.counter.done : ''}|${m.lines.join('~')}|${this.pack.map((l) => `${l.count ?? ''}${l.label}`).join('~')}` : '';
     if (key === this.shown) return;
     this.shown = key;
     if (!m) { this.card.hidden = true; this.grad.hide(); return; }
     if (m.graduate) {
       this.card.hidden = true;
       this.grad.show({
-        mode: 'modal', title: 'Training complete', intro: 'You know the whole loop. Here is your starter pack:', lines: this.pack,
-        note: 'It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.', button: 'Enter Sol',
+        mode: 'modal', title: 'Training complete',
+        ...(m.returner
+          ? { intro: 'You know the whole loop.', lines: [], note: 'Your own ship is waiting, just as you left it.', button: 'Back to my ship' }
+          : { intro: 'You know the whole loop. Here is your starter pack:', lines: this.pack, note: 'It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.', button: 'Enter Sol' }),
         onClose: () => {
           this.flow.enter();
           // (If the server never answers, the button comes back)
@@ -215,7 +217,7 @@ export class TutorialPanel {
       ${m.counter ? `<div class="tp-ct${m.counter.done >= m.counter.total ? ' full' : ''}" role="status">${esc(m.counter.label)} ${m.counter.done}/${m.counter.total}</div>` : ''}
       <div class="tp-bar"><i style="width:${Math.round(m.progress * 100)}%"></i></div>
       <div class="tp-row">${sent ? '<span class="q">Leaving...</span>' : confirm
-        ? `<span class="q">Leave now? You'll get the starter pack and can't come back.</span><button class="warn" data-a="yes">Leave</button><button data-a="no">Stay</button>`
+        ? `<span class="q">${m.returner ? "Leave now? You'll go back to your own ship, just as you left it." : "Leave now? You'll get the starter pack and can't come back."}</span><button class="warn" data-a="yes">Leave</button><button data-a="no">Stay</button>`
         : `${m.canContinue ? '<button class="go" data-a="continue">Continue</button>' : ''}<button class="leave" data-a="ask">Leave training</button>`}</div>`;
   }
 

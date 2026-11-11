@@ -130,6 +130,10 @@ export interface TutorialProfile {
   left: boolean;
   /** Damage this pilot has dealt to each training object (their own counter; at the object's hp it is broken for them) */
   hits?: Record<string, number>;
+  /** left: a pilot saved before the tutorial who has not been through it yet: their next login sends them to the yard (in a training ship, their own set aside: PlayerProfile.yard). Cleared for good by leaving */
+  unseen?: boolean;
+  /** in training: this is a returning pilot's visit (their own ship and state are set aside; leaving puts them back, with no starter pack) */
+  returner?: boolean;
 }
 
 /** What the step engine hears (`pid` is passed beside it). The foundation emits the first group; the rest are for the step engine and the other modules */

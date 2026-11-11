@@ -43,8 +43,10 @@ describe('data/tutorial.json', () => {
 describe('a pilot\'s tutorial state', () => {
   it('a new pilot starts at the first step; anything saved without it has left', () => {
     expect(newTutorial()).toEqual({ step: 'welcome', done: [], left: false });
-    expect(cleanTutorial(undefined)).toEqual({ step: '', done: [], left: true });
+    expect(cleanTutorial(undefined)).toEqual({ step: '', done: [], left: true, unseen: true });
     expect(cleanTutorial([])).toEqual({ step: '', done: [], left: true });
+    expect(cleanTutorial({ left: true, unseen: true })).toEqual({ step: '', done: [], left: true, unseen: true });
+    expect(cleanTutorial({ left: false, step: 'rings', returner: true })).toMatchObject({ left: false, returner: true });
     expect(cleanTutorial({ left: true, done: ['welcome', 3] })).toEqual({ step: '', done: ['welcome'], left: true });
     expect(cleanTutorial({ left: false, step: 7, done: 'x' })).toEqual({ step: 'welcome', done: [], left: false });
   });

@@ -224,6 +224,11 @@ export interface PlayerProfile {
   bank?: RepairBank;
   /** The training yard (common/src/tutorial): a new pilot starts in it; a profile saved before it is `left` (never enters) */
   tutorial: TutorialProfile;
+  /**
+   * Saved only: a returning pilot's training-yard profile (a fresh training ship, its own storage and progress) while they are in the yard.
+   * The document's own fields are then their real profile, set aside untouched (server/src/game/pilots/returners.ts); never set in memory
+   */
+  yard?: PlayerProfile;
   createdAt: string;
   updatedAt: string;
 }
@@ -379,6 +384,7 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     ...cleanNotices(r.notices),
     // (a save from before the tutorial is a pilot who has left it: existing pilots never enter the yard)
     tutorial: cleanTutorial(r.tutorial),
+    ...((y) => (y ? { yard: y } : {}))(cleanYard(r.yard, kit, catalog, opts)),
     ...((b) => (b ? { bank: b } : {}))(cleanBank(r.bank)),
     ...(Array.isArray(r.fabOrders) ? { fabOrders: (r.fabOrders as FabOrder[]).filter((o) => o && typeof o.item === 'string' && typeof o.n === 'number').map((o) => ({ id: num(o.id, 0), item: o.item, n: Math.floor(o.n), made: Math.floor(num(o.made, 0)) })) } : {}),
     ...(Array.isArray(r.designs) ? { designs: (r.designs as unknown[]).map((b) => (b && typeof b === 'object' && Array.isArray((b as Blueprint).parts) && typeof (b as Blueprint).name === 'string' ? (b as Blueprint) : null)) } : {}),
@@ -404,6 +410,12 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
   // another way has the gun turned to keep its barrel where it was. Safe on every load (a gun already right is left alone)
   if (catalog) migrateProfileGunFacings(out, catalog);
   return out;
+}
+
+/** A returner's saved yard profile, migrated like any other (one that can't be is dropped: the pilot is sent in afresh, their real profile never at risk) */
+function cleanYard(v: unknown, kit: StarterKit, catalog: Catalog | undefined, opts: MigrateOptions): PlayerProfile | undefined {
+  if (!v || typeof v !== 'object' || (v as { yard?: unknown }).yard) return undefined;
+  try { return migrateProfile(v, kit, catalog, opts); } catch { return undefined; }
 }
 
 /** Every ship and design of a profile with its guns' barrels following their turn (ships/gunFacing.ts) */

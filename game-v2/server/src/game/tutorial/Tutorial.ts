@@ -1,7 +1,7 @@
 /**
  * @contract server.game.tutorial
  * owns:       the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else
- *             kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState
+ *             kept out), leaving (skip or graduate: the starter pack and the one-way exit; a returner's own ship back instead, no pack) and the pilot's tutorialState
  * needs:      TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps
  * invariants: one pilot's hits never touch another's counter; the shared bodies never change (no hp loss, no movement);
  *             a pilot who has left is never placed in, or left in, the yard — server/src/game/tutorial/tutorial.test.ts
@@ -271,6 +271,7 @@ export class Tutorial {
   leave(conn: PilotConn): boolean {
     const p = this.pilots.get(conn);
     if (!p || p.tutorial.left) return false;
+    if (this.pilots.isAway(conn)) return this.leaveVisit(conn);
     const pack = this.data.starterPack;
     const done = p.tutorial.done;
     p.tutorial = leftTutorial(done);
@@ -287,6 +288,21 @@ export class Tutorial {
     this.pilots.markDirty(conn);
     this.pilots.sendProfile(conn);
     this.pilots.sendItems(conn);
+    this.sendState(conn);
+    this.pilots.saveNow(conn);
+    return true;
+  }
+
+  /**
+   * A returning pilot (saved before the yard) leaves: skipped at any step or graduated, the same. Nothing the yard gave stays and no starter pack
+   * comes: their own ship and state are back exactly as they were (Pilots.endVisit), where they were, and the yard is closed to them for good.
+   */
+  private leaveVisit(conn: PilotConn): boolean {
+    this.clearPilot(conn.playerId);
+    this.steps.forget(conn.playerId);
+    if (conn.docked) this.host.undock(conn);
+    if (!this.pilots.endVisit(conn)) return false;
+    this.pilots.toast(conn, 'Back in your own ship, just as you left it.', 'good');
     this.sendState(conn);
     this.pilots.saveNow(conn);
     return true;
@@ -328,7 +344,7 @@ export class Tutorial {
     const t = this.pilots.get(conn)?.tutorial;
     if (!t) return;
     const got = t.left ? undefined : this.steps.gotOf(conn.playerId, t.step);
-    this.host.send(conn, { type: 'tutorialState', step: t.left ? '' : t.step, done: [...t.done], left: t.left, broken: t.left ? [] : brokenIds(t, this.data), passed: t.left ? [] : this.steps.passedOf(conn.playerId, t.step), ...(got !== undefined ? { got } : {}) });
+    this.host.send(conn, { type: 'tutorialState', step: t.left ? '' : t.step, done: [...t.done], left: t.left, broken: t.left ? [] : brokenIds(t, this.data), passed: t.left ? [] : this.steps.passedOf(conn.playerId, t.step), ...(got !== undefined ? { got } : {}), ...(t.returner && !t.left ? { returner: true } : {}) });
   }
 
   // ------------------------------------------------------------ the tick

@@ -10512,7 +10512,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 234,
+      "lines": 236,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, a new step's chime and flare, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -10556,7 +10556,7 @@
           "name": "TutorialPanel",
           "kind": "class",
           "start": 72,
-          "end": 234
+          "end": 236
         }
       ]
     },
@@ -10794,7 +10794,7 @@
       "id": "client.ui.tutorial.model",
       "path": "client/src/ui/tutorial/tutorialModel.ts",
       "group": "client/ui/tutorial",
-      "lines": 222,
+      "lines": 225,
       "owns": "the lesson UI's decisions, as pure functions of the server's tutorialState and data/tutorial.json: what the instruction panel shows, which training objects are drawn ghosted (and how), which markers light up, where a screen-edge arrow sits, the leave-confirm flow, the step-done toast, the graduate screen's pack list",
       "needs": "common ServerTutorialStateMessage, TutorialData and the object defs (types only)",
       "events": "",
@@ -10950,55 +10950,55 @@
           "name": "PanelModel",
           "kind": "interface",
           "start": 125,
-          "end": 141
+          "end": 143
         },
         {
           "name": "panelModel",
           "kind": "function",
-          "start": 143,
-          "end": 160
+          "start": 145,
+          "end": 163
         },
         {
           "name": "newlyDone",
           "kind": "function",
-          "start": 162,
-          "end": 166
+          "start": 165,
+          "end": 169
         },
         {
           "name": "packLines",
           "kind": "function",
-          "start": 168,
-          "end": 175
+          "start": 171,
+          "end": 178
         },
         {
           "name": "LeaveFlow",
           "kind": "class",
-          "start": 177,
-          "end": 190
+          "start": 180,
+          "end": 193
         },
         {
           "name": "edgeArrow",
           "kind": "function",
-          "start": 192,
-          "end": 202
+          "start": 195,
+          "end": 205
         },
         {
           "name": "ringArrow",
           "kind": "function",
-          "start": 204,
-          "end": 212
+          "start": 207,
+          "end": 215
         },
         {
           "name": "distLabel",
           "kind": "function",
-          "start": 214,
-          "end": 217
+          "start": 217,
+          "end": 220
         },
         {
           "name": "risingPanels",
           "kind": "function",
-          "start": 219,
-          "end": 222
+          "start": 222,
+          "end": 225
         }
       ]
     },
@@ -13348,7 +13348,7 @@
       "id": "protocol.tutorial",
       "path": "common/src/network/tutorialProtocol.ts",
       "group": "common/network",
-      "lines": 45,
+      "lines": 46,
       "owns": "the training yard's messages: leave (skip or graduate), report (an acknowledgement or an opened panel), and the pilot's own tutorial state",
       "needs": "type-only import of tutorial/types (TutorialPanel)",
       "events": "",
@@ -13394,19 +13394,19 @@
           "name": "ServerTutorialStateMessage",
           "kind": "interface",
           "start": 30,
-          "end": 37
+          "end": 38
         },
         {
           "name": "ServerTutorialEdgeMessage",
           "kind": "interface",
-          "start": 39,
-          "end": 43
+          "start": 40,
+          "end": 44
         },
         {
           "name": "TutorialServerMessage",
           "kind": "type",
-          "start": 45,
-          "end": 45
+          "start": 46,
+          "end": 46
         }
       ]
     },
@@ -17809,13 +17809,13 @@
       "id": "common.tutorial.state",
       "path": "common/src/tutorial/state.ts",
       "group": "common/tutorial",
-      "lines": 77,
+      "lines": 78,
       "owns": "a pilot's saved tutorial progress: a fresh one, a tolerant copy of a saved one, and \"is this object live for them\"",
       "needs": "types (TutorialProfile, TutorialObjectDef, TutorialData)",
       "events": "",
       "invariants": [
         {
-          "text": "an existing profile (one saved before the tutorial) is always `left`",
+          "text": "an existing profile (one saved before the tutorial) is always `left` (and `unseen` until it has been through the yard)",
           "test": "common/src/tutorial/tutorial.test.ts"
         }
       ],
@@ -17855,49 +17855,49 @@
           "name": "cleanTutorial",
           "kind": "function",
           "start": 24,
-          "end": 36
+          "end": 37
         },
         {
           "name": "inTutorial",
           "kind": "function",
-          "start": 38,
-          "end": 41
+          "start": 39,
+          "end": 42
         },
         {
           "name": "objectBroken",
           "kind": "function",
-          "start": 43,
-          "end": 46
+          "start": 44,
+          "end": 47
         },
         {
           "name": "objectLive",
           "kind": "function",
-          "start": 48,
-          "end": 56
+          "start": 49,
+          "end": 57
         },
         {
           "name": "brokenIds",
           "kind": "function",
-          "start": 58,
-          "end": 61
+          "start": 59,
+          "end": 62
         },
         {
           "name": "objectPos",
           "kind": "function",
-          "start": 63,
-          "end": 66
+          "start": 64,
+          "end": 67
         },
         {
           "name": "stepIds",
           "kind": "function",
-          "start": 68,
-          "end": 71
+          "start": 69,
+          "end": 72
         },
         {
           "name": "nextStep",
           "kind": "function",
-          "start": 73,
-          "end": 77
+          "start": 74,
+          "end": 78
         }
       ]
     },
@@ -17905,7 +17905,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 159,
+      "lines": 163,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -18018,25 +18018,25 @@
           "name": "TutorialProfile",
           "kind": "interface",
           "start": 125,
-          "end": 133
+          "end": 137
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 135,
-          "end": 155
+          "start": 139,
+          "end": 159
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 157,
-          "end": 158
+          "start": 161,
+          "end": 162
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 159,
-          "end": 159
+          "start": 163,
+          "end": 163
         }
       ]
     },
@@ -19592,7 +19592,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 724,
+      "lines": 735,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, backups, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -19625,62 +19625,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 44,
-          "end": 53
+          "start": 45,
+          "end": 54
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 55,
-          "end": 84
+          "start": 56,
+          "end": 85
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 86,
-          "end": 97
+          "start": 87,
+          "end": 98
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 99,
-          "end": 99
+          "start": 100,
+          "end": 100
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 101,
-          "end": 116
+          "start": 102,
+          "end": 117
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 118,
-          "end": 119
+          "start": 119,
+          "end": 120
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 121,
-          "end": 144
+          "start": 122,
+          "end": 145
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 146,
-          "end": 147
+          "start": 147,
+          "end": 148
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 149,
-          "end": 159
+          "start": 150,
+          "end": 160
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 161,
-          "end": 724
+          "start": 162,
+          "end": 735
         }
       ]
     },
@@ -20977,7 +20977,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 222,
+      "lines": 226,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -21091,19 +21091,60 @@
           "name": "persistable",
           "kind": "function",
           "start": 189,
-          "end": 195
+          "end": 196
         },
         {
           "name": "chosen",
           "kind": "function",
-          "start": 197,
-          "end": 210
+          "start": 198,
+          "end": 214
         },
         {
           "name": "keepSavedShip",
           "kind": "function",
-          "start": 212,
-          "end": 222
+          "start": 216,
+          "end": 226
+        }
+      ]
+    },
+    {
+      "id": "server.pilots.returners",
+      "path": "server/src/game/pilots/returners.ts",
+      "group": "server/game/pilots",
+      "lines": 63,
+      "owns": "a pilot saved before the training yard who has never been through it (tutorial.unseen): at login their real profile is set aside untouched and a fresh training profile flies the yard; leaving (skip or graduate) puts the real one back exactly as it was",
+      "needs": "Pilots (sessions, away, bank, opts, tutorialSpawn), pilots/persist; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "nothing done in the yard reaches the real profile, and every save writes it whole beside the training profile (persist.persistable: the document is the real profile with the training one under `yard`), so a restart mid-yard loses neither; a pilot who has left (or finished) is never sent in again; a server with no yard never sets anyone aside",
+          "test": "server/src/game/tutorial/returners.test.ts"
+        }
+      ],
+      "extend": "a new thing the yard grants goes to the training profile only: nothing here ever copies from it to the real one",
+      "exports": [
+        "arrive",
+        "isAway",
+        "restore"
+      ],
+      "sections": [
+        {
+          "name": "arrive",
+          "kind": "function",
+          "start": 16,
+          "end": 39
+        },
+        {
+          "name": "isAway",
+          "kind": "function",
+          "start": 41,
+          "end": 44
+        },
+        {
+          "name": "restore",
+          "kind": "function",
+          "start": 46,
+          "end": 63
         }
       ]
     },
@@ -21111,9 +21152,9 @@
       "id": "server.pilots.session",
       "path": "server/src/game/pilots/session.ts",
       "group": "server/game/pilots",
-      "lines": 175,
+      "lines": 183,
       "owns": "a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest (and tell them how long they have), detach (save, release), adopt (a lingering session moves to a new connection)",
-      "needs": "Pilots (sessions, store, bank, banking, guests, frozen, devStash, opts, host), pilots/{cargo, death, persist, lease}; npm: @space-game/common",
+      "needs": "Pilots (sessions, store, bank, banking, guests, frozen, away, devStash, opts, host), pilots/{cargo, death, persist, lease, returners}; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -21138,38 +21179,38 @@
         {
           "name": "attach",
           "kind": "function",
-          "start": 17,
-          "end": 32
+          "start": 18,
+          "end": 33
         },
         {
           "name": "login",
           "kind": "function",
-          "start": 34,
-          "end": 81
+          "start": 35,
+          "end": 84
         },
         {
           "name": "resumeGuest",
           "kind": "function",
-          "start": 83,
-          "end": 111
+          "start": 86,
+          "end": 114
         },
         {
           "name": "takeKept",
           "kind": "function",
-          "start": 113,
-          "end": 134
+          "start": 116,
+          "end": 138
         },
         {
           "name": "detach",
           "kind": "function",
-          "start": 136,
-          "end": 152
+          "start": 140,
+          "end": 157
         },
         {
           "name": "adopt",
           "kind": "function",
-          "start": 154,
-          "end": 175
+          "start": 159,
+          "end": 183
         }
       ]
     },
@@ -21375,8 +21416,8 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 427,
-      "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
+      "lines": 443,
+      "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit; a returner's own ship back instead, no pack) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps",
       "events": "",
       "invariants": [
@@ -21413,7 +21454,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 426
+          "end": 442
         }
       ]
     },

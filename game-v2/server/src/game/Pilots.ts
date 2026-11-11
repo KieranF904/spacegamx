@@ -37,6 +37,7 @@ import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
 import * as freezer from './pilots/freeze.js';
 import * as session from './pilots/session.js';
+import * as returners from './pilots/returners.js';
 import * as convert from './pilots/convert.js';
 import { GuestKeep } from './pilots/guests.js';
 import type { LeaseResult } from '../profile/lease.js';
@@ -316,6 +317,16 @@ export class Pilots {
    * copy flies the cheat ship (pilots/freeze.ts). Every save writes the frozen one; gives, takes and awards refuse.
    */
   /** @internal pilots/*.ts */ frozen = new Map<PilotConn, PlayerProfile>();
+
+  /**
+   * Pilots on a returner's visit to the training yard (pilots/returners.ts): their real profile, set aside untouched, while a fresh training
+   * profile is the one in play. Saves write both (persist.persistable); the visit ends with `endVisit`.
+   */
+  /** @internal pilots/*.ts */ away = new Map<PilotConn, PlayerProfile>();
+  /** On a returner's visit to the yard (their real profile set aside) */
+  isAway(conn: PilotConn): boolean { return returners.isAway(this, conn); }
+  /** The visit is over: the real profile back exactly as it was, and their own ship in the world again (false: not on a visit) */
+  endVisit(conn: PilotConn): boolean { return returners.restore(this, conn); }
 
   /** Set the profile aside and fly `ship` (the gun range's cheat ship) on a throwaway copy (pilots/freeze.ts) */
   freeze(conn: PilotConn, ship: Blueprint): boolean { return freezer.freeze(this, conn, ship); }

@@ -11,7 +11,7 @@
 import type { ServerTutorialStateMessage, TutorialData, TutorialLine, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
 import { esc } from '../escape';
 
-type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[]; got?: number };
+type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[]; got?: number; returner?: boolean };
 
 /** How the renderer draws a training body: a live practice drone, a ghost (faded, grey) of one, or nothing (a later step's) */
 export type TrainingLook = 'drone' | 'droneGhost' | 'hidden';
@@ -138,6 +138,8 @@ export interface PanelModel {
   canContinue: boolean;
   /** The last step: the graduate screen instead of the card */
   graduate: boolean;
+  /** A returning pilot's visit: leaving takes them back to their own ship (no starter pack) */
+  returner: boolean;
 }
 
 /** What the card shows, or null when it is not shown (not in the lesson, or a step the data does not know) */
@@ -156,6 +158,7 @@ export function panelModel(s: State | null, data: TutorialData, keyOf: (action: 
     progress: Math.min(1, s.done.length / Math.max(1, data.steps.length)),
     canContinue: st.trigger.kind === 'ack',
     graduate: st.trigger.kind === 'graduate',
+    returner: !!s.returner,
   };
 }
 
