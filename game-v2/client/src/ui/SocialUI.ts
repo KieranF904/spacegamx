@@ -22,6 +22,7 @@ import { onlineCount } from './social/friendsView';
 import { settings } from '../settings/Settings';
 import systemsData from '../../../data/systems.json';
 import { esc } from './escape';
+import { backupPicker } from './BackupPicker';
 
 const SYSTEMS = new Map((systemsData as { systems: StarSystemData[] }).systems.map((s) => [s.id, s]));
 const sysName = (id: string) => SYSTEMS.get(id)?.name.replace(/ System$/, '') ?? id;
@@ -231,14 +232,14 @@ export class SocialUI {
     const home = document.createElement('button');
     home.className = 'sgw-btn';
     home.textContent = `Respawn at home (${boundKeyName('respawn', settings.data.bindings)})`;
-    home.onclick = () => this.d.send({ type: 'respawn' });
+    home.onclick = () => this.d.send({ type: 'respawn', ...backupPicker.choice() });
     this.rally.appendChild(home);
     for (const m of others) {
       const b = document.createElement('button');
       b.className = 'sgw-btn good';
       b.textContent = `Rally with ${m.name} · ${sysName(m.system)}`;
       b.title = 'Respawn beside them (if they are not in a fight)';
-      b.onclick = () => this.d.send({ type: 'respawn', rally: m.name });
+      b.onclick = () => this.d.send({ type: 'respawn', rally: m.name, ...backupPicker.choice() });
       this.rally.appendChild(b);
     }
     this.rally.style.display = 'flex';

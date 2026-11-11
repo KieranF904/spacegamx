@@ -25,5 +25,5 @@
   "miners": 0,
   "dodge": 0,
   "tow": 0,
-  "rebuild": 251.40000000000006
+  "rebuild": 1142
 }

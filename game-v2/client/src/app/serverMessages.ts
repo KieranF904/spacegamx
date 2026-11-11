@@ -70,6 +70,8 @@ import type { BossUI } from '../ui/BossUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ContributorPanel } from '../ui/ContributorPanel';
 import type { ChatBubbles } from '../ui/bubbles/ChatBubbles';
+import { wreckFromMessage, type WreckMark } from '../ui/wreckMark';
+import { backupPicker } from '../ui/BackupPicker';
 
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
 export interface MessageHost {
@@ -115,7 +117,7 @@ export interface MessageHost {
   systemArrivedAt: number;
   perfSrv: number | undefined;
   perfNet: string;
-  wreck: { system: string; x: number; y: number; until: number } | null;
+  wreck: WreckMark | null;
   onDisconnected(info?: DisconnectInfo): void;
   netRates(): string;
   addChatMessage(playerName: string, text: string, isSystem?: boolean, color?: string): void;
@@ -150,6 +152,7 @@ function welcome(h: MessageHost, msg: Msg<'welcome'>): void {
   h.renderer.hideDeathScreen(); // welcome also follows a respawn
   h.localDead = false;
   h.social?.showRally(false);
+  backupPicker.show(false);
   console.log('Joined as player', msg.playerId);
 }
 
@@ -283,6 +286,7 @@ function death(h: MessageHost, msg: Msg<'death'>): void {
     h.autopilot.cancel();
     h.localDead = true;
     h.social.showRally(true);
+    backupPicker.show(true);
   } else {
     h.renderer.showExplosion(msg.entityId);
     // Get dead entity info
@@ -311,9 +315,9 @@ const TABLE: Handlers = {
   },
   items: (h, msg) => { h.pilot.setItems(msg); },
   gained,
-  wreck: (h, msg) => {
-    h.wreck = msg.gone || msg.system === undefined ? null : { system: msg.system, x: msg.x ?? 0, y: msg.y ?? 0, until: Date.now() + (msg.seconds ?? 0) * 1000 };
-  },
+  wreck: (h, msg) => { h.wreck = wreckFromMessage(msg, Date.now()); },
+  // Your ship was lost: the backups you may respawn in (ui/BackupPicker.ts)
+  backups: (h, msg) => { backupPicker.set(msg); },
   toast: (h, msg) => {
     h.toasts.show(msg.text, msg.kind);
     if (msg.kind === 'bad') h.audio.playUI('error', 0.5);

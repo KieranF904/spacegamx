@@ -31,14 +31,15 @@ const msg: ServerRepairBankMessage = {
 };
 
 describe('bank panel', () => {
-  it('renders the free part, the spare and the deposits apart from a repairBank message', () => {
+  it('renders the free part and the deposits apart from a repairBank message, and what the bank does not do', () => {
     const html = bankHtml(econ, icon, msg, 0);
     expect(html).toContain('full in 8 min');
     expect(html).toContain('width:83%');
     expect(html).toMatch(/Free part/);
-    expect(html).toMatch(/Spare for repairs/);
     expect(html).toMatch(/data-bank="deposits"/);
-    expect(html).toContain('Rebuilding from deposits: 2 parts left');
+    expect(html).toMatch(/starter-level parts/);
+    expect(html).toMatch(/A lost ship, or a part you've only planned, has to be fabricated/);
+    expect(html).not.toMatch(/respawn/i);
     expect(html.indexOf('Free part')).toBeLessThan(html.indexOf('Deposits'));
   });
 
@@ -49,11 +50,9 @@ describe('bank panel', () => {
     expect(freeShare({ free: {}, cap: { a: 4 } })).toBe(0);
   });
 
-  it('says so when nothing is deposited or spare', () => {
+  it('says so when nothing is deposited', () => {
     const html = bankHtml(econ, icon, { ...msg, deposits: {}, spare: {}, rebuilding: undefined });
     expect(html).toContain('none yet');
-    expect(html).toContain('No spare for repairs');
-    expect(html).not.toContain('Rebuilding');
   });
 
   it('waits for the first report', () => {

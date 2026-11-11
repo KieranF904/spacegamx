@@ -83,6 +83,7 @@ import './app/rockTables';
 import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon, shipIcon } from './ui/itemIcons';
 import { LoadingFlow } from './app/loadingFlow';
+import { wreckLabel, type WreckMark } from './ui/wreckMark';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
 import { inGunRange, resetRangeState } from './ui/gunRange/rangeState';
 
@@ -139,8 +140,8 @@ export class Game {
   private worldEvents = new Map<number, { name: string; x: number; y: number; system: string }>();
   /** Kills (and assists) this session, for the tutorial */
   private sessionKills = 0;
-  /** Your last ship's wreck, kept for you a while (wall ms): marked until you recover it */
-  private wreck: { system: string; x: number; y: number; until: number } | null = null;
+  /** Your last ship's wreck, yours alone a while, then anyone's (ui/wreckMark.ts): marked until you recover it or it's gone */
+  private wreck: WreckMark | null = null;
   /** Objective banners (a city under siege) */
   private objectives = new ObjectiveBanner();
   /** A moon siege's panel (and its night HUD and cards): its own chunk, fetched when the first siege message arrives */
@@ -730,13 +731,13 @@ this.boostHudEl = document.getElementById('boostHud');
    * Where the followed job wants you. Jobs out in space follow what's live: the
    * freighter you're escorting as it flies, the outpost or beacons once they're up.
    */
-  /** Your wreck, as a marker while it's kept for you here (with the time left) */
+  /** Your wreck, as a marker while it's there (whose it is, and the time left) */
   private wreckMarker(): { name: string; x: number; y: number; system: string }[] {
     const w = this.wreck;
     if (!w || w.system !== this.state.systemId) return [];
-    const left = Math.max(0, Math.round((w.until - Date.now()) / 1000));
-    if (!left) { this.wreck = null; return []; }
-    return [{ name: `⚑ Your wreck (${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')})`, x: w.x, y: w.y, system: w.system }];
+    const name = wreckLabel(w, Date.now());
+    if (!name) { this.wreck = null; return []; }
+    return [{ name, x: w.x, y: w.y, system: w.system }];
   }
 
   private objective(): QuestTarget | null {

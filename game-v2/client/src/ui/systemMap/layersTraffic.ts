@@ -9,6 +9,7 @@
 import { EntityType } from '@space-game/common';
 import type { MapHost, MapScene } from './host';
 import { FACTION_LIST } from './mapConsts';
+import { wreckLabel } from '../wreckMark';
 
 export function drawGhosts(host: MapHost, sc: MapScene): void {
   const { ctx, sx, sy, w, h, ships } = sc;
@@ -78,10 +79,10 @@ export function drawDerelicts(host: MapHost, sc: MapScene): void {
 
 export function drawYourWreck(host: MapHost, sc: MapScene): void {
   const { ctx, sx, sy, time } = sc;
-  // Your wreck: a beacon with how long it's kept for you
+  // Your wreck: a beacon with whose it is and for how long
   const wk = host.wreck?.();
-  const wkLeft = wk && wk.system === host.state.systemId ? Math.ceil((wk.until - Date.now()) / 1000) : 0;
-  if (wk && wkLeft > 0) {
+  const wkLabel = wk && wk.system === host.state.systemId ? wreckLabel(wk, Date.now()) : null;
+  if (wk && wkLabel) {
     const x = sx(wk.x), y = sy(wk.y);
     const k = (time * 0.9) % 1;
     ctx.strokeStyle = `rgba(240, 171, 252, ${0.8 * (1 - k)})`;
@@ -90,7 +91,7 @@ export function drawYourWreck(host: MapHost, sc: MapScene): void {
     ctx.fillStyle = '#f0abfc';
     ctx.strokeStyle = '#2a0a2e';
     ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 6, y); ctx.closePath(); ctx.fill(); ctx.stroke();
-    host.label(ctx, `⚑ Your wreck · ${Math.floor(wkLeft / 60)}:${String(wkLeft % 60).padStart(2, '0')}`, x, y - 14, '#f5c2ff', 9, y);
+    host.label(ctx, wkLabel, x, y - 14, '#f5c2ff', 9, y);
     host.hits.push({ kind: 'beacon', x: wk.x, y: wk.y, sx: x, sy: y });
   }
 }

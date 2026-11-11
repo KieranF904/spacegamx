@@ -11,6 +11,7 @@ import type { GameState } from '../../state/GameState';
 import { type RouteView } from '../../ships/Autopilot';
 import type { PartyMemberView } from '@space-game/common';
 import type { Camera, Hit } from './types';
+import type { WreckMark } from '../wreckMark';
 
 /** What a frame of the system view works from (worked out once per draw, then handed to each layer) */
 export interface MapScene {
@@ -56,7 +57,7 @@ export interface MapHost {
   mouse: { x: number; y: number };
   belt: { inner: number; outer: number } | null;
   ghostList: import('../../state/Populations').PopGhost[];
-  wreck?: () => { system: string; x: number; y: number; until: number } | null;
+  wreck?: () => WreckMark | null;
   autoRoute: (() => RouteView | null) | null;
   autoTarget: (() => { x: number; y: number } | null) | null;
   pings: (() => { name: string; x: number; y: number }[]) | null;

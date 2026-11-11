@@ -48,6 +48,7 @@ import { JUMP, SECTOR_COLORS, BODY_NAMES } from './systemMap/mapConsts';
 import type { View, Camera, Fit, Hit } from './systemMap/types';
 import { actionable, nearestHit } from './systemMap/types';
 import type { MapHost, MapScene } from './systemMap/host';
+import type { WreckMark } from './wreckMark';
 
 export class SystemMapUI implements MapHost {
   /** Map click-to-warp (dev tool): Game sends it to the server */
@@ -69,8 +70,8 @@ export class SystemMapUI implements MapHost {
   /** Live pings in this system, and a ping from the map (Shift + right-click) */
   public pings: (() => { name: string; x: number; y: number }[]) | null = null;
   public onPing: ((x: number, y: number) => void) | null = null;
-  /** Your wreck while it's kept for you (until: ms timestamp) */
-  public wreck?: () => { system: string; x: number; y: number; until: number } | null;
+  /** Your wreck while it's there (ui/wreckMark.ts: yours alone, then open to all) */
+  public wreck?: () => WreckMark | null;
   /** The jump drive: lining up (key held, latched or spooling), its phase, how far it reaches */
   public jump: (() => { aiming: boolean; phase: string; reach: number }) | null = null;
   /** Where the jump is aimed this tick (Game sets it from the aim, after any lock-on) */
