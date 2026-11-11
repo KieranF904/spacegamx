@@ -51,7 +51,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'respawn', label: 'Respawn', category: 'Ship & world', key: 'KeyR', hint: 'After being destroyed' },
   { id: 'menu', label: 'Menu', category: 'Interface', key: 'Escape', rebindable: false },
   { id: 'map', label: 'Galaxy / system map', category: 'Interface', key: 'KeyM' },
-  { id: 'inventory', label: 'Cargo and storage', category: 'Interface', key: 'KeyI' },
+  { id: 'inventory', label: 'Ship window (docked: cargo and storage)', category: 'Interface', key: 'KeyI', hint: 'Status, power, weapons, auto-pickup, refiner, fabricator and kills. You can fly with it open, but not fire' },
   { id: 'components', label: 'Component guide (the side panel)', category: 'Interface', key: 'KeyC', hint: 'Every ship part: the level it opens at and what it takes. Again: fold the panel' },
   { id: 'quick1', label: 'Quick bar slot 1', category: 'Ship & world', key: 'Digit1' },
   { id: 'quick2', label: 'Quick bar slot 2', category: 'Ship & world', key: 'Digit2' },

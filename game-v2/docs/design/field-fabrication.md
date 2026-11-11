@@ -342,6 +342,8 @@ These are JSON messages, wired into `ClientMessage` and `ServerMessage`. All of 
 | `fieldPlanClear` | C to S | "As it stands": missing parts dropped, recycling stopped | A |
 | `machine { kind, on?, packs?, recipe? }` | C to S | a switch changed | A |
 | `fieldCancel { kind, job }` | C to S | a job called off | A |
+| `fieldOrder { action: top / hold / resume / clear, uid? }` | C to S | the fabricator's priority list (`FieldRecord.first`, worked before the usual order whenever it can be) and parts held off (`paused`; a job under way on one is called off); shown in `MachineView.first` / `paused` (2026-11-11, the Ship window) | A |
+| `machine { kind: 'refiner', refine: string[] }` | C to S | the refiner's auto list (`FieldRecord.refine`): on auto, once the plan needs nothing it can make, these recipes in order from the hold's ore; `MachineView.refine` (2026-11-11) | A |
 | `fieldRecycle { uids, cancel? }` | C to S | parts queued or unqueued | A |
 | `bankDeposit { items, from? }` | C to S | at a station | B |
 | `devBank { action, items? }` | C to S | dev server only: `fill`, `empty`, `clearDeposits`, `grant` | B (server), D (UI) |

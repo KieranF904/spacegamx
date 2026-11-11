@@ -684,3 +684,74 @@ describe('field fabricator: a planned part built in', () => {
     expect(missing()).toEqual({ ghosts: [], wrecked: [] });
   });
 });
+
+describe("field fabricator: the pilot's order of work (fieldOrder, the Ship window's Fabricator tab)", () => {
+  it('a part put on top is worked first; a part held is left alone until let go; both lists are kept in the record and shown', () => {
+    const w = world(design());
+    const e = (w.server as any).econ;
+    const inputs = e.recipes.partInputs(pip) as Bag;
+    w.destroy(1);
+    w.destroy(2);
+    for (let k = 0; k < 4; k++) w.give(inputs);
+    // (Usually Pip 1 goes first: the lower index at the same depth)
+    w.send({ type: 'fieldOrder', action: 'top', uid: 2 });
+    w.send({ type: 'fieldOrder', action: 'hold', uid: 1 });
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    w.run(1);
+    expect(w.fabView()).toMatchObject({ first: [2], paused: [1], job: { kind: 'build', uid: 2 } });
+    expect(w.prof.ship.field).toMatchObject({ first: [2], paused: [1] });
+    expect(until(w, () => w.alive(2), 5000)).toBeGreaterThan(0);
+    w.run(900);
+    expect(w.alive(1)).toBe(false);
+    expect(w.fabView().job?.uid).not.toBe(1);
+    w.send({ type: 'fieldOrder', action: 'resume', uid: 1 });
+    expect(until(w, () => w.alive(1), 8000)).toBeGreaterThan(0);
+    expect(w.prof.ship.field?.paused).toBeUndefined();
+    w.send({ type: 'fieldOrder', action: 'clear' });
+    w.run(1);
+    expect(w.prof.ship.field?.first).toBeUndefined();
+    expect(w.fabView().first).toBeUndefined();
+  });
+
+  it('holding the part under way calls its job off and gives its inputs back; the core and unknown parts are refused', () => {
+    const w = world(design());
+    const e = (w.server as any).econ;
+    const inputs = e.recipes.partInputs(pip) as Bag;
+    w.destroy(1);
+    w.give(inputs);
+    w.send({ type: 'fieldOrder', action: 'top', uid: 1 });
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    w.run(2);
+    expect(w.fabView().job).toMatchObject({ kind: 'build', uid: 1 });
+    // (Switched off first, so nothing else takes the inputs straight back out of the hold)
+    w.send({ type: 'machine', kind: 'fabricator', on: false });
+    w.send({ type: 'fieldOrder', action: 'hold', uid: 1 });
+    w.run(2);
+    expect(w.fabView().job).toBeUndefined();
+    for (const [id, n] of Object.entries(inputs)) expect(w.hold(id)).toBe(n);
+    expect(w.prof.ship.field?.first).toBeUndefined();
+    expect(w.prof.ship.field?.paused).toEqual([1]);
+    w.send({ type: 'fieldOrder', action: 'top', uid: 0 });
+    w.send({ type: 'fieldOrder', action: 'top', uid: 999 });
+    w.send({ type: 'fieldOrder', action: 'bogus', uid: 1 });
+    w.run(1);
+    expect(w.prof.ship.field?.first).toBeUndefined();
+    expect(w.prof.ship.field?.paused).toEqual([1]);
+  });
+});
+
+describe("field refiner: the pilot's auto list", () => {
+  it('is kept in the record (known recipes only, each once), shown, and run while the plan needs nothing', () => {
+    const w = world(design());
+    w.give({ iron_ore: 2, nickel_ore: 1 });
+    w.send({ type: 'machine', kind: 'refiner', on: true, refine: ['alloy_plate', 'no_such_recipe', 'alloy_plate'] });
+    w.run(1);
+    const ref = () => w.lastState().machines.find((m) => m.kind === 'refiner')!;
+    expect(w.prof.ship.field?.refine).toEqual(['alloy_plate']);
+    expect(ref()).toMatchObject({ refine: ['alloy_plate'], job: { kind: 'refine', recipe: 'alloy_plate' } });
+    w.send({ type: 'machine', kind: 'refiner', refine: [] });
+    w.run(1);
+    expect(w.prof.ship.field?.refine).toBeUndefined();
+    expect(ref().refine).toBeUndefined();
+  });
+});

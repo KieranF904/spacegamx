@@ -128,6 +128,11 @@ export class StationWindow {
     this.win.close();
   }
 
+  /** Show a tab (the Ship window's "Repair bank" while docked); open already */
+  showTab(id: Tab): void {
+    if (this.win.isOpen && this.tabEls.get(id)?.style.display !== 'none') this.tabEls.get(id)?.click();
+  }
+
   /** Hide without undocking (the hangar opens over it) */
   hideForHangar(): void {
     this.win.veil.style.display = 'none';

@@ -278,3 +278,25 @@ describe('inputSend: the weapon groups selection', () => {
     groupSelection.reset();
   });
 });
+
+describe('inputSend: the Ship window holds the guns (fireBlocked)', () => {
+  it('sends no fire while it is open, flies on as before, and fires again once it closes, with no tick of delay', () => {
+    const { ctx, sc, sent, predicted, tick } = fakeCtx();
+    const c = ctx as unknown as { fireBlocked: boolean };
+    c.fireBlocked = true;
+    sc.mouse.add(0); sc.mouse.add(2);
+    sc.keys.add('KeyW');
+    tick(); tick();
+    const all = [...sent, ...predicted];
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.every((m) => !m.fireLeft && !m.fireRight)).toBe(true);
+    // (Flight is untouched: the thrust went on the first tick)
+    expect(sent[0].forward).toBe(true);
+    c.fireBlocked = false;
+    const before = sent.length;
+    tick();
+    expect(sent.length).toBe(before + 1);
+    expect(sent[sent.length - 1].fireLeft).toBe(true);
+    expect(sent[sent.length - 1].fireRight).toBe(true);
+  });
+});

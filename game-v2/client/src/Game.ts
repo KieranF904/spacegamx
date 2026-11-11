@@ -190,7 +190,6 @@ export class Game {
   private loading: LoadingFlow | null = null;
   private topHudEl: HTMLElement | null;
 private xpHudEl: HTMLElement | null;
-private boostHudEl: HTMLElement | null;
   private inventoryPanelEl: HTMLElement | null;
 private perfMonitor: PerfMonitor | null = null;
   private perfSrv: number | undefined;
@@ -293,7 +292,6 @@ private perfMonitor: PerfMonitor | null = null;
     this.loadingEl = document.getElementById('loading');
     this.topHudEl = document.getElementById('topHud');
 this.xpHudEl = document.getElementById('xpHud');
-this.boostHudEl = document.getElementById('boostHud');
     this.inventoryPanelEl = document.getElementById('inventoryPanel');
     
     // Individual components
@@ -714,6 +712,7 @@ this.boostHudEl = document.getElementById('boostHud');
       get dialogue() { return g.w.dialogue; },
       get hub() { return g.w.hub; },
       get inventoryWindow() { return g.w.inventoryWindow; },
+      get shipWindow() { return g.w.shipWindow; },
       get pickup() { return g.w.pickup; },
       get tradeWindow() { return g.w.tradeWindow; },
       get social() { return g.w.social; },
@@ -919,6 +918,7 @@ this.boostHudEl = document.getElementById('boostHud');
       this.w.pickup.update(blocked || this.stationOpen || !me || inGunRange());
     }
     this.chargeGauge.update(this.shipClient.laserCharge(), this.loggedIn && !this.shipClient.hangarOpen);
+    this.updateShipHud(now, blocked);
     // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo
     this.weaponRing?.update(this.shipClient.ringGroups(), this.input.mouseX, this.input.mouseY,
       this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.stationOpen && !this.w.systemMapUI.isOpen, this.shipClient.ringChip());
@@ -985,6 +985,21 @@ this.boostHudEl = document.getElementById('boostHud');
     this.hud.update();
   }
 
+  /** The Ship window, the footer, the power readout and the status icons (ui/ship, ui/hud), once a frame */
+  private updateShipHud(now: number, blocked: boolean): void {
+    const w = this.w;
+    w.shipWindow.update(now, !this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || w.systemMapUI.isOpen);
+    const flying = this.loggedIn && !blocked && !this.stationOpen && !this.localDead;
+    w.footer.update(flying);
+    const me = flying ? this.state.entities.get(this.state.playerId) : undefined;
+    const ship = me ? this.shipClient.myShip() : null;
+    const sent = this.inputCtx.lastSent;
+    w.powerMargin.update(ship?.derived, this.state.charge, {
+      thrust: !!(sent.forward || sent.backward || sent.left || sent.right), boost: !!sent.boost, firing: !!(sent.fireLeft || sent.fireRight),
+    });
+    w.statusTray.update(me ? { tick: this.state.serverTick, empUntil: me.empUntil, slowUntil: me.slowUntil, markUntil: me.markUntil, warmth: me.warmth } : null);
+  }
+
   /** What app/inputSend.ts (tickInput, sendNeutralInput) reads (getters, so windows built late resolve at use) plus its last-sent state; made once */
   private makeInputCtx(): InputSendCtx {
     const g = this;
@@ -993,6 +1008,8 @@ this.boostHudEl = document.getElementById('boostHud');
       get loggedIn() { return g.loggedIn; },
       get stationOpen() { return g.stationOpen; },
       get localDead() { return g.localDead; },
+      // (The Ship window open: fly, but the guns are held)
+      get fireBlocked() { return g.w.shipWindow?.isOpen ?? false; },
       get compactInputs() { return g.network instanceof NetworkManager; },
       get noseThrust() { return viewMode.pinnedAim(g.shipClient.helmMode()); },
       get menu() { return g.menu; },
@@ -1113,7 +1130,6 @@ this.boostHudEl = document.getElementById('boostHud');
     // Show all HUD elements
     if (this.topHudEl) this.topHudEl.style.display = 'flex';
 if (this.xpHudEl) this.xpHudEl.style.display = 'flex';
-if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     this.w.pilotHud.show();
     this.shipClient.setInGame(true);
     this.w.quests.show();
@@ -1196,7 +1212,6 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     // Hide all HUD elements on disconnect
     if (this.topHudEl) this.topHudEl.style.display = 'none';
 if (this.xpHudEl) this.xpHudEl.style.display = 'none';
-if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.w.pilotHud.hide();
     this.shipClient.setInGame(false);
     this.w.quests.hide();
@@ -1205,6 +1220,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.w.social.hide();
     this.w.quests.log.close();
     this.w.inventoryWindow.close();
+    this.w.shipWindow.close();
   }
 
   /** Unread mail, said once a page when the pilot is in (the inbox is on the join screen) */

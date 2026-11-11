@@ -12,9 +12,11 @@ const hasAll = (inputs: Bag, have: (id: string) => number) => Object.entries(inp
 
 /**
  * `recipe`: the pilot's choice (undefined: auto). `short`: what the fabricator's jobs were short of (auto refines the
- * first of those, by id, that a recipe this tier can run makes from what the hold has)
+ * first of those, by id, that a recipe this tier can run makes from what the hold has). `list`: the pilot's auto list
+ * (FieldRecord.refine): on auto, once nothing the plan is short of can be made, the first of these, in order, the hold has
+ * the ore for (so a pilot can keep turning ore into plates between jobs)
  */
-export function pickRefine(econ: Economy, tier: number, recipe: string | undefined, short: Bag, have: (id: string) => number): RefinePick {
+export function pickRefine(econ: Economy, tier: number, recipe: string | undefined, short: Bag, have: (id: string) => number, list: readonly string[] = []): RefinePick {
   const batch = (id: string): RefinePick => {
     const r = econ.recipes.refining.get(id)!;
     return { recipe: id, inputs: { ...r.inputs }, out: { [id]: r.out } };
@@ -31,5 +33,13 @@ export function pickRefine(econ: Economy, tier: number, recipe: string | undefin
     if (!canRefine(econ, tier, id)) { graded = true; continue; }
     if (hasAll(r.inputs, have)) return batch(id);
   }
-  return { blocked: graded ? 'grade' : 'idle' };
+  let short2 = false;
+  for (const id of list) {
+    const r = econ.recipes.refining.get(id);
+    if (!r) continue;
+    if (!canRefine(econ, tier, id)) { graded = true; continue; }
+    if (hasAll(r.inputs, have)) return batch(id);
+    short2 = true;
+  }
+  return { blocked: graded && !short2 ? 'grade' : short2 ? 'materials' : 'idle' };
 }

@@ -25,7 +25,7 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.sgk { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, calc(100vw - 40px)); height: min(560px, calc(100vh - 60px)); z-index: 1200;
+.sgk { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, calc(100vw - 40px)); height: min(560px, calc(100vh - 60px)); z-index: 2700;
   display: none; flex-direction: column; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; background: rgba(9, 15, 28, 0.97);
   border: 1px solid rgba(125, 211, 252, 0.35); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); color: #c9d4e5; font: 12px 'Segoe UI', system-ui, sans-serif; }
 .sgk.on { display: flex; }

@@ -75,6 +75,7 @@ import type { ContributorPanel } from '../ui/ContributorPanel';
 import type { ChatBubbles } from '../ui/bubbles/ChatBubbles';
 import { wreckFromMessage, type WreckMark } from '../ui/wreckMark';
 import { backupPicker } from '../ui/BackupPicker';
+import { killLog } from '../ui/ship/killLog';
 
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
 export interface MessageHost {
@@ -236,6 +237,11 @@ function gained(h: MessageHost, msg: Msg<'gained'>): void {
   if (k) h.audio.playUI('credits', 0.35);
   if (msg.xp) h.floatingRewardsUI.addXP(at.x + 40, at.y - k * 26, msg.xp);
   if (msg.credits) h.floatingRewardsUI.addCredits(at.x - 40, at.y - k * 26, msg.credits);
+  // (The Ship window's Kills log: a kill or an assist with what it paid; repeats of one enemy collapse there)
+  if (msg.source?.startsWith('kill:') || msg.source?.startsWith('assist:')) {
+    const kill = msg.source.startsWith('kill:');
+    killLog.add({ kind: kill ? 'kill' : 'assist', name: msg.source.slice(kill ? 5 : 7), items: msg.items, credits: msg.credits, xp: msg.xp, at: Date.now() });
+  }
   if (msg.source?.startsWith('kill:')) {
     h.killFeedUI.addEnemyDefeat(h.state.playerName, msg.source.slice(5), true);
     h.playerStatsUI.addEnemyDefeated();
@@ -284,6 +290,7 @@ function death(h: MessageHost, msg: Msg<'death'>): void {
     // (The blast itself sounds from the core's partDestroyed message)
     h.renderer.showDeathScreen(msg.killerId !== undefined ? h.state.entities.get(msg.killerId)?.name : undefined);
     h.killFeedUI.addSystemMessage('You were destroyed');
+    killLog.add({ kind: 'death', name: msg.killerId !== undefined ? h.state.entities.get(msg.killerId)?.name ?? '' : '', at: Date.now() });
     h.autopilot.cancel();
     h.localDead = true;
     h.social.showRally(true);
@@ -415,7 +422,7 @@ const TABLE: Handlers = {
     // (no line: a reminder of the phase it's in, for someone arriving mid-fight)
     if (msg.text) h.bossUI.onPhase(msg.text);
   },
-  bossDefeated: (h, msg) => { h.bossUI.defeated(msg.name); },
+  bossDefeated: (h, msg) => { h.bossUI.defeated(msg.name); killLog.add({ kind: 'boss', name: msg.name, at: Date.now() }); },
   // (A lair boss waking, sinking back, gone: drawn from its tick, ships/bossLife.ts)
   bossLife: (h, msg) => {
     noteBossLife(msg);

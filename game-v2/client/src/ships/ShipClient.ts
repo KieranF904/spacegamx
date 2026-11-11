@@ -79,6 +79,7 @@ import { wireRendererHooks } from './wiring/rendererHooks';
 import { makeHangar } from './wiring/hangarFactory';
 import { makeFeatures, mountFieldFor, type FeatureWiringHost } from './wiring/featuresWiring';
 import { inGunRange } from '../ui/gunRange/rangeState';
+import type { StatusInput } from '../ui/shipStatus/source';
 
 export interface ShipClientOptions {
   catalog: Catalog;
@@ -617,6 +618,8 @@ export class ShipClient {
   ringGroups(): RingGroup[] { return this.readouts.ringGroups(); }
   /** The weapon ring's chip, "L: 2  R: all" */
   ringChip(): string { return this.readouts.ringChip(); }
+  /** What the ship status source reads (ui/shipStatus/source.ts): the HUD's schematic and the Ship window */
+  statusInput(): StatusInput | null { return this.readouts.statusInput(); }
   /** Your pulse lasers' charge, for the HUD */
   laserCharge(): { charge: number; ready: number; total: number } | null { return this.readouts.laserCharge(); }
   /** All your ship's stored energy as one percentage (the HUD's gauge) */

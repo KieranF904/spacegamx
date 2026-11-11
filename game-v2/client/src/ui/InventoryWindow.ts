@@ -1,5 +1,6 @@
 /**
- * Cargo & Storage (I): the ship's hold beside the shared station storage.
+ * Cargo & Storage (I at a station; in flight I is the Ship window and the HUD's cargo panel is the hold): the ship's
+ * hold beside the shared station storage.
  * Click moves a whole stack across (Shift: one, Ctrl: ten), drag works too,
  * right-click for more (use, learn a plan, jettison). Storage is only
  * reachable at a station; away from one it's shown dimmed.
@@ -9,6 +10,7 @@ import type { ClientMessage } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { GameWindow, ItemGrid, ItemFilter, FILTERS, openMenu } from './windowKit';
 import { storeControls, holdClassOf, holdTag } from './storeControls';
+import { itemUseActions } from './itemActions';
 
 export class InventoryWindow {
   private win = new GameWindow('Cargo & Storage');
@@ -150,27 +152,7 @@ export class InventoryWindow {
   }
 
   private useItems(id: string): { label: string; run: () => void }[] {
-    const d = this.pilot.econ.items.get(id);
-    const out: { label: string; run: () => void }[] = [];
-    if (d?.category === 'consumable' && (d.repair || id === 'boost_cell' || id === 'scanner_charge')) out.push({ label: 'Use', run: () => this.send({ type: 'itemUse', id }) });
-    // Modules break down to salvage: most of their ore back, their components in full
-    if (d?.category === 'part' && this.pilot.atStation) {
-      const have = (this.pilot.cargo.find((x) => x.id === id)?.n ?? 0) + (this.pilot.storage.find((x) => x.id === id)?.n ?? 0);
-      out.push({ label: 'Scrap one (salvage)', run: () => this.send({ type: 'scrapItem', id, n: 1 }) });
-      if (have > 1) out.push({ label: `Scrap all ${have} (salvage)`, run: () => this.send({ type: 'scrapItem', id, n: have }) });
-    }
-    if (d?.ammoFor) {
-      const first = this.pilot.profile?.ammoPrefer?.[d.ammoFor.weapon] === id;
-      if (!first) out.push({ label: `Open first (this ship's ${d.ammoFor.weapon})`, run: () => this.send({ type: 'ammoPrefer', item: id }) });
-    }
-    if (d?.category === 'consumable') {
-      const bar = this.pilot.profile?.quickbar ?? [];
-      const free = bar.findIndex((q) => !q);
-      const at = bar.indexOf(id);
-      if (at >= 0) out.push({ label: `Remove from quick bar (${at + 1})`, run: () => this.send({ type: 'quickbarSet', slot: at, id: null }) });
-      else out.push({ label: `Put on quick bar (${(free >= 0 ? free : 4) + 1})`, run: () => this.send({ type: 'quickbarSet', slot: free >= 0 ? free : 4, id }) });
-    }
-    return out;
+    return itemUseActions(this.pilot, this.send, id);
   }
 
   private cargoMenu(id: string, e: MouseEvent): void {

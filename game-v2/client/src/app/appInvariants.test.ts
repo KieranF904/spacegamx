@@ -78,7 +78,7 @@ describe('client.app.charge-gauge', () => {
 
 describe('client.app.hud-readouts', () => {
   it('writes each element only when its value changes', async () => {
-    for (const id of ['xpFill', 'xpBar', 'boostFill', 'level', 'xp', 'xpToNext', 'credits', 'systemInfo']) {
+    for (const id of ['xpFill', 'xpBar', 'level', 'xp', 'xpToNext', 'credits', 'systemInfo']) {
       const e = new FakeEl(); e.id = id; byId.set(id, e);
     }
     const { HudReadouts } = await import('./hudReadouts');

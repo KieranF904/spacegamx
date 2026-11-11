@@ -40,9 +40,17 @@ export interface ClientFieldPlanClearMessage { type: 'fieldPlanClear' }
 
 /**
  * A machine's switches (the ship's fabricator or refiner: its part's, or the core's own when it has none): on/off (any time, mid-fight too), how the fabricator may use packs from the hold, and what the
- * refiner refines (`recipe`: a refining recipe id, or null: what the plan is short of, from the hold's ore)
+ * refiner refines (`recipe`: a refining recipe id, or null: what the plan is short of, from the hold's ore; `refine`: its
+ * auto list, recipe ids it refines in this order once the plan needs nothing it can make, [] to clear)
  */
-export interface ClientMachineMessage { type: 'machine'; kind: MachineKind; on?: boolean; packs?: PackMode; recipe?: string | null }
+export interface ClientMachineMessage { type: 'machine'; kind: MachineKind; on?: boolean; packs?: PackMode; recipe?: string | null; refine?: string[] }
+
+/**
+ * The fabricator's order of work (the Ship window's Fabricator tab): `top` puts a part (blueprint uid) first in its
+ * priority list (FieldRecord.first: worked before the usual order whenever it can be), `hold` leaves a part alone until
+ * `resume` (a job under way on it is called off, its inputs back to the hold), `clear` empties the priority list
+ */
+export interface ClientFieldOrderMessage { type: 'fieldOrder'; action: 'top' | 'hold' | 'resume' | 'clear'; uid?: number }
 
 /** Call off a machine's job under way (its inputs go back to the hold, or wait in the machine while the hold is full) */
 export interface ClientFieldCancelMessage { type: 'fieldCancel'; kind: MachineKind; job: number }
@@ -57,7 +65,7 @@ export interface ClientBankDepositMessage { type: 'bankDeposit'; items: Bag; fro
 export interface ClientDevBankMessage { type: 'devBank'; action: 'fill' | 'empty' | 'clearDeposits' | 'grant'; items?: Bag }
 
 export type FieldClientMessage = ClientFieldPlanMessage | ClientFieldPlanClearMessage | ClientMachineMessage | ClientFieldCancelMessage
-  | ClientFieldRecycleMessage | ClientBankDepositMessage | ClientDevBankMessage;
+  | ClientFieldRecycleMessage | ClientFieldOrderMessage | ClientBankDepositMessage | ClientDevBankMessage;
 
 // ============================================ server -> client
 
@@ -87,6 +95,11 @@ export interface MachineView {
   packs?: PackMode;
   /** The refiner's chosen recipe (absent: auto) */
   recipe?: string;
+  /** The refiner's auto list (FieldRecord.refine) */
+  refine?: string[];
+  /** The fabricator's priority list and the parts it holds off (FieldRecord.first, paused: uids) */
+  first?: number[];
+  paused?: number[];
   job?: FieldJob;
   /** Its clock when `job` was copied: machEu (a powered machine) or the tick (the core) */
   at?: number;

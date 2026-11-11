@@ -11,7 +11,7 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.sga { position: fixed; z-index: 1300; display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(9, 15, 28, 0.98);
+.sga { position: fixed; z-index: 2800; display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(9, 15, 28, 0.98);
   border: 1px solid rgba(125, 211, 252, 0.5); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55); font: 12px 'Segoe UI', sans-serif; color: #c9d4e5; }
 .sga input { width: 120px; padding: 3px 6px; border-radius: 5px; background: rgba(4, 8, 16, 0.8); border: 1px solid rgba(140, 170, 220, 0.35); color: #e8f0fb; font: inherit; }
 .sga input[type=number] { width: 70px; }

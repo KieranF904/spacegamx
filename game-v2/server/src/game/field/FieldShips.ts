@@ -27,7 +27,7 @@
 import { defineQuery, hasComponent } from 'bitecs';
 import {
   Player, Dead, InSystem, MACHINE_FAB, MACHINE_REF, PACK_MODES, attachWork, buildPoints, canFabricate, canRefine, fabWork,
-  fieldBuildInputs, fieldPay, fixModelMaterials, healPart, isStructural, jobEu, jobTicks, nextFieldTarget, packDefs, packShare,
+  fieldBuildInputs, fieldPay, fieldTargetOf, fixModelMaterials, MAX_ORDER, MAX_REFINE, healPart, isStructural, jobEu, jobTicks, nextFieldTarget, packDefs, packShare,
   parseBlueprint, partItemId, partLicensed, placeFinished, portsMachineEu, recycleCandidates, recycleReturn, recycleWork,
   REARM, nextRearm, rearmBill, rearmWork,
   refineWork, repairBill, repairWork, restorePart, setPortsMachine, specOf, stepJob, tierRule, unlocks, joinDepths, adjacency,
@@ -147,6 +147,7 @@ export class FieldShips implements FeatureInstance {
     machine: (eid, msg) => this.onMachine(eid, msg),
     fieldCancel: (eid, msg) => this.onCancel(eid, msg),
     fieldRecycle: (eid, msg) => this.onRecycle(eid, msg),
+    fieldOrder: (eid, msg) => this.onOrder(eid, msg),
   };
 
   onShipRebuilt(eid: number): void {
@@ -379,8 +380,19 @@ export class FieldShips implements FeatureInstance {
   private pickFab(fs: FieldShip, m: Machine, tick: number): void {
     const bp = fs.ship.blueprint, n = bp.parts.length, root = fs.ship.derived.root, joins = joinsOf(this.host.ships.catalog, bp);
     const view = this.views(fs, m.tier);
-    const skip = new Set<number>();
+    // (Parts the pilot holds off are never picked; the pilot's priority list goes first, in its order)
+    const held = this.pausedIdx(fs);
+    const skip = new Set<number>(held);
     const short: Bag = {};
+    for (const u of fs.rec.field?.first ?? []) {
+      const i = this.indexOf(fs, u);
+      // (A part just put back stands from the next rebuild point: not built twice meanwhile)
+      if (i < 0 || skip.has(i) || (!view[i].alive && fs.ship.hp[i] > 0 && !fs.ship.ghost[i])) continue;
+      const t = fieldTargetOf(i, n, root, joins, view);
+      if (!t) continue;
+      if (this.startFab(fs, m, t.kind, t.part, view[t.part].missing, short, tick)) { this.setBlocked(fs, m, undefined); return; }
+      skip.add(i);
+    }
     for (let guard = 0; guard <= n; guard++) {
       const t = nextFieldTarget(n, root, joins, view, (i) => skip.has(i));
       if (!t) break;
@@ -390,9 +402,9 @@ export class FieldShips implements FeatureInstance {
     // (Then the Mine Bays' magazines, once nothing above could start)
     const rearm = this.startRearm(fs, m, short, tick);
     if (rearm === 'started') { this.setBlocked(fs, m, undefined); return; }
-    if (skip.size || rearm === 'short') { this.setBlocked(fs, m, 'materials'); return; }
+    if (skip.size > held.size || rearm === 'short') { this.setBlocked(fs, m, 'materials'); return; }
     // (Nothing it can make: would a better machine find work?)
-    const better = nextFieldTarget(n, root, joins, view.map((v) => ({ ...v, makeable: true })));
+    const better = nextFieldTarget(n, root, joins, view.map((v) => ({ ...v, makeable: true })), (i) => held.has(i));
     this.setBlocked(fs, m, better ? 'grade' : 'idle');
   }
 
@@ -405,9 +417,10 @@ export class FieldShips implements FeatureInstance {
     const econ = this.host.econ, bp = fs.ship.blueprint, view = this.views(fs, m.tier);
     const busy = m.job?.uid, need: Bag = {};
     const items: Bag = {};
+    const held = this.pausedIdx(fs);
     bp.parts.forEach((p, i) => {
       const v = view[i];
-      if (!v.makeable || p.uid === busy) return;
+      if (!v.makeable || p.uid === busy || held.has(i)) return;
       if (v.alive && !v.recycle && v.missing > 1e-6) addBag(need, repairBill(econ, p, v.missing));
       else if (v.wanted) {
         const item = partItemId(p);
@@ -497,7 +510,7 @@ export class FieldShips implements FeatureInstance {
 
   private pickRef(fs: FieldShip, m: Machine, tick: number): void {
     const econ = this.host.econ;
-    const r = pickRefine(econ, m.tier, fs.rec.field?.recipe, fs.short, (id) => this.host.holdCount(fs.eid, id));
+    const r = pickRefine(econ, m.tier, fs.rec.field?.recipe, fs.short, (id) => this.host.holdCount(fs.eid, id), fs.rec.field?.refine);
     if ('blocked' in r) { this.setBlocked(fs, m, r.blocked); return; }
     if (!this.host.holdTake(fs.eid, r.inputs)) { this.setBlocked(fs, m, 'materials'); return; }
     this.setBlocked(fs, m, undefined);
@@ -511,10 +524,12 @@ export class FieldShips implements FeatureInstance {
     const ship = fs.ship, bp = ship.blueprint, n = bp.parts.length, joins = joinsOf(this.host.ships.catalog, bp);
     const alive = ship.derived.alive, adj = adjacency(n, joins), depth = joinDepths(n, ship.derived.root, joins);
     const rc = new Set(fs.rec.field?.recycle ?? []);
+    // (A part the pilot holds off takes no finished part either)
+    const held = new Set(fs.rec.field?.paused ?? []);
     const out: PlanSpot[] = [];
     for (let i = 0; i < n; i++) {
       const p = bp.parts[i];
-      if (alive[i] || p.fn === 'core' || rc.has(p.uid) || depth[i] < 0) continue;
+      if (alive[i] || p.fn === 'core' || rc.has(p.uid) || held.has(p.uid) || depth[i] < 0) continue;
       out.push({ part: i, item: partItemId(p), open: true, joined: adj[i].some((j) => alive[j]) });
     }
     return out.sort((a, b) => depth[a.part] - depth[b.part] || a.part - b.part);
@@ -691,6 +706,17 @@ export class FieldShips implements FeatureInstance {
 
   /** A part queued for recycling that was lost meanwhile simply goes (nothing left to break down) */
   private tidy(fs: FieldShip): void {
+    // (The priority and hold lists forget parts no longer in the design)
+    const f0 = fs.rec.field;
+    for (const key of ['first', 'paused'] as const) {
+      const list = f0?.[key];
+      if (!list?.length) continue;
+      const kept = list.filter((u) => this.indexOf(fs, u) >= 0);
+      if (kept.length === list.length) continue;
+      if (kept.length) f0![key] = kept; else delete f0![key];
+      this.host.markDirty(fs.eid);
+      fs.changed = true;
+    }
     const rc = fs.rec.field?.recycle;
     if (!rc?.length) return;
     const lost = rc.filter((u) => { const i = this.indexOf(fs, u); return i < 0 || !fs.ship.derived.alive[i]; });
@@ -779,7 +805,7 @@ export class FieldShips implements FeatureInstance {
     return kind === 'fabricator' ? fs.fab : kind === 'refiner' ? fs.ref : undefined;
   }
 
-  private onMachine(eid: number, msg: { kind?: unknown; on?: unknown; packs?: unknown; recipe?: unknown }): void {
+  private onMachine(eid: number, msg: { kind?: unknown; on?: unknown; packs?: unknown; recipe?: unknown; refine?: unknown }): void {
     const fs = this.ensure(eid);
     const m = fs && this.machineOf(fs, msg?.kind);
     if (!fs || !m) return;
@@ -796,6 +822,11 @@ export class FieldShips implements FeatureInstance {
     if (m.kind === 'refiner' && msg.recipe !== undefined) {
       if (msg.recipe === null) delete f.recipe;
       else if (typeof msg.recipe === 'string' && this.host.econ.recipes.refining.has(msg.recipe)) f.recipe = msg.recipe;
+    }
+    // (The auto list: known refining recipes only, each once, at most MAX_REFINE; [] clears it)
+    if (m.kind === 'refiner' && Array.isArray(msg.refine) && msg.refine.length <= 64) {
+      const list = [...new Set(msg.refine.filter((id): id is string => typeof id === 'string' && this.host.econ.recipes.refining.has(id)))].slice(0, MAX_REFINE);
+      if (list.length) f.refine = list; else delete f.refine;
     }
     this.host.markDirty(eid);
     fs.changed = true; fs.wake = true;
@@ -823,6 +854,38 @@ export class FieldShips implements FeatureInstance {
     const j = fs.fab.job;
     if (j?.kind === 'recycle' && j.uid !== undefined && !rc.has(j.uid)) this.callOff(fs, fs.fab);
     fs.wake = true;
+  }
+
+  /** The parts the pilot holds off, as part indices */
+  private pausedIdx(fs: FieldShip): Set<number> {
+    const out = new Set<number>();
+    for (const u of fs.rec.field?.paused ?? []) { const i = this.indexOf(fs, u); if (i >= 0) out.add(i); }
+    return out;
+  }
+
+  /**
+   * The fabricator's order of work (fieldOrder): `top` puts a part of this ship first, `hold` holds it off (a job under way
+   * on it is called off: its inputs go back), `resume` lets it go on, `clear` empties the priority list
+   */
+  private onOrder(eid: number, msg: { action?: unknown; uid?: unknown }): void {
+    const fs = this.ensure(eid);
+    if (!fs) return;
+    const f = this.field(fs), uid = msg?.uid, action = msg?.action;
+    const known = Number.isInteger(uid) && this.indexOf(fs, uid as number) >= 0 && fs.ship.blueprint.parts[this.indexOf(fs, uid as number)].fn !== 'core';
+    const without = (list: number[] | undefined, u: number) => (list ?? []).filter((x) => x !== u);
+    const put = (key: 'first' | 'paused', list: number[]) => { if (list.length) f[key] = list.slice(0, MAX_ORDER); else delete f[key]; };
+    if (action === 'clear') put('first', []);
+    else if (!known) return;
+    else if (action === 'top') { put('first', [uid as number, ...without(f.first, uid as number)]); put('paused', without(f.paused, uid as number)); }
+    else if (action === 'hold') {
+      put('paused', [...without(f.paused, uid as number), uid as number]);
+      put('first', without(f.first, uid as number));
+      const j = fs.fab.job;
+      if (j && j.uid === uid && j.kind !== 'rearm' && j.kind !== 'refine') this.callOff(fs, fs.fab);
+    } else if (action === 'resume') put('paused', without(f.paused, uid as number));
+    else return;
+    this.host.markDirty(eid);
+    fs.changed = true; fs.wake = true;
   }
 
   // ===================================================================== telling the pilot
@@ -862,8 +925,13 @@ export class FieldShips implements FeatureInstance {
   private view(fs: FieldShip, m: Machine): MachineView {
     const f = fs.rec.field ?? {};
     const v: MachineView = { kind: m.kind, tier: m.tier, uid: m.uid, on: m.on, drawing: m.drawing };
-    if (m.kind === 'fabricator') v.packs = f.packs ?? 'off';
+    if (m.kind === 'fabricator') {
+      v.packs = f.packs ?? 'off';
+      if (f.first?.length) v.first = [...f.first];
+      if (f.paused?.length) v.paused = [...f.paused];
+    }
     if (m.kind === 'refiner' && f.recipe) v.recipe = f.recipe;
+    if (m.kind === 'refiner' && f.refine?.length) v.refine = [...f.refine];
     if (m.job) { v.job = { ...m.job, held: { ...m.job.held } }; v.at = m.powered ? fs.eu[m.pk] : this.host.getTick(); }
     if (!isEmpty(m.holding)) v.holding = { ...m.holding };
     if (m.blocked) v.blocked = m.blocked;

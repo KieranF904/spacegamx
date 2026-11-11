@@ -62,8 +62,8 @@
       "id": "client.app.hud-readouts",
       "path": "client/src/app/hudReadouts.ts",
       "group": "client/app",
-      "lines": 73,
-      "owns": "the top-HUD readouts each frame: boost bar, XP bar and level (with their gain glow), credits, system name",
+      "lines": 67,
+      "owns": "the top-HUD readouts each frame: XP bar and level (with their gain glow), credits, system name (the pool-era energy bar went: ui/hud/PowerMargin.ts is the power readout)",
       "needs": "HudHost (state, pilot, ship client, system names), domWrite setText and setStyle",
       "events": "",
       "invariants": [
@@ -81,14 +81,14 @@
         {
           "name": "HudHost",
           "kind": "interface",
-          "start": 14,
-          "end": 20
+          "start": 15,
+          "end": 21
         },
         {
           "name": "HudReadouts",
           "kind": "class",
-          "start": 22,
-          "end": 73
+          "start": 23,
+          "end": 67
         }
       ]
     },
@@ -152,7 +152,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 509,
+      "lines": 516,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores, input/keybindings fillKeyNames (a toast's {actionId} key slots)",
       "events": "",
@@ -176,86 +176,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 79,
-          "end": 133
+          "start": 80,
+          "end": 134
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 135,
-          "end": 135
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 136,
           "end": 136
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 137,
-          "end": 139
+          "end": 137
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 138,
+          "end": 140
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 141,
-          "end": 160
+          "start": 142,
+          "end": 161
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 162,
-          "end": 166
+          "start": 163,
+          "end": 167
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 168,
-          "end": 213
+          "start": 169,
+          "end": 214
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 215,
-          "end": 226
+          "start": 216,
+          "end": 227
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 228,
-          "end": 244
+          "start": 229,
+          "end": 250
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 246,
-          "end": 280
+          "start": 252,
+          "end": 286
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 282,
-          "end": 300
+          "start": 288,
+          "end": 307
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 302,
-          "end": 499
+          "start": 309,
+          "end": 506
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 501,
-          "end": 502
+          "start": 508,
+          "end": 509
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 504,
-          "end": 509
+          "start": 511,
+          "end": 516
         }
       ]
     },
@@ -2355,7 +2355,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 777,
+      "lines": 780,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -2382,14 +2382,14 @@
         {
           "name": "ShipClientOptions",
           "kind": "interface",
-          "start": 83,
-          "end": 115
+          "start": 84,
+          "end": 116
         },
         {
           "name": "ShipClient",
           "kind": "class",
-          "start": 117,
-          "end": 777
+          "start": 118,
+          "end": 780
         }
       ]
     },
@@ -8447,6 +8447,200 @@
       ]
     },
     {
+      "id": "client.ui.footer-bar",
+      "path": "client/src/ui/hud/FooterBar.ts",
+      "group": "client/ui/hud",
+      "lines": 89,
+      "owns": "the HUD's footer: shortcut buttons along the bottom right (right of the XP bar, under the power readout), each with its key (Ship, Build, Jobs, Map, Station (at a station's ring only), Social, Guide, Settings); a click does what its key does",
+      "needs": "FooterItem list from app/windows.ts (each its action id, a run and an optional shown()), domWrite, keybindings boundKeyName (key names follow rebinds)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a button's key is its action's bound key, never a literal letter; the bar holds no state of its own",
+          "test": "client/src/ui/ship/shipWindow.test.ts"
+        }
+      ],
+      "extend": "a new button is one FooterItem in app/windows.ts",
+      "exports": [
+        "FooterBar",
+        "FooterItem",
+        "footerKey"
+      ],
+      "sections": [
+        {
+          "name": "FooterItem",
+          "kind": "interface",
+          "start": 15,
+          "end": 26
+        },
+        {
+          "name": "CSS",
+          "kind": "const",
+          "start": 28,
+          "end": 35
+        },
+        {
+          "name": "footerKey",
+          "kind": "function",
+          "start": 37,
+          "end": 42
+        },
+        {
+          "name": "FooterBar",
+          "kind": "class",
+          "start": 44,
+          "end": 89
+        }
+      ]
+    },
+    {
+      "id": "client.ui.power-margin",
+      "path": "client/src/ui/hud/PowerMargin.ts",
+      "group": "client/ui/hud",
+      "lines": 61,
+      "owns": "the HUD's power readout, bottom right (it replaced the pool-era ENERGY bar): the spare power now (the generators less the steady loads and what the keys ask), or the deficit the stores pay; amber in deficit, red when starved; the stores' charge as a thin bar under it; a click opens the Ship window's Power tab",
+      "needs": "powerModel.powerMargin (ui/ship), domWrite; npm: @space-game/common (types)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the numbers are powerMargin's (the ports layout and the predicted state, nothing sent)",
+          "test": "client/src/ui/ship/powerModel.test.ts"
+        }
+      ],
+      "extend": "another figure is one more element written in update()",
+      "exports": [
+        "PowerMargin"
+      ],
+      "sections": [
+        {
+          "name": "CSS",
+          "kind": "const",
+          "start": 16,
+          "end": 24
+        },
+        {
+          "name": "PowerMargin",
+          "kind": "class",
+          "start": 26,
+          "end": 61
+        }
+      ]
+    },
+    {
+      "id": "client.ui.status-tray",
+      "path": "client/src/ui/hud/StatusTray.ts",
+      "group": "client/ui/hud",
+      "lines": 77,
+      "owns": "the row of status icons above the jump drive bar (its left end): an icon a status on now with its seconds left, gone when it ends, a tooltip on hover (what it does, what clears it)",
+      "needs": "statusEffects (the model), domWrite setText, windowKit showTip / hideTip",
+      "events": "",
+      "invariants": [
+        {
+          "text": "it shows exactly activeStatuses() (rebuilt only when that set changes; timers rewritten through domWrite)",
+          "test": "client/src/ui/hud/statusEffects.test.ts"
+        }
+      ],
+      "extend": "a new status is in statusEffects.ts; nothing here names one",
+      "exports": [
+        "StatusTray"
+      ],
+      "sections": [
+        {
+          "name": "CSS",
+          "kind": "const",
+          "start": 15,
+          "end": 23
+        },
+        {
+          "name": "StatusTray",
+          "kind": "class",
+          "start": 25,
+          "end": 77
+        }
+      ]
+    },
+    {
+      "id": "client.ui.status-effects",
+      "path": "client/src/ui/hud/statusEffects.ts",
+      "group": "client/ui/hud",
+      "lines": 78,
+      "owns": "the status effects the client knows about the pilot's own ship (EMP, slowed, marked, the cold's stages): what each is, what it does, what clears it, and which are on now with the time left",
+      "needs": "common warmthStage (the cold's stage from the warmth %), the own entity's empUntil / slowUntil / markUntil / warmth",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a timed status shows only while its end tick is ahead, with whole seconds left rounded up; the cold shows from chilled down, with no timer",
+          "test": "client/src/ui/hud/statusEffects.test.ts"
+        }
+      ],
+      "extend": "a new status is one STATUS_DEFS entry and one branch in activeStatuses()",
+      "exports": [
+        "ActiveStatus",
+        "STATUS_DEFS",
+        "StatusDef",
+        "StatusId",
+        "StatusSource",
+        "activeStatuses",
+        "statusTip"
+      ],
+      "sections": [
+        {
+          "name": "StatusId",
+          "kind": "type",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "StatusDef",
+          "kind": "interface",
+          "start": 15,
+          "end": 24
+        },
+        {
+          "name": "STATUS_DEFS",
+          "kind": "const",
+          "start": 26,
+          "end": 33
+        },
+        {
+          "name": "StatusSource",
+          "kind": "interface",
+          "start": 35,
+          "end": 44
+        },
+        {
+          "name": "ActiveStatus",
+          "kind": "interface",
+          "start": 46,
+          "end": 52
+        },
+        {
+          "name": "TPS",
+          "kind": "const",
+          "start": 54,
+          "end": 54
+        },
+        {
+          "name": "left",
+          "kind": "const",
+          "start": 55,
+          "end": 55
+        },
+        {
+          "name": "activeStatuses",
+          "kind": "function",
+          "start": 57,
+          "end": 72
+        },
+        {
+          "name": "statusTip",
+          "kind": "function",
+          "start": 74,
+          "end": 78
+        }
+      ]
+    },
+    {
       "id": "client.ui.join.news-feed",
       "path": "client/src/ui/join/newsFeed.ts",
       "group": "client/ui/join",
@@ -8586,13 +8780,13 @@
       "id": "client.ui.auto-pickup-panel",
       "path": "client/src/ui/pickup/AutoPickupPanel.ts",
       "group": "client/ui/pickup",
-      "lines": 187,
-      "owns": "the auto-pickup panel the cargo panel opens: mining mode (mirrored from the cargo panel), the hold's whitelist (icons, a target or unlimited, right-click to set or remove), the pilot's ore blacklist (icons, right-click to remove), + Whitelist / + Blacklist (the catalogue), and the whitelist's templates (save as, load, delete)",
+      "lines": 183,
+      "owns": "the auto-pickup lists, drawn in the Ship window's Pickup tab (the cargo panel's chip opens it there): mining mode's switch, a search box, the hold's whitelist as an icon grid (a target or unlimited, right-click to set or remove), the pilot's ore blacklist (right-click to remove), + Whitelist / + Blacklist (the catalogue), and the whitelist's templates (save as, load, delete)",
       "needs": "PilotState (the whitelist, mining mode, templates), CataloguePicker, askBox, windowKit (tips, menus), itemIcons; the server's ghost, ghostTemplate, pickupPrefs and oreBlacklist; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "every change is one message the server checks; the panel only shows what the server last said (no local copies)",
+          "text": "every change is one message the server checks; the view only shows what the server last said (no local copies)",
           "test": "server/src/game/pickup.test.ts"
         }
       ],
@@ -8604,20 +8798,20 @@
         {
           "name": "styled",
           "kind": "let",
-          "start": 17,
-          "end": 17
+          "start": 20,
+          "end": 20
         },
         {
           "name": "injectStyles",
           "kind": "function",
-          "start": 18,
-          "end": 47
+          "start": 21,
+          "end": 48
         },
         {
           "name": "AutoPickupPanel",
           "kind": "class",
-          "start": 49,
-          "end": 187
+          "start": 50,
+          "end": 183
         }
       ]
     },
@@ -8844,8 +9038,8 @@
       "id": "client.ui.pickup",
       "path": "client/src/ui/pickup/index.ts",
       "group": "client/ui/pickup",
-      "lines": 49,
-      "owns": "the pickup windows built and wired as one set (docs/design/loot-pickup-2026-11.md): the pickup panel (F), the auto-pickup panel (the cargo panel's chip), the catalogue picker; their per-frame show/hide and their keys (F, Esc, Enter)",
+      "lines": 51,
+      "owns": "the pickup windows built and wired as one set (docs/design/loot-pickup-2026-11.md): the pickup panel (F), the auto-pickup lists (drawn in the Ship window's Pickup tab; the cargo panel's chip opens it there), the catalogue picker; their per-frame show/hide and their keys (F, Esc, Enter)",
       "needs": "PickupPanelUI, AutoPickupPanel, CataloguePicker, CargoPanelUI (the chip, its place), PilotState; npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -8863,7 +9057,7 @@
           "name": "PickupWindows",
           "kind": "class",
           "start": 17,
-          "end": 49
+          "end": 51
         }
       ]
     },
@@ -10423,6 +10617,382 @@
           "kind": "class",
           "start": 72,
           "end": 94
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.window",
+      "path": "client/src/ui/ship/ShipWindow.ts",
+      "group": "client/ui/ship",
+      "lines": 179,
+      "owns": "the Ship window: one tabbed panel on the right of the screen (Status, Power, Weapons, Pickup, Refiner, Fabricator, Kills), opened on a tab by the footer, its key or another panel; live tabs redrawn at their rate",
+      "needs": "ShipTab / ShipCtx (shipTabs.ts), windowKit styles, the tabs from tabs/index.ts",
+      "events": "",
+      "invariants": [
+        {
+          "text": "it is not modal: no veil, the flight keys still reach the game (only typing in a field stays in it), and while it is open the guns are held (Game passes isOpen to app/inputSend.ts fireBlocked)",
+          "test": "client/src/app/inputSend.test.ts"
+        },
+        {
+          "text": "open(tab) shows that tab; toggle(tab) on the tab on show closes it",
+          "test": "client/src/ui/ship/shipWindow.test.ts"
+        }
+      ],
+      "extend": "a new tab is a ShipTab module in tabs/ and a line in tabs/index.ts; nothing here names a tab",
+      "exports": [
+        "ShipWindow"
+      ],
+      "sections": [
+        {
+          "name": "CSS",
+          "kind": "const",
+          "start": 16,
+          "end": 46
+        },
+        {
+          "name": "ShipWindow",
+          "kind": "class",
+          "start": 48,
+          "end": 179
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.fab-queue",
+      "path": "client/src/ui/ship/fabQueue.ts",
+      "group": "client/ui/ship",
+      "lines": 115,
+      "owns": "the fabricator's queue as the Ship window shows it (Status and Fabricator tabs): every part it has work for (damaged: repair, missing or planned: build, queued: recycle), in the order it takes them (the pilot's priority list first, then repairs, recycles, builds; parts held off last), each with what it waits on; and the messages \"Queue repairs\" sends",
+      "needs": "nothing imported at run time (pure): the caller passes the parts, the field lists and the bills",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the job under way is first; the priority list comes before the usual order and keeps its own order; held parts are last and say so; a part whose bill the hold can't pay says what it is short of",
+          "test": "client/src/ui/ship/fabQueue.test.ts"
+        }
+      ],
+      "extend": "a new kind of work is one QueueKind and its place in KIND_ORDER",
+      "exports": [
+        "QueueInput",
+        "QueueKind",
+        "QueuePart",
+        "QueueRow",
+        "QueueState",
+        "fabQueue",
+        "repairMessages",
+        "shortOf"
+      ],
+      "sections": [
+        {
+          "name": "QueueKind",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "QueueState",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "QueuePart",
+          "kind": "interface",
+          "start": 17,
+          "end": 34
+        },
+        {
+          "name": "QueueInput",
+          "kind": "interface",
+          "start": 36,
+          "end": 45
+        },
+        {
+          "name": "QueueRow",
+          "kind": "interface",
+          "start": 47,
+          "end": 58
+        },
+        {
+          "name": "KIND_ORDER",
+          "kind": "const",
+          "start": 60,
+          "end": 60
+        },
+        {
+          "name": "kindOf",
+          "kind": "function",
+          "start": 62,
+          "end": 67
+        },
+        {
+          "name": "shortOf",
+          "kind": "function",
+          "start": 69,
+          "end": 74
+        },
+        {
+          "name": "fabQueue",
+          "kind": "function",
+          "start": 76,
+          "end": 101
+        },
+        {
+          "name": "repairMessages",
+          "kind": "function",
+          "start": 103,
+          "end": 115
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.kill-log",
+      "path": "client/src/ui/ship/killLog.ts",
+      "group": "client/ui/ship",
+      "lines": 86,
+      "owns": "the Ship window's Kills log: significant events only (your kills and assists with what each paid, bosses beaten, your ship lost), consecutive kills of the same enemy collapsed into one row with their loot totalled",
+      "needs": "nothing (pure); fed from app/serverMessages.ts (gained kill:/assist:, bossDefeated, death)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a kill or assist of the same name and kind as the newest row adds to it (count, loot, credits, XP); any other event starts a new row; the log keeps at most KILL_LOG_MAX rows, oldest dropped",
+          "test": "client/src/ui/ship/killLog.test.ts"
+        }
+      ],
+      "extend": "a new kind of event is one KillKind and its words in killTitle()",
+      "exports": [
+        "KILL_LOG_MAX",
+        "KillEvent",
+        "KillKind",
+        "KillLog",
+        "KillRow",
+        "killLog",
+        "killLoot",
+        "killTitle"
+      ],
+      "sections": [
+        {
+          "name": "KillKind",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "KillEvent",
+          "kind": "interface",
+          "start": 14,
+          "end": 22
+        },
+        {
+          "name": "KillRow",
+          "kind": "interface",
+          "start": 24,
+          "end": 33
+        },
+        {
+          "name": "KILL_LOG_MAX",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "stacks",
+          "kind": "const",
+          "start": 37,
+          "end": 37
+        },
+        {
+          "name": "KillLog",
+          "kind": "class",
+          "start": 39,
+          "end": 64
+        },
+        {
+          "name": "killTitle",
+          "kind": "function",
+          "start": 66,
+          "end": 75
+        },
+        {
+          "name": "killLoot",
+          "kind": "function",
+          "start": 77,
+          "end": 83
+        },
+        {
+          "name": "killLog",
+          "kind": "const",
+          "start": 85,
+          "end": 86
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.power-model",
+      "path": "client/src/ui/ship/powerModel.ts",
+      "group": "client/ui/ship",
+      "lines": 170,
+      "owns": "the Ship window's Power tab and the HUD's power margin, worked out from the ports core the client already has: per generator its output against what it gives flat out, the stores' charge, the parts starved (no line in, short flat out in the load test, or short now), whether firing everything browns out, and the margin now (supply less the steady loads and what the keys ask of the engines and guns)",
+      "needs": "common power (ShipDerived.ports PortsLayout, PortsState, portsLoadTestCached, roles), ships/portsReport (portsReport, loadRow); no server message: everything is the layout, the predicted state and the load test",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a sparrow's two reactors give 70/s between them; a part with no line in is starved; the margin is supply less the steady loads and the active draws, negative when the keys ask more than the generators make",
+          "test": "client/src/ui/ship/powerModel.test.ts"
+        }
+      ],
+      "extend": "a new row kind is one more field on PowerSummary filled in powerSummary()",
+      "exports": [
+        "GenRow",
+        "PowerAsk",
+        "PowerMargin",
+        "PowerSummary",
+        "StarvedRow",
+        "StoreRow",
+        "powerMargin",
+        "powerSummary"
+      ],
+      "sections": [
+        {
+          "name": "eps",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "GenRow",
+          "kind": "interface",
+          "start": 24,
+          "end": 33
+        },
+        {
+          "name": "StoreRow",
+          "kind": "interface",
+          "start": 35,
+          "end": 42
+        },
+        {
+          "name": "StarvedRow",
+          "kind": "interface",
+          "start": 44,
+          "end": 51
+        },
+        {
+          "name": "PowerSummary",
+          "kind": "interface",
+          "start": 53,
+          "end": 66
+        },
+        {
+          "name": "genOutput",
+          "kind": "function",
+          "start": 68,
+          "end": 74
+        },
+        {
+          "name": "powerSummary",
+          "kind": "function",
+          "start": 76,
+          "end": 131
+        },
+        {
+          "name": "PowerAsk",
+          "kind": "interface",
+          "start": 133,
+          "end": 138
+        },
+        {
+          "name": "PowerMargin",
+          "kind": "interface",
+          "start": 140,
+          "end": 147
+        },
+        {
+          "name": "engineBurn",
+          "kind": "function",
+          "start": 149,
+          "end": 154
+        },
+        {
+          "name": "powerMargin",
+          "kind": "function",
+          "start": 156,
+          "end": 170
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.tabs",
+      "path": "client/src/ui/ship/shipTabs.ts",
+      "group": "client/ui/ship",
+      "lines": 55,
+      "owns": "the Ship window's tab contract (ShipTab) and what every tab may read of the game (ShipCtx)",
+      "needs": "common types (ShipState, PlacedGeom, Charge, ClientMessage), PilotState, the status source's StatusInput",
+      "events": "",
+      "invariants": [
+        {
+          "text": "tab ids are unique and kept in their order; the window names no tab (a tab is a module and one line in SHIP_TAB_ORDER)",
+          "test": "client/src/ui/ship/shipWindow.test.ts"
+        }
+      ],
+      "extend": "a new tab is a module in ui/ship/tabs/ giving a ShipTab, its id in ShipTabId and a line in tabs/index.ts",
+      "exports": [
+        "ShipCtx",
+        "ShipTab",
+        "ShipTabId"
+      ],
+      "sections": [
+        {
+          "name": "ShipTabId",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "ShipCtx",
+          "kind": "interface",
+          "start": 17,
+          "end": 43
+        },
+        {
+          "name": "ShipTab",
+          "kind": "interface",
+          "start": 45,
+          "end": 55
+        }
+      ]
+    },
+    {
+      "id": "client.ui.ship.tab-list",
+      "path": "client/src/ui/ship/tabs/index.ts",
+      "group": "client/ui/ship",
+      "lines": 26,
+      "owns": "the Ship window's tabs in their order (SHIP_TAB_ORDER) and building them",
+      "needs": "each tab module in this folder; the auto-pickup lists (the Pickup tab draws them)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one tab per ShipTabId, in SHIP_TAB_ORDER",
+          "test": "client/src/ui/ship/shipWindow.test.ts"
+        }
+      ],
+      "extend": "a new tab is its module here, its id in shipTabs.ts ShipTabId and SHIP_TAB_ORDER, and a line in shipTabs()",
+      "exports": [
+        "SHIP_TAB_ORDER",
+        "shipTabs"
+      ],
+      "sections": [
+        {
+          "name": "SHIP_TAB_ORDER",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "shipTabs",
+          "kind": "function",
+          "start": 20,
+          "end": 26
         }
       ]
     },
@@ -13265,7 +13835,7 @@
       "id": "protocol.field",
       "path": "common/src/network/fieldProtocol.ts",
       "group": "common/network",
-      "lines": 130,
+      "lines": 143,
       "owns": "the field fabrication and repair bank messages: plans saved, machines switched, jobs done, bank changed (job progress is never sent)",
       "needs": "type-only import of ships/types (Blueprint); econ/field jobs for the clock",
       "events": "",
@@ -13284,6 +13854,7 @@
         "ClientBankDepositMessage",
         "ClientDevBankMessage",
         "ClientFieldCancelMessage",
+        "ClientFieldOrderMessage",
         "ClientFieldPlanClearMessage",
         "ClientFieldPlanMessage",
         "ClientFieldRecycleMessage",
@@ -13313,73 +13884,79 @@
           "name": "ClientMachineMessage",
           "kind": "interface",
           "start": 41,
-          "end": 45
+          "end": 46
+        },
+        {
+          "name": "ClientFieldOrderMessage",
+          "kind": "interface",
+          "start": 48,
+          "end": 53
         },
         {
           "name": "ClientFieldCancelMessage",
           "kind": "interface",
-          "start": 47,
-          "end": 48
+          "start": 55,
+          "end": 56
         },
         {
           "name": "ClientFieldRecycleMessage",
           "kind": "interface",
-          "start": 50,
-          "end": 51
+          "start": 58,
+          "end": 59
         },
         {
           "name": "ClientBankDepositMessage",
           "kind": "interface",
-          "start": 53,
-          "end": 54
+          "start": 61,
+          "end": 62
         },
         {
           "name": "ClientDevBankMessage",
           "kind": "interface",
-          "start": 56,
-          "end": 57
+          "start": 64,
+          "end": 65
         },
         {
           "name": "FieldClientMessage",
           "kind": "type",
-          "start": 59,
-          "end": 62
+          "start": 67,
+          "end": 70
         },
         {
           "name": "MachineBlock",
           "kind": "type",
-          "start": 64,
-          "end": 73
+          "start": 72,
+          "end": 81
         },
         {
           "name": "MachineView",
           "kind": "interface",
-          "start": 75,
-          "end": 96
+          "start": 83,
+          "end": 109
         },
         {
           "name": "ServerFieldStateMessage",
           "kind": "interface",
-          "start": 98,
-          "end": 110
+          "start": 111,
+          "end": 123
         },
         {
           "name": "ServerFieldDoneMessage",
           "kind": "interface",
-          "start": 112,
-          "end": 113
+          "start": 125,
+          "end": 126
         },
         {
           "name": "ServerRepairBankMessage",
           "kind": "interface",
-          "start": 115,
-          "end": 128
+          "start": 128,
+          "end": 141
         },
         {
           "name": "FieldServerMessage",
           "kind": "type",
-          "start": 130,
-          "end": 130
+          "start": 143,
+          "end": 143
         }
       ]
     },
@@ -24613,7 +25190,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 115,
+      "lines": 117,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -24639,19 +25216,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 80
+          "end": 82
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 82,
-          "end": 93
+          "start": 84,
+          "end": 95
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 95,
-          "end": 115
+          "start": 97,
+          "end": 117
         }
       ]
     },

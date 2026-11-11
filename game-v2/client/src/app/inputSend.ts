@@ -52,6 +52,8 @@ export interface InputSendHost {
    * keys push along the ship, said by both strafe bits (common flight.ts noseFrame)
    */
   readonly noseThrust?: boolean;
+  /** The guns are held quiet (the Ship window is open: the pilot flies but can't fire); flight is untouched */
+  readonly fireBlocked?: boolean;
   readonly menu: MenuFacade;
   readonly adminPanel: AdminPanel | null;
   readonly shipClient: ShipClient;
@@ -158,9 +160,10 @@ export function tickInput(s: InputSendCtx): void {
     s.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: best?.name ?? null };
   }
 
-  // (A click on the station's screen is a click on the screen)
-  let fireLeft = inputEnabled && !s.stationOpen && ((s.input.isMouseDown(0) && !s.context.withholdingLeft()) || s.systemMapUI.firing());
-  let fireRight = inputEnabled && !s.stationOpen && s.rightHeld();
+  // (A click on the station's screen is a click on the screen; with the Ship window open nothing fires, flight goes on)
+  const canFire = inputEnabled && !s.stationOpen && !s.fireBlocked;
+  let fireLeft = canFire && ((s.input.isMouseDown(0) && !s.context.withholdingLeft()) || s.systemMapUI.firing());
+  let fireRight = canFire && s.rightHeld();
   // A click calls off a menu jump too
   if (fireLeft && s.context.jumpMark()) s.context.cancel('Jump cancelled');
   // The autopilot flies until a click (or a flight key) takes over
