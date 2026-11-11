@@ -191,3 +191,22 @@ export function unitsPerDrop(table: MiningTable, keep: number): number {
   for (let w = lo; w <= hi; w++) sum += keep >= 1 ? w : w + dpow(1 - keep, w) / keep;
   return sum / (hi - lo + 1);
 }
+
+/**
+ * Rock units a hit of `damage` works: damage × the tool's yield × its work rate ÷ damagePerUnit. The one rule: the
+ * server works the rock by it (Mining.extract) and the client fills your progress ring by it (MiningProgress.ts).
+ */
+export function workedUnits(table: MiningTable, damage: number, toolYield: number, work: number): number {
+  return (damage * toolYield * work) / table.damagePerUnit;
+}
+
+/** Guns: a miner's damage on a rock in about the last second, a leaking sum: `prev` as of `dt` seconds ago, plus `damage` now */
+export function gunDps(prev: number, dt: number, damage: number): number {
+  return (dt >= 1 ? 0 : prev * (1 - dt)) + damage;
+}
+
+/** Guns: their work rate on rock at `dps` (gunDps): 1, and past refDps only with the square root of it (GunMining) */
+export function gunPace(table: MiningTable, dps: number): number {
+  const g = table.guns;
+  return g && dps > g.refDps ? Math.sqrt(g.refDps / dps) : 1;
+}

@@ -64,6 +64,32 @@ export function miningPulse(ticks: number): PulseTuning {
   return p;
 }
 
+/**
+ * A mining laser's cut at tick `age` of its pulse (`prof`: pulseProfile of its MINING_PULSE or miningPulse), against
+ * its steady rate: the pulse's share at that tick × its length, so a whole pulse cuts what it would steadily and the
+ * flare carries nearly half of it. The server cuts by it (bridge/weapons.ts stepMiners), the client's ring fills by it.
+ */
+export function pulseCut(prof: PulseProfile, age: number): number {
+  return prof.share[Math.max(0, Math.min(prof.ticks - 1, age))] * prof.ticks;
+}
+
+/**
+ * Seconds of steady cut a mining laser's pulses `runs` (each from its start tick, the newest last) made over the whole
+ * ticks from + 1 .. to, each by the curve of the pulse under way then (pulseCut): the client's progress ring
+ * (MiningBeamFx.ownCut) counts your laser's cut by it, frame by frame, as the server cuts it tick by tick
+ */
+export function pulseCutOver(runs: readonly { start: number }[], prof: PulseProfile, from: number, to: number): number {
+  let sum = 0;
+  for (let k = from + 1; k <= to; k++) {
+    let r = runs.length - 1;
+    while (r > 0 && runs[r].start > k) r--;
+    if (r < 0) break;
+    const age = Math.floor(k - runs[r].start);
+    if (age >= 0 && age < prof.ticks) sum += pulseCut(prof, age);
+  }
+  return sum / 60;
+}
+
 /** A mining laser reaches this much further than its range, fading out (and mining less) over the extra */
 export const MINE_TAIL = 0.4;
 

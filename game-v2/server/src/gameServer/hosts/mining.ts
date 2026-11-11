@@ -52,6 +52,11 @@ export function createMiningHost(gs: GameServer): MiningHost {
       for (const [ore, n] of Object.entries(ores)) accrueTraces(ledger, gs.gameData.miningTable.traces, ore, n, from);
       if (Object.keys(ledger).length) { p.traces = ledger; gs.pilots.markDirty(pc); }
     },
+    // (Rounded to a hundredth of a unit: the ring only snaps to it)
+    chunk: (eid, rock, due, at, drop) => {
+      const pc = gs.pilots.connOf(eid);
+      if (pc) gs.send((pc as ClientConnection).ws, { type: 'mineChunk', r: rock, n: due, w: Math.round(at * 100) / 100, ...(drop ? { d: 1 as const } : {}) });
+    },
     notify: (eid, text) => { const pc = gs.pilots.connOf(eid); if (pc) gs.pilots.toast(pc, text, 'warn'); },
     respawn: (num, index) => respawnAsteroid(gs, num, index),
     shed: (eid, stage, size, left) => shedAsteroid(gs, eid, stage, size, left),

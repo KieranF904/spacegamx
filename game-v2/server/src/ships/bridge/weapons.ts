@@ -18,7 +18,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, portsPiecePhase, portsMinePhase, miningPulse, shotAimQ, TELL_BEAM_PIECE, TELL_MINE_PULSE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt, shapedStopAt, shapedReachWorld, type SegmentHit } from '@space-game/common';
+import { rayTerrain, portsDamageMul, portsPiecePhase, portsMinePhase, miningPulse, pulseCut, shotAimQ, TELL_BEAM_PIECE, TELL_MINE_PULSE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt, shapedStopAt, shapedReachWorld, type SegmentHit } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -160,7 +160,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
     const ph = pz && pe ? portsMinePhase(pz, pe, m.part) : -2;
     if (ph === -1) continue;
     const mp = ph >= 0 ? pulseProfile(miningPulse(pz!.minePulse[m.part])) : prof, ma = ph >= 0 ? Math.min(mp.ticks - 1, ph) : age;
-    const focus = mp.share[ma] * mp.ticks;
+    const focus = pulseCut(mp, ma);
     // (Cut by the share of its draw it got: a ports ship's laser its fulfilment, the rest the ship's share for its mining lasers)
     const fill = ph >= 0 ? pe!.sat[m.part] / 255 : ship.mineShare ?? 1;
     if (fill <= 0.01) continue;

@@ -124,8 +124,8 @@
           "stream": "7b70515fa94566428f5aca37b6f19aec385e7d0265da22eb770b1baeea7b677e"
         },
         "striker": {
-          "frames": 106,
-          "stream": "69625f81f06e3e21010539ad86ae1a8cacba9975fadc2b0e1c84f4199f061a36"
+          "frames": 107,
+          "stream": "28365c964bf225963d008025c2312c12d9e2397efa2c5885005bb9fbad273d37"
         },
         "sparrow": {
           "frames": 106,
@@ -146,8 +146,8 @@
           "stream": "07289b25881fcddf01aaa5c3fe93a975c3eb1078800d2d123a8da4f8adb81585"
         },
         "striker": {
-          "frames": 126,
-          "stream": "2efd10214729d379ecb582d01a63d8a0b0f8f6de65817c8d202b1e73afe35cc2"
+          "frames": 127,
+          "stream": "0ab29d720373c46e0b516d55b0930e5582cafc7bb51a803a2713839174adf819"
         },
         "sparrow": {
           "frames": 126,
@@ -168,8 +168,8 @@
           "stream": "bbb34f5a0062845f3301f3f2fcb778581031dde085fe0b71a005510f9a8b93d8"
         },
         "striker": {
-          "frames": 144,
-          "stream": "e9b66c5e8fe8832e48031f4fe2748eb7a4bf8577ef792da83b911dd24b3550eb"
+          "frames": 145,
+          "stream": "0b9a003252b4992e282e46c8418c807d79fd00d486a74610bafb4f732b2d872f"
         },
         "sparrow": {
           "frames": 145,
@@ -190,8 +190,8 @@
           "stream": "0252107962b001ec1239762d313d5b1a68c5973350b08e3ba6c42209049c52dc"
         },
         "striker": {
-          "frames": 162,
-          "stream": "8b87d23260a85a5a72a83419d2c1f754e76fd1fb9e9aed09e07d78098849ee2b"
+          "frames": 163,
+          "stream": "f6bc324e42fcb2ea773a6efd789eb9cc3b64c0be3fef845a0109811a7e118510"
         },
         "sparrow": {
           "frames": 163,
@@ -279,6 +279,7 @@
       "hpCheck": 2,
       "items": 1,
       "mapDots": 15,
+      "mineChunk": 1,
       "netCaps": 3,
       "news": 1,
       "ownSync": 1,

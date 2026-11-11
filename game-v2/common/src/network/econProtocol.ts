@@ -137,6 +137,21 @@ export interface ServerLootMessage2 {
   source?: string;
 }
 
+/**
+ * Your chunk on a rock (server Mining.extract): its drop comes at `n` rock units worked into it, `w` worked so far
+ * (fractions too); `d`: one was just thrown. Sent only when a chunk starts (your first hit on a rock, each drop) or
+ * another tool moves its drop: a chunk's size and keeps are on the server's secret dice. Your progress ring fills
+ * towards it from your own hits by the same rule (common econ/mining.ts workedUnits) and snaps to `w` here
+ */
+export interface ServerMineChunkMessage {
+  type: 'mineChunk';
+  /** The rock */
+  r: number;
+  n: number;
+  w: number;
+  d?: 1;
+}
+
 /** A short notice for the player (styled by kind) */
 export interface ServerToastMessage {
   type: 'toast';
@@ -241,7 +256,7 @@ export interface ClientItemUseMessage {
   id: string;
 }
 
-export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerBackupsMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
+export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerMineChunkMessage | ServerToastMessage | ServerWreckMessage | ServerBackupsMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
   | ServerQuestsMessage | ServerQuestBoardMessage | ServerQuestStepMessage | ServerHangarMessage | ServerTalkMessage | ServerPeopleMessage | ServerCodexMessage;
 export type EconClientMessage = ClientItemMoveMessage | ClientItemStoreMessage | ClientRestockLoadoutMessage | ClientSlotLoadoutMessage | ClientItemJettisonMessage | ClientItemUseMessage
   | ClientStationOpenMessage | ClientRefineMessage | ClientCraftMessage | ClientGemCutMessage | ClientGemSocketMessage | ClientGemUnsocketMessage | ClientAmmoPreferMessage | ClientOutpostCharterMessage | ClientOutpostUpgradeMessage | ClientDesignSaveMessage | ClientDesignDeleteMessage | ClientDevStationMessage | ClientFabOrderMessage | ClientFabOrderCancelMessage | ClientMarketSellMessage | ClientMarketBuyMessage

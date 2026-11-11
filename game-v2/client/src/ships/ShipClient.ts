@@ -298,11 +298,6 @@ export class ShipClient {
     return this.fx.damageFx?.bubbleAt(x, y) ?? false;
   }
 
-  /** Ore you broke off came into your hold (serverMessages 'gained'): your progress ring's drop */
-  minedDrop(): void {
-    this.strike.minedDrop();
-  }
-
   /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
   readonly hits: ConfirmedHits;
   /** Client-detected hits (part D): the hits found here on the tick-faithful layer, and the chain reported */

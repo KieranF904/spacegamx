@@ -17,8 +17,8 @@ import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import { inertBody } from '../state/trainingBodies';
 import {
-  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, pulseProfile, MINING_PULSE, MINE_TAIL, mineFalloff,
-  type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState,
+  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, pulseProfile, pulseCutOver, MINING_PULSE, MINE_TAIL, mineFalloff,
+  type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState, type PulseProfile,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 
@@ -79,7 +79,8 @@ export class MiningBeamFx {
   onMiningStrike: ((x: number, y: number, dx: number, dy: number, material: string, owner: number) => void) | null = null;
   /**
    * Your own mining laser cutting rock this frame: which rock, where, at what damage a second (its tuning's, times
-   * what it got and the beam's falloff: over a pulse the server's cut averages that), for `dt` seconds, its material
+   * what it got and the beam's falloff), `dt` the seconds of steady cut since the last frame (the ticks passed, each by its
+   * pulse's curve: pulseCutOver, as the server cuts), its material
    * (its grade). The progress ring (MiningProgress) works the rock by it
    */
   onOwnCut: ((rock: number, x: number, y: number, dps: number, dt: number, material: string) => void) | null = null;
@@ -111,7 +112,7 @@ export class MiningBeamFx {
     this.localActive = false;
     if (!mt) return;
     const frames = Math.min(4, dt * 60);
-    const prof = pulseProfile(MINING_PULSE), miningSeen = new Set<number>(), miningSounded = new Set<number>();
+    const prof = pulseProfile(MINING_PULSE), miningSeen = new Set<number>(), miningSounded = new Set<number>(), cutSeen = new Set<number>();
     this.miningFx.begin(this.t * 60, frames);
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship' || !ship.derived.miners.length) continue;
@@ -171,7 +172,8 @@ export class MiningBeamFx {
         if (!runs.length) continue;
         miningSeen.add(key);
         if (id === this.state.playerId && t < 0.999 && this.rockId >= 0 && !m.gas && (!pz || pz.phase[mi] >= 0)) {
-          this.onOwnCut?.(this.rockId, hx, hy, mt.dps * (pz ? pz.fill[mi] : 1) * mineFalloff(t * reach, mt.range), this.dt, m.material);
+          cutSeen.add(key);
+          this.onOwnCut?.(this.rockId, hx, hy, mt.dps * (pz ? pz.fill[mi] : 1) * mineFalloff(t * reach, mt.range), this.ownCut(key, runs, pz ? pz.prof[mi] : prof, now), m.material);
         }
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
@@ -185,6 +187,7 @@ export class MiningBeamFx {
     }
     // (A beam let go: its next press starts a fresh pulse)
     for (const key of this.mining.keys()) if (!miningSeen.has(key)) this.mining.delete(key);
+    for (const key of this.cutTo.keys()) if (!cutSeen.has(key)) this.cutTo.delete(key);
     this.miningFx.drawAfter(g, dt, frames);
     // Sparks off the rock face
     let w = 0;
@@ -455,6 +458,18 @@ export class MiningBeamFx {
 
   /** Mining lasers' pulses under way (the newest last), by ship and miner (id × 16 + its index) */
   private mining = new Map<number, PulseRun[]>();
+  /** Your own mining lasers cutting rock: the last whole tick of their cut counted (ownCut), by miner */
+  private cutTo = new Map<number, number>();
+
+  /**
+   * Seconds of steady cut your mining laser `key` made since the last frame: each whole tick passed, by its pulse's
+   * curve at that tick (pulseCut, as the server cuts: nearly half a pulse's cut lands at its flare). `runs`: its pulses
+   */
+  private ownCut(key: number, runs: PulseRun[], prof: PulseProfile, now: number): number {
+    const to = Math.floor(now), from = Math.max(this.cutTo.get(key) ?? to - 1, to - 8);
+    this.cutTo.set(key, to);
+    return pulseCutOver(runs, prof, from, to);
+  }
   /** The rock the last cast met (its composition: what its cut throws off) */
   private rockHit: Composition | undefined;
   /** The rock the last cast met (-1 none) */

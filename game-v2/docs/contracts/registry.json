@@ -152,7 +152,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 505,
+      "lines": 503,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores, input/keybindings fillKeyNames (a toast's {actionId} key slots)",
       "events": "",
@@ -225,37 +225,37 @@
           "name": "gained",
           "kind": "function",
           "start": 228,
-          "end": 246
+          "end": 244
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 248,
-          "end": 282
+          "start": 246,
+          "end": 280
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 284,
-          "end": 302
+          "start": 282,
+          "end": 300
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 304,
-          "end": 495
+          "start": 302,
+          "end": 493
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 497,
-          "end": 498
+          "start": 495,
+          "end": 496
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 500,
-          "end": 505
+          "start": 498,
+          "end": 503
         }
       ]
     },
@@ -877,7 +877,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 742,
+      "lines": 740,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "npm: pixi.js; GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -900,7 +900,7 @@
           "name": "Renderer",
           "kind": "class",
           "start": 60,
-          "end": 742
+          "end": 740
         }
       ]
     },
@@ -2355,7 +2355,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 777,
+      "lines": 772,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -2389,7 +2389,7 @@
           "name": "ShipClient",
           "kind": "class",
           "start": 117,
-          "end": 777
+          "end": 772
         }
       ]
     },
@@ -6409,7 +6409,7 @@
       "id": "client.ship.strike-fx",
       "path": "client/src/ships/hits/StrikeFx.ts",
       "group": "client/ships/hits",
-      "lines": 111,
+      "lines": 106,
       "owns": "where a shell is seen to strike: shield ripples, plain-hit looks, mining strikes on rock and the progress ring towards your next drop",
       "needs": "StrikeFxHost (state, store, scene, damageFx, shellModel, sound), MiningProgress, common gunShell",
       "events": "",
@@ -6451,7 +6451,7 @@
           "name": "StrikeFx",
           "kind": "class",
           "start": 39,
-          "end": 111
+          "end": 106
         }
       ]
     },
@@ -6541,8 +6541,8 @@
       "id": "client.ship.messages",
       "path": "client/src/ships/messages/ShipMessages.ts",
       "group": "client/ships/messages",
-      "lines": 176,
-      "owns": "routing the server messages a ship client reacts to (hits, damage, bosses, scans, ship sync, system info, docking) to the pieces that draw or track them",
+      "lines": 180,
+      "owns": "routing the server messages a ship client reacts to (hits, damage, bosses, scans, ship sync, system info, docking, your mining chunks) to the pieces that draw or track them",
       "needs": "ShipMessageHost (state, store, fx getters, debris, away, selfHits, hits, own, causes, moves, flow, turrets, dock, jump, strike); npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -6567,7 +6567,7 @@
           "name": "handleShipMessage",
           "kind": "function",
           "start": 59,
-          "end": 176
+          "end": 180
         }
       ]
     },
@@ -7295,7 +7295,7 @@
       "id": "client.ship.renderer-hooks",
       "path": "client/src/ships/wiring/rendererHooks.ts",
       "group": "client/ships/wiring",
-      "lines": 72,
+      "lines": 71,
       "owns": "the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line, flak burst marks)",
       "needs": "RendererHooksHost (state, store, placement, jump, fire, drawnWorld, strike, ownPresent, localAim), Renderer hook fields",
       "events": "",
@@ -7321,7 +7321,7 @@
           "name": "wireRendererHooks",
           "kind": "function",
           "start": 34,
-          "end": 72
+          "end": 71
         }
       ]
     },
@@ -12669,7 +12669,7 @@
       "id": "protocol.econ",
       "path": "common/src/network/econProtocol.ts",
       "group": "common/network",
-      "lines": 469,
+      "lines": 484,
       "owns": "the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and builds; every action is a request the server checks",
       "needs": "type-only imports of econ/stacks, econ/quests and other econ shapes",
       "events": "",
@@ -12734,6 +12734,7 @@
         "ServerHangarMessage",
         "ServerItemsMessage",
         "ServerLootMessage2",
+        "ServerMineChunkMessage",
         "ServerPeopleMessage",
         "ServerProfileDeltaMessage",
         "ServerProfileMessage",
@@ -12793,340 +12794,346 @@
           "end": 138
         },
         {
-          "name": "ServerToastMessage",
+          "name": "ServerMineChunkMessage",
           "kind": "interface",
           "start": 140,
-          "end": 145
+          "end": 153
+        },
+        {
+          "name": "ServerToastMessage",
+          "kind": "interface",
+          "start": 155,
+          "end": 160
         },
         {
           "name": "ServerWreckMessage",
           "kind": "interface",
-          "start": 147,
-          "end": 162
+          "start": 162,
+          "end": 177
         },
         {
           "name": "BackupOption",
           "kind": "interface",
-          "start": 164,
-          "end": 172
+          "start": 179,
+          "end": 187
         },
         {
           "name": "ServerBackupsMessage",
           "kind": "interface",
-          "start": 174,
-          "end": 180
+          "start": 189,
+          "end": 195
         },
         {
           "name": "ServerScanPulseMessage",
           "kind": "interface",
-          "start": 182,
-          "end": 186
+          "start": 197,
+          "end": 201
         },
         {
           "name": "ServerRebuildStatusMessage",
           "kind": "interface",
-          "start": 188,
-          "end": 209
+          "start": 203,
+          "end": 224
         },
         {
           "name": "ClientItemMoveMessage",
           "kind": "interface",
-          "start": 211,
-          "end": 217
+          "start": 226,
+          "end": 232
         },
         {
           "name": "ClientItemStoreMessage",
           "kind": "interface",
-          "start": 219,
-          "end": 223
+          "start": 234,
+          "end": 238
         },
         {
           "name": "ClientRestockLoadoutMessage",
           "kind": "interface",
-          "start": 225,
-          "end": 226
+          "start": 240,
+          "end": 241
         },
         {
           "name": "ClientSlotLoadoutMessage",
           "kind": "interface",
-          "start": 228,
-          "end": 229
+          "start": 243,
+          "end": 244
         },
         {
           "name": "ClientItemJettisonMessage",
           "kind": "interface",
-          "start": 231,
-          "end": 236
+          "start": 246,
+          "end": 251
         },
         {
           "name": "ClientItemUseMessage",
           "kind": "interface",
-          "start": 238,
-          "end": 242
+          "start": 253,
+          "end": 257
         },
         {
           "name": "EconServerMessage",
           "kind": "type",
-          "start": 244,
-          "end": 245
+          "start": 259,
+          "end": 260
         },
         {
           "name": "EconClientMessage",
           "kind": "type",
-          "start": 246,
-          "end": 250
+          "start": 261,
+          "end": 265
         },
         {
           "name": "ClientQuickbarSetMessage",
           "kind": "interface",
-          "start": 252,
-          "end": 257
+          "start": 267,
+          "end": 272
         },
         {
           "name": "HangarSlotView",
           "kind": "interface",
-          "start": 259,
-          "end": 277
+          "start": 274,
+          "end": 292
         },
         {
           "name": "JobView",
           "kind": "interface",
-          "start": 279,
-          "end": 293
+          "start": 294,
+          "end": 308
         },
         {
           "name": "ServerHangarMessage",
           "kind": "interface",
-          "start": 295,
-          "end": 312
+          "start": 310,
+          "end": 327
         },
         {
           "name": "ClientSlotSaveMessage",
           "kind": "interface",
-          "start": 314,
-          "end": 315
+          "start": 329,
+          "end": 330
         },
         {
           "name": "ClientSlotFlyMessage",
           "kind": "interface",
-          "start": 316,
-          "end": 317
+          "start": 331,
+          "end": 332
         },
         {
           "name": "ClientSlotClearMessage",
           "kind": "interface",
-          "start": 318,
-          "end": 319
+          "start": 333,
+          "end": 334
         },
         {
           "name": "ClientScrapItemMessage",
           "kind": "interface",
-          "start": 320,
-          "end": 321
+          "start": 335,
+          "end": 336
         },
         {
           "name": "ClientSlotBuildMessage",
           "kind": "interface",
-          "start": 322,
-          "end": 323
+          "start": 337,
+          "end": 338
         },
         {
           "name": "ClientSlotOrderMessage",
           "kind": "interface",
-          "start": 324,
-          "end": 325
+          "start": 339,
+          "end": 340
         },
         {
           "name": "ClientJobMessage",
           "kind": "interface",
-          "start": 326,
-          "end": 327
+          "start": 341,
+          "end": 342
         },
         {
           "name": "ClientMarketSellAllMessage",
           "kind": "interface",
-          "start": 328,
-          "end": 333
+          "start": 343,
+          "end": 348
         },
         {
           "name": "ServerQuestsMessage",
           "kind": "interface",
-          "start": 335,
-          "end": 351
+          "start": 350,
+          "end": 366
         },
         {
           "name": "ServerQuestBoardMessage",
           "kind": "interface",
-          "start": 353,
-          "end": 363
+          "start": 368,
+          "end": 378
         },
         {
           "name": "ServerTalkMessage",
           "kind": "interface",
-          "start": 365,
-          "end": 369
+          "start": 380,
+          "end": 384
         },
         {
           "name": "ServerPeopleMessage",
           "kind": "interface",
-          "start": 371,
-          "end": 375
+          "start": 386,
+          "end": 390
         },
         {
           "name": "ServerCodexMessage",
           "kind": "interface",
-          "start": 377,
-          "end": 386
+          "start": 392,
+          "end": 401
         },
         {
           "name": "ServerQuestStepMessage",
           "kind": "interface",
-          "start": 388,
-          "end": 397
+          "start": 403,
+          "end": 412
         },
         {
           "name": "ClientQuestBoardMessage",
           "kind": "interface",
-          "start": 399,
-          "end": 400
+          "start": 414,
+          "end": 415
         },
         {
           "name": "ClientQuestAcceptMessage",
           "kind": "interface",
-          "start": 401,
-          "end": 401
+          "start": 416,
+          "end": 416
         },
         {
           "name": "ClientQuestAbandonMessage",
           "kind": "interface",
-          "start": 402,
-          "end": 402
+          "start": 417,
+          "end": 417
         },
         {
           "name": "ClientQuestSeenMessage",
           "kind": "interface",
-          "start": 403,
-          "end": 404
+          "start": 418,
+          "end": 419
         },
         {
           "name": "ClientCodexReadMessage",
           "kind": "interface",
-          "start": 405,
-          "end": 406
+          "start": 420,
+          "end": 421
         },
         {
           "name": "ClientTalkMessage",
           "kind": "interface",
-          "start": 407,
-          "end": 408
+          "start": 422,
+          "end": 423
         },
         {
           "name": "ClientSkillUpMessage",
           "kind": "interface",
-          "start": 409,
-          "end": 414
+          "start": 424,
+          "end": 429
         },
         {
           "name": "ServerStationMessage",
           "kind": "interface",
-          "start": 416,
-          "end": 440
+          "start": 431,
+          "end": 455
         },
         {
           "name": "ClientStationOpenMessage",
           "kind": "interface",
-          "start": 442,
-          "end": 443
-        },
-        {
-          "name": "ClientRefineMessage",
-          "kind": "interface",
-          "start": 444,
-          "end": 445
-        },
-        {
-          "name": "ClientCraftMessage",
-          "kind": "interface",
-          "start": 446,
-          "end": 447
-        },
-        {
-          "name": "ClientGemCutMessage",
-          "kind": "interface",
-          "start": 448,
-          "end": 449
-        },
-        {
-          "name": "ClientGemSocketMessage",
-          "kind": "interface",
-          "start": 450,
-          "end": 451
-        },
-        {
-          "name": "ClientGemUnsocketMessage",
-          "kind": "interface",
-          "start": 452,
-          "end": 452
-        },
-        {
-          "name": "ClientDesignSaveMessage",
-          "kind": "interface",
-          "start": 453,
-          "end": 454
-        },
-        {
-          "name": "ClientDesignDeleteMessage",
-          "kind": "interface",
-          "start": 455,
-          "end": 455
-        },
-        {
-          "name": "ClientOutpostCharterMessage",
-          "kind": "interface",
-          "start": 456,
-          "end": 457
-        },
-        {
-          "name": "ClientOutpostUpgradeMessage",
-          "kind": "interface",
-          "start": 458,
+          "start": 457,
           "end": 458
         },
         {
-          "name": "ClientFabOrderMessage",
+          "name": "ClientRefineMessage",
           "kind": "interface",
           "start": 459,
           "end": 460
         },
         {
-          "name": "ClientFabOrderCancelMessage",
+          "name": "ClientCraftMessage",
           "kind": "interface",
           "start": 461,
-          "end": 461
+          "end": 462
+        },
+        {
+          "name": "ClientGemCutMessage",
+          "kind": "interface",
+          "start": 463,
+          "end": 464
+        },
+        {
+          "name": "ClientGemSocketMessage",
+          "kind": "interface",
+          "start": 465,
+          "end": 466
+        },
+        {
+          "name": "ClientGemUnsocketMessage",
+          "kind": "interface",
+          "start": 467,
+          "end": 467
+        },
+        {
+          "name": "ClientDesignSaveMessage",
+          "kind": "interface",
+          "start": 468,
+          "end": 469
+        },
+        {
+          "name": "ClientDesignDeleteMessage",
+          "kind": "interface",
+          "start": 470,
+          "end": 470
+        },
+        {
+          "name": "ClientOutpostCharterMessage",
+          "kind": "interface",
+          "start": 471,
+          "end": 472
+        },
+        {
+          "name": "ClientOutpostUpgradeMessage",
+          "kind": "interface",
+          "start": 473,
+          "end": 473
+        },
+        {
+          "name": "ClientFabOrderMessage",
+          "kind": "interface",
+          "start": 474,
+          "end": 475
+        },
+        {
+          "name": "ClientFabOrderCancelMessage",
+          "kind": "interface",
+          "start": 476,
+          "end": 476
         },
         {
           "name": "ClientDevStationMessage",
           "kind": "interface",
-          "start": 462,
-          "end": 463
+          "start": 477,
+          "end": 478
         },
         {
           "name": "ClientAmmoPreferMessage",
           "kind": "interface",
-          "start": 464,
-          "end": 465
+          "start": 479,
+          "end": 480
         },
         {
           "name": "ClientMarketSellMessage",
           "kind": "interface",
-          "start": 466,
-          "end": 467
+          "start": 481,
+          "end": 482
         },
         {
           "name": "ClientMarketBuyMessage",
           "kind": "interface",
-          "start": 468,
-          "end": 469
+          "start": 483,
+          "end": 484
         }
       ]
     },
@@ -23916,7 +23923,7 @@
       "id": "server.gameserver.hosts.mining",
       "path": "server/src/gameServer/hosts/mining.ts",
       "group": "server/gameServer/hosts",
-      "lines": 189,
+      "lines": 194,
       "owns": "host adapter for mining and beams, comets and site exits",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -23949,49 +23956,49 @@
           "name": "createMiningHost",
           "kind": "function",
           "start": 34,
-          "end": 70
+          "end": 75
         },
         {
           "name": "mineBeam",
           "kind": "function",
-          "start": 72,
-          "end": 113
+          "start": 77,
+          "end": 118
         },
         {
           "name": "arrivalEffect",
           "kind": "function",
-          "start": 115,
-          "end": 118
+          "start": 120,
+          "end": 123
         },
         {
           "name": "siteExit",
           "kind": "function",
-          "start": 120,
-          "end": 130
+          "start": 125,
+          "end": 135
         },
         {
           "name": "isGas",
           "kind": "function",
-          "start": 132,
-          "end": 136
+          "start": 137,
+          "end": 141
         },
         {
           "name": "cometNow",
           "kind": "function",
-          "start": 138,
-          "end": 143
+          "start": 143,
+          "end": 148
         },
         {
           "name": "watchComet",
           "kind": "function",
-          "start": 145,
-          "end": 154
+          "start": 150,
+          "end": 159
         },
         {
           "name": "beamAsteroid",
           "kind": "function",
-          "start": 156,
-          "end": 189
+          "start": 161,
+          "end": 194
         }
       ]
     },

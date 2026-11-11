@@ -190,7 +190,7 @@ export function createEntityGraphics(rend: Renderer, type: EntityType, id: numbe
       rend.lootPods.set(id, pod);
       // (A chunk thrown out of a rock just struck: the strike kept ore, and it shows richer where it appears)
       const at = rend.state.entities.get(id);
-      if (at) { rend.miningStrikes.pod(at.x, at.y); rend.onPodAppeared?.(at.x, at.y); }
+      if (at) rend.miningStrikes.pod(at.x, at.y);
       container.addChild(pod.container);
       break;
     }

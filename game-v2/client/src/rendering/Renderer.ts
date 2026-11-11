@@ -78,8 +78,6 @@ export class Renderer {
   weaponFx: WeaponFx;
   /** Mining strikes on rock (a hit that rolls for ore), and a chunk's richer puff where it appears (weapons/MiningStrikeFx.ts) */
   miningStrikes = new MiningStrikeFx({ spark: (...a) => this.fx.spark(...a), flash: (...a) => this.fx.flash(...a) }, () => performance.now() / 1000);
-  /** A loot pod appeared at (x, y) (a mined chunk among them: ships/MiningProgress.ts takes it as your drop when it's by your strikes) */
-  onPodAppeared: ((x: number, y: number) => void) | null = null;
   /** Black hole / pulsar central bodies */
   centralShaders = new CentralBodyShaders();
   /** The current system's planets and moons */

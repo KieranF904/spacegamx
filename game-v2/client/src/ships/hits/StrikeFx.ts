@@ -68,7 +68,7 @@ export class StrikeFx {
         this.h.scene()?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
         // Your own: the work it did towards your next drop (MiningProgress), and a light tick
         if (owner === this.h.state.playerId && this.miningProgress) {
-          this.miningProgress.shell(target, kind, this.ownShellDamage(type), this.systemTier(), x, y);
+          this.miningProgress.shell(target, kind, this.ownShellDamage(type), this.systemTier());
           this.mineTick();
         }
       } else this.h.scene()?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
@@ -87,11 +87,6 @@ export class StrikeFx {
   /** The system's rock tier (its Mk: the server's MiningHost.rockTier, from factions.json spawns) */
   systemTier(): number {
     return (factionsData as { spawns?: Record<string, { grade?: number }> }).spawns?.[this.h.state.systemId]?.grade || 1;
-  }
-
-  /** Ore you broke off came into your hold (serverMessages 'gained'): your progress ring's drop */
-  minedDrop(): void {
-    this.miningProgress?.dropped();
   }
 
   /** A light, gritty tick for a working hit of yours on rock: at most one every MINE_TICK_EVERY */
