@@ -24,7 +24,7 @@ describe('message dispatch', () => {
     const server = makeEmptyServer({ clock: () => 1_000_000 });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));
     expect(server.handledMessageTypes().sort()).toEqual(pinned);
-    expect(server.handledMessageTypes().length).toBe(102);
+    expect(server.handledMessageTypes().length).toBe(103);
   }, 120_000);
 
   it('drops non-messages, pre-join messages and limited ones; unknown types fall through silently', () => {

@@ -1,13 +1,13 @@
 /**
  * @contract server.pilots.session
- * owns:       a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest, detach (save, release), adopt (a lingering session moves to a new connection)
+ * owns:       a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest (and tell them how long they have), detach (save, release), adopt (a lingering session moves to a new connection)
  * needs:      Pilots (sessions, store, bank, banking, guests, frozen, devStash, opts, host), pilots/{cargo, death, persist, lease}; npm: @space-game/common
  * invariants: a profile that fails to load or migrate is never saved over (the session stays `loading`) — server/src/game/pilots/guests.test.ts
  *             a disconnect saves twice if the first try fails, and keeps the lease if a save failed — server/src/game/pilots/lease.test.ts
  * extend:     none: the rules each step applies live in pilots/*.ts and profile/; this is the order they run in
  */
 
-import { newProfile, migrateProfile, refundRetiredSkills, cloneJson, type PlayerProfile } from '@space-game/common';
+import { newProfile, migrateProfile, refundRetiredSkills, cloneJson, GUEST_KEEP_MS, GUEST_LIFE_MS, type PlayerProfile } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
 import * as cargo from './cargo.js';
 import * as death from './death.js';
@@ -82,18 +82,40 @@ export async function login(self: Pilots, conn: PilotConn, userId: number): Prom
 
 /**
  * A guest joined with their browser's key (conn.guestId): the pilot kept under it, if any, is theirs again as they left
- * it (their ship, hold, place and tutorial step: what a signed-in pilot's login loads from their save). False: none
- * kept (a new guest: the fresh profile they were given stands), or they left or signed in meanwhile
+ * it (their ship, hold, place and tutorial step: what a signed-in pilot's login loads from their save). The guest is told how
+ * long they have (guestStatus). False: none kept (a new guest: the fresh profile they were given stands, and is kept from now,
+ * the 3 days running from it), or the guest is past their 3 days (they can only register: pilots/convert.ts), or they left or
+ * signed in meanwhile
  */
 export async function resumeGuest(self: Pilots, conn: PilotConn): Promise<boolean> {
   const id = conn.guestId;
   if (!id) return false;
   const kept = await self.guests.take(id);
   const s = self.sessions.get(conn);
-  if (!kept || !s || s.loading || conn.userId !== null || conn.guestId !== id) return false;
+  if (!s || s.loading || conn.userId !== null || conn.guestId !== id) return false;
+  if (!kept) {
+    self.guests.put(id, conn.username, persist.persistable(self, conn, s.profile), conn.address);
+    self.host.send(conn, { type: 'guestStatus', state: 'active', keepMs: GUEST_KEEP_MS, expiresInMs: GUEST_LIFE_MS });
+    return false;
+  }
+  if (kept.expired) {
+    // (Not theirs to play: nothing of this connection is saved over it; the record stays, to be registered, till it is wiped)
+    s.loading = true;
+    s.guestBlocked = true;
+    self.host.send(conn, { type: 'guestStatus', state: 'expired', keepMs: GUEST_KEEP_MS, expiresInMs: kept.expiresInMs });
+    return false;
+  }
+  if (!takeKept(self, s, kept.profile)) return false;
+  self.host.send(conn, { type: 'guestStatus', state: 'active', keepMs: GUEST_KEEP_MS, expiresInMs: kept.expiresInMs });
+  return true;
+}
+
+/** A kept guest's profile (as saved) becomes the session's, put into the world as a login does. False: it can't be made sense of (the session is unchanged) */
+export function takeKept(self: Pilots, s: Session, raw: unknown): boolean {
+  const conn = s.conn;
   let profile: PlayerProfile;
   try {
-    profile = migrateProfile(kept.profile, self.opts.starter, self.econ.ships, { econ: self.econ });
+    profile = migrateProfile(raw, self.opts.starter, self.econ.ships, { econ: self.econ });
   } catch (e) {
     console.error(`[Pilots] could not migrate a kept guest profile (${conn.username}):`, e);
     return false;

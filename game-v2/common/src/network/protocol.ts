@@ -25,6 +25,7 @@ export * from './tutorialProtocol.js';
 export * from './gunRangeProtocol.js';
 export * from './combatProtocol.js';
 export * from './updateProtocol.js';
+export * from './guestProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
 export * from './protocol/clientMessages.js';

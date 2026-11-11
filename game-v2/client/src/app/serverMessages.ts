@@ -31,6 +31,7 @@ import { devFeeds } from './devFeeds';
 import { setBank } from '../ui/station/bankStore';
 import { setTutorialState, tutorialEdge } from '../ui/tutorial/tutorialStore';
 import { showServerUpdate } from '../ui/updateBanner';
+import { onGuestStatus, onGuestConverted } from '../ui/guest/guestBanner';
 import { showHitTick } from '../ui/HitTick';
 import { setCombatLock } from '../ui/CombatLockUI';
 import { coalesceDelayMs } from '../network/netCaps';
@@ -373,6 +374,8 @@ const TABLE: Handlers = {
   tutorialState: (_h, msg) => { setTutorialState(msg); },
   tutorialEdge: () => { tutorialEdge(); },
   serverUpdate: (_h, msg) => { showServerUpdate(msg.inMs); },
+  guestStatus: (_h, msg) => { onGuestStatus(msg); },
+  guestConverted: (_h, msg) => { onGuestConverted(msg); },
   minesLaid: (h, msg) => { mineClient.laid(msg, h.state.playerId); },
   minesGone: (_h, msg) => { mineClient.gone(msg); },
   minesKept: (_h, msg) => { mineClient.kept(msg); },

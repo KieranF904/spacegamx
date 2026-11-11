@@ -20,6 +20,7 @@ import { activity } from '../activity/index.js';
 import { registerShipEditHandlers } from '../net/handlers/shipEdit.js';
 import { registerWeaponGroupsHandlers } from '../net/handlers/weaponGroups.js';
 import { registerBankHandlers } from '../net/handlers/bank.js';
+import { registerGuestAccountHandlers } from '../net/handlers/guestAccount.js';
 import { stationQuery } from '../game/Docking.js';
 import { HandlerRegistry, dispatch, registerHandlers, type HandlerTable } from '../net/dispatch.js';
 import * as flight from '../net/handlers/flight.js';
@@ -41,6 +42,7 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
   registerHandlers(t, registerShipEditHandlers);
   registerHandlers(t, registerWeaponGroupsHandlers);
   registerHandlers(t, registerBankHandlers);
+  registerHandlers(t, registerGuestAccountHandlers);
   registerHandlers(t, registerFlightHandlers);
   registerHandlers(t, registerSocialHandlers);
   registerHandlers(t, registerGunRangeHandlers);

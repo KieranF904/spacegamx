@@ -1,22 +1,26 @@
 /**
  * @contract server.pilots.guests
  * owns:       guest pilots kept for a while by their browser's guest key (the join's guestKey): a guest who joins again
- *             (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all
+ *             (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all; and a guest's
+ *             lifetime: wiped after GUEST_KEEP_MS unused, at most GUEST_LIFE_MS old (then GUEST_GRACE_MS only to register)
  * needs:      ProfileStore (loadDoc / saveDoc only: never the accounts' saves); npm: node crypto, @space-game/common
  * invariants: a guest is kept by a hash of their key, never the key or their name (a name proves nothing) —
  *             server/src/game/pilots/guests.test.ts
- *             kept GUEST_KEEP_MS at most, GUEST_KEEP_MAX at most (the oldest go first) — server/src/game/pilots/guests.test.ts
+ *             kept GUEST_KEEP_MS since last used, GUEST_KEEP_MAX at most (the oldest go first); a connected guest is never wiped
+ *             — server/src/game/pilots/guests.test.ts
+ *             a guest older than GUEST_LIFE_MS is handed back as expired (to register, not to play) for GUEST_GRACE_MS, then
+ *             gone; a record taken by `consume` is gone for good (a guest registers once) — server/src/game/pilots/guests.test.ts
  *             one address keeps GUEST_KEEP_PER_IP guests at most (its own oldest go first): a flood of new guests from one place
  *             can't push out everyone else's — server/src/game/pilots/guests.test.ts
  * extend:     none: what a guest keeps is their profile; Pilots decides when one is put or taken
  */
 
 import { createHash } from 'crypto';
-import { cloneJson } from '@space-game/common';
+import { cloneJson, GUEST_KEEP_MS, GUEST_LIFE_MS, GUEST_GRACE_MS } from '@space-game/common';
 import type { ProfileStore } from '../../profile/ProfileStore.js';
 
-/** How long a guest who left is kept (wall ms): long enough to come back after a restart, an update or a night */
-export const GUEST_KEEP_MS = 24 * 60 * 60_000;
+// (How long a guest is kept unused, lives, and has to register: common network/guestProtocol.ts, which tells the guest too)
+export { GUEST_KEEP_MS, GUEST_LIFE_MS, GUEST_GRACE_MS };
 /** Guests kept at most (each a small profile: the doc stays a few MB at worst) */
 export const GUEST_KEEP_MAX = 200;
 /**
@@ -44,7 +48,11 @@ function addressKey(address: string): string {
   return createHash('sha256').update(address).digest('hex').slice(0, 16);
 }
 
-interface Kept { name: string; profile: unknown; at: number; ip?: string }
+/** `at`: when they were last put (last used); `created`: when the guest began (the 3 days run from it) */
+interface Kept { name: string; profile: unknown; at: number; created: number; ip?: string }
+
+/** A guest as `take` hands them back: `expired` is the 3 days gone (only to be registered), `expiresInMs` until that ends / until the wipe */
+export interface TakenGuest { name: string; profile: unknown; expired: boolean; expiresInMs: number }
 
 export class GuestKeep {
   /** By id, the least recently put first */
@@ -55,7 +63,8 @@ export class GuestKeep {
   /** The doc read from the store (at start-up): taking waits for it */
   readonly ready: Promise<void>;
 
-  constructor(private readonly store: Pick<ProfileStore, 'loadDoc' | 'saveDoc'>, private readonly now: () => number) {
+  /** `live`: a guest id someone is connected as (not idle, so never wiped for it) */
+  constructor(private readonly store: Pick<ProfileStore, 'loadDoc' | 'saveDoc'>, private readonly now: () => number, private readonly live: (id: string) => boolean = () => false) {
     this.ready = this.load();
   }
 
@@ -70,9 +79,10 @@ export class GuestKeep {
     if (!Array.isArray(list)) return;
     // (Kept before any put since start-up, oldest first: a put meanwhile is newer)
     const fresh = new Map<string, Kept>();
-    for (const g of list as { id?: unknown; name?: unknown; profile?: unknown; at?: unknown; ip?: unknown }[]) {
+    for (const g of list as { id?: unknown; name?: unknown; profile?: unknown; at?: unknown; created?: unknown; ip?: unknown }[]) {
       if (typeof g?.id !== 'string' || typeof g.name !== 'string' || typeof g.at !== 'number' || !g.profile || typeof g.profile !== 'object') continue;
-      fresh.set(g.id, { name: g.name, profile: g.profile, at: g.at, ...(typeof g.ip === 'string' ? { ip: g.ip } : {}) });
+      // (A guest kept before the 3 days: begun when last used)
+      fresh.set(g.id, { name: g.name, profile: g.profile, at: g.at, created: typeof g.created === 'number' ? g.created : g.at, ...(typeof g.ip === 'string' ? { ip: g.ip } : {}) });
     }
     for (const [id, k] of this.kept) { fresh.delete(id); fresh.set(id, k); }
     this.kept = fresh;
@@ -89,29 +99,44 @@ export class GuestKeep {
       const mine = [...this.kept].filter(([, k]) => k.ip === ip);
       for (let i = 0; i <= mine.length - GUEST_KEEP_PER_IP; i++) this.kept.delete(mine[i][0]);
     }
-    this.kept.set(id, { name, profile: cloneJson(profile), at: this.now(), ...(ip ? { ip } : {}) });
+    this.kept.set(id, { name, profile: cloneJson(profile), at: this.now(), created: prior?.created ?? this.now(), ...(ip ? { ip } : {}) });
     this.dirty = true;
     this.prune();
   }
 
   /** The guest kept under this id, if still kept (a copy of their profile; it stays kept until it's put again or expires) */
-  async take(id: string): Promise<{ name: string; profile: unknown } | null> {
+  async take(id: string): Promise<TakenGuest | null> {
     await this.ready;
-    this.prune();
+    // (The joining connection is "connected as" this guest already: it doesn't keep its own record from the wipe)
+    this.prune(id);
     const k = this.kept.get(id);
-    return k ? { name: k.name, profile: cloneJson(k.profile) } : null;
+    if (!k) return null;
+    const age = this.now() - k.created;
+    const expired = age > GUEST_LIFE_MS;
+    return { name: k.name, profile: cloneJson(k.profile), expired, expiresInMs: (expired ? GUEST_LIFE_MS + GUEST_GRACE_MS : GUEST_LIFE_MS) - age };
+  }
+
+  /** The guest registered: their record is gone for good (true if there was one: only the first call to it gets the profile moved) */
+  consume(id: string): boolean {
+    const had = this.kept.delete(id);
+    if (had) this.dirty = true;
+    return had;
   }
 
   get size(): number { return this.kept.size; }
 
-  private prune(): void {
-    const old = this.now() - GUEST_KEEP_MS;
+  private prune(joining?: string): void {
+    const now = this.now();
+    // (Unused for GUEST_KEEP_MS, or past the 3 days and the grace to register: never one someone is connected as)
     for (const [id, k] of this.kept) {
-      if (k.at >= old && this.kept.size <= GUEST_KEEP_MAX) break;
+      if ((now - k.at > GUEST_KEEP_MS || now - k.created > GUEST_LIFE_MS + GUEST_GRACE_MS) && (id === joining || !this.live(id))) { this.kept.delete(id); this.dirty = true; }
+    }
+    // (Then the oldest put first, till the count fits: put order is time order)
+    for (const id of this.kept.keys()) {
+      if (this.kept.size <= GUEST_KEEP_MAX) break;
       this.kept.delete(id);
       this.dirty = true;
     }
-    // (Put order is time order, except a clock that went back: those are caught on the next prune)
   }
 
   /** Once a tick: written to the store if anything changed and the last write was long enough ago */
@@ -130,7 +155,7 @@ export class GuestKeep {
     this.lastWrite = this.now();
     // (After the start-up read: written before it, the guests kept from before would be lost)
     const p = this.ready
-      .then(() => this.store.saveDoc(GUEST_DOC, { guests: [...this.kept].map(([id, k]) => ({ id, name: k.name, at: k.at, profile: k.profile, ...(k.ip ? { ip: k.ip } : {}) })) }))
+      .then(() => this.store.saveDoc(GUEST_DOC, { guests: [...this.kept].map(([id, k]) => ({ id, name: k.name, at: k.at, created: k.created, profile: k.profile, ...(k.ip ? { ip: k.ip } : {}) })) }))
       .catch((e) => { this.dirty = true; console.error('[Guests] could not write the kept guests:', e); })
       .finally(() => { if (this.writing === p) this.writing = null; });
     this.writing = p;

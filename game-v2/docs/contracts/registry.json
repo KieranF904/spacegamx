@@ -152,7 +152,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 493,
+      "lines": 496,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -176,86 +176,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 74,
-          "end": 128
+          "start": 75,
+          "end": 129
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 130,
-          "end": 130
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 131,
           "end": 131
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 132,
-          "end": 134
+          "end": 132
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 133,
+          "end": 135
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 136,
-          "end": 154
+          "start": 137,
+          "end": 155
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 156,
-          "end": 160
+          "start": 157,
+          "end": 161
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 162,
-          "end": 207
+          "start": 163,
+          "end": 208
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 209,
-          "end": 220
+          "start": 210,
+          "end": 221
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 222,
-          "end": 240
+          "start": 223,
+          "end": 241
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 242,
-          "end": 276
+          "start": 243,
+          "end": 277
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 278,
-          "end": 295
+          "start": 279,
+          "end": 296
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 297,
-          "end": 483
+          "start": 298,
+          "end": 486
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 485,
-          "end": 486
+          "start": 488,
+          "end": 489
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 488,
-          "end": 493
+          "start": 491,
+          "end": 496
         }
       ]
     },
@@ -7783,6 +7783,210 @@
       ]
     },
     {
+      "id": "client.ui.guest-banner",
+      "path": "client/src/ui/guest/guestBanner.ts",
+      "group": "client/ui/guest",
+      "lines": 168,
+      "owns": "the guest's banner in the top right (title, rules, time left, a Register button that opens the form in place) and, for a guest past their 3 days, the one screen that asks them to register to play on; sends convertGuest",
+      "needs": "DOM (optional: with none every call does nothing), guestBannerModel, the hooks Game gives it (send, the lobby's register, what to do once registered); @space-game/common (types)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "an expired guest is told to register to keep playing",
+          "test": "client/src/ui/guest/guestBannerModel.test.ts"
+        }
+      ],
+      "extend": "the words are guestBannerModel.ts; the server's side is net/handlers/guestAccount.ts. No prompts or popups while a guest plays (the banner is always there, the form opens only when asked); the lobby's account is made once: a refused move of the pilot is retried with the same session, not a second account",
+      "exports": [
+        "GuestHooks",
+        "hideGuestBanner",
+        "initGuestBanner",
+        "onGuestConverted",
+        "onGuestStatus"
+      ],
+      "sections": [
+        {
+          "name": "GuestHooks",
+          "kind": "interface",
+          "start": 16,
+          "end": 24
+        },
+        {
+          "name": "hooks",
+          "kind": "let",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "status",
+          "kind": "let",
+          "start": 27,
+          "end": 27
+        },
+        {
+          "name": "receivedAt",
+          "kind": "let",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "root",
+          "kind": "let",
+          "start": 29,
+          "end": 29
+        },
+        {
+          "name": "timer",
+          "kind": "let",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "formOpen",
+          "kind": "let",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "busy",
+          "kind": "let",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "error",
+          "kind": "let",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "made",
+          "kind": "let",
+          "start": 34,
+          "end": 35
+        },
+        {
+          "name": "initGuestBanner",
+          "kind": "function",
+          "start": 37,
+          "end": 37
+        },
+        {
+          "name": "onGuestStatus",
+          "kind": "function",
+          "start": 39,
+          "end": 47
+        },
+        {
+          "name": "onGuestConverted",
+          "kind": "function",
+          "start": 49,
+          "end": 59
+        },
+        {
+          "name": "hideGuestBanner",
+          "kind": "function",
+          "start": 61,
+          "end": 68
+        },
+        {
+          "name": "el",
+          "kind": "function",
+          "start": 70,
+          "end": 75
+        },
+        {
+          "name": "FONT",
+          "kind": "const",
+          "start": 77,
+          "end": 77
+        },
+        {
+          "name": "FIELD",
+          "kind": "const",
+          "start": 78,
+          "end": 78
+        },
+        {
+          "name": "BUTTON",
+          "kind": "const",
+          "start": 79,
+          "end": 79
+        },
+        {
+          "name": "QUIET",
+          "kind": "const",
+          "start": 80,
+          "end": 80
+        },
+        {
+          "name": "paint",
+          "kind": "function",
+          "start": 82,
+          "end": 115
+        },
+        {
+          "name": "form",
+          "kind": "function",
+          "start": 117,
+          "end": 155
+        },
+        {
+          "name": "submit",
+          "kind": "function",
+          "start": 157,
+          "end": 168
+        }
+      ]
+    },
+    {
+      "id": "client.ui.guest-banner-model",
+      "path": "client/src/ui/guest/guestBannerModel.ts",
+      "group": "client/ui/guest",
+      "lines": 57,
+      "owns": "what the guest banner says: the title, the rules in short and the time left, from the server's guestStatus",
+      "needs": "type-only import of @space-game/common (the guest status message)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the time left counts down from when the status arrived and never goes below zero; an expired guest is told to register to keep playing",
+          "test": "client/src/ui/guest/guestBannerModel.test.ts"
+        }
+      ],
+      "extend": "the words are here and nowhere else; the DOM that shows them is guestBanner.ts",
+      "exports": [
+        "GuestBannerModel",
+        "guestBannerModel",
+        "spanText"
+      ],
+      "sections": [
+        {
+          "name": "MIN",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "spanText",
+          "kind": "function",
+          "start": 14,
+          "end": 27
+        },
+        {
+          "name": "GuestBannerModel",
+          "kind": "interface",
+          "start": 29,
+          "end": 37
+        },
+        {
+          "name": "guestBannerModel",
+          "kind": "function",
+          "start": 39,
+          "end": 57
+        }
+      ]
+    },
+    {
       "id": "client.gun-range.hud",
       "path": "client/src/ui/gunRange/GunRangeHud.ts",
       "group": "client/ui/gunRange",
@@ -12303,6 +12507,86 @@
       ]
     },
     {
+      "id": "protocol.guest",
+      "path": "common/src/network/guestProtocol.ts",
+      "group": "common/network",
+      "lines": 39,
+      "owns": "the guest account's lifetime rules (kept 12 h after leaving, 3 days at most, 12 h of grace to register) and the messages that tell a guest how long they have and turn them into a registered account",
+      "needs": "nothing",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the server types the client handles itself are exactly the pinned set",
+          "test": "client/src/app/serverMessages.test.ts"
+        },
+        {
+          "text": "every client-sent type here is one the server dispatches, pinned by name",
+          "test": "server/src/golden/structure.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of this area's client / server union below; then its handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins",
+      "exports": [
+        "ClientConvertGuestMessage",
+        "GUEST_GRACE_MS",
+        "GUEST_KEEP_MS",
+        "GUEST_LIFE_MS",
+        "GuestClientMessage",
+        "GuestServerMessage",
+        "ServerGuestConvertedMessage",
+        "ServerGuestStatusMessage"
+      ],
+      "sections": [
+        {
+          "name": "GUEST_KEEP_MS",
+          "kind": "const",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "GUEST_LIFE_MS",
+          "kind": "const",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "GUEST_GRACE_MS",
+          "kind": "const",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "ServerGuestStatusMessage",
+          "kind": "interface",
+          "start": 19,
+          "end": 26
+        },
+        {
+          "name": "ServerGuestConvertedMessage",
+          "kind": "interface",
+          "start": 28,
+          "end": 29
+        },
+        {
+          "name": "ClientConvertGuestMessage",
+          "kind": "interface",
+          "start": 31,
+          "end": 36
+        },
+        {
+          "name": "GuestClientMessage",
+          "kind": "type",
+          "start": 38,
+          "end": 38
+        },
+        {
+          "name": "GuestServerMessage",
+          "kind": "type",
+          "start": 39,
+          "end": 39
+        }
+      ]
+    },
+    {
       "id": "protocol.gun-range",
       "path": "common/src/network/gunRangeProtocol.ts",
       "group": "common/network",
@@ -12538,7 +12822,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 82,
+      "lines": 83,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -12565,32 +12849,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 49,
-          "end": 61
+          "start": 50,
+          "end": 62
         },
         {
           "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
-          "start": 62,
-          "end": 63
+          "start": 63,
+          "end": 64
         },
         {
           "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
-          "start": 64,
-          "end": 65
+          "start": 65,
+          "end": 66
         },
         {
           "name": "PROTOCOL_MISMATCH_REASON",
           "kind": "const",
-          "start": 66,
-          "end": 66
+          "start": 67,
+          "end": 67
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 68,
-          "end": 82
+          "start": 69,
+          "end": 83
         }
       ]
     },
@@ -13244,7 +13528,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 308,
+      "lines": 310,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -13294,182 +13578,182 @@
         {
           "name": "ClientInputMessage",
           "kind": "interface",
-          "start": 26,
-          "end": 64
+          "start": 27,
+          "end": 65
         },
         {
           "name": "BodyCheck",
           "kind": "interface",
-          "start": 66,
-          "end": 70
+          "start": 67,
+          "end": 71
         },
         {
           "name": "ClientPingMessage",
           "kind": "interface",
-          "start": 72,
-          "end": 75
+          "start": 73,
+          "end": 76
         },
         {
           "name": "ClientMapViewMessage",
           "kind": "interface",
-          "start": 77,
-          "end": 81
+          "start": 78,
+          "end": 82
         },
         {
           "name": "ClientChatMessage",
           "kind": "interface",
-          "start": 83,
-          "end": 86
+          "start": 84,
+          "end": 87
         },
         {
           "name": "ClientInteractMessage",
           "kind": "interface",
-          "start": 88,
-          "end": 91
+          "start": 89,
+          "end": 92
         },
         {
           "name": "ClientDropItemMessage",
           "kind": "interface",
-          "start": 93,
-          "end": 97
+          "start": 94,
+          "end": 98
         },
         {
           "name": "ClientPickupMessage",
           "kind": "interface",
-          "start": 99,
-          "end": 102
+          "start": 100,
+          "end": 103
         },
         {
           "name": "ClientBuyMessage",
           "kind": "interface",
-          "start": 104,
-          "end": 109
+          "start": 105,
+          "end": 110
         },
         {
           "name": "ClientSellMessage",
           "kind": "interface",
-          "start": 111,
-          "end": 116
+          "start": 112,
+          "end": 117
         },
         {
           "name": "ClientRepairMessage",
           "kind": "interface",
-          "start": 118,
-          "end": 121
+          "start": 119,
+          "end": 122
         },
         {
           "name": "ClientRefuelMessage",
           "kind": "interface",
-          "start": 123,
-          "end": 126
+          "start": 124,
+          "end": 127
         },
         {
           "name": "ClientWarpMessage",
           "kind": "interface",
-          "start": 129,
-          "end": 132
+          "start": 130,
+          "end": 133
         },
         {
           "name": "ClientRespawnMessage",
           "kind": "interface",
-          "start": 134,
-          "end": 138
+          "start": 135,
+          "end": 139
         },
         {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 140,
-          "end": 153
+          "start": 141,
+          "end": 154
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 155,
-          "end": 162
+          "start": 156,
+          "end": 163
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 164,
-          "end": 167
+          "start": 165,
+          "end": 168
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 169,
-          "end": 173
+          "start": 170,
+          "end": 174
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 175,
-          "end": 214
+          "start": 176,
+          "end": 216
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 216,
-          "end": 225
+          "start": 218,
+          "end": 227
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 227,
-          "end": 234
+          "start": 229,
+          "end": 236
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 236,
-          "end": 243
+          "start": 238,
+          "end": 245
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 245,
-          "end": 255
+          "start": 247,
+          "end": 257
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 257,
-          "end": 271
+          "start": 259,
+          "end": 273
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 273,
-          "end": 278
+          "start": 275,
+          "end": 280
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 280,
-          "end": 283
+          "start": 282,
+          "end": 285
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 285,
-          "end": 287
+          "start": 287,
+          "end": 289
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 289,
-          "end": 296
+          "start": 291,
+          "end": 298
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 298,
-          "end": 301
+          "start": 300,
+          "end": 303
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 303,
-          "end": 307
+          "start": 305,
+          "end": 309
         }
       ]
     },
@@ -14261,7 +14545,7 @@
       "id": "protocol.server-union",
       "path": "common/src/network/protocol/serverMessage.ts",
       "group": "common/network/protocol",
-      "lines": 128,
+      "lines": 130,
       "owns": "the ServerMessage union over every family",
       "needs": "every server message family file",
       "events": "",
@@ -14279,8 +14563,8 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 26,
-          "end": 128
+          "start": 27,
+          "end": 130
         }
       ]
     },
@@ -19193,9 +19477,9 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 686,
+      "lines": 705,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
-      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs",
+      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
       "invariants": [
         {
@@ -19226,62 +19510,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 42,
-          "end": 51
+          "start": 43,
+          "end": 52
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 53,
-          "end": 78
+          "start": 54,
+          "end": 79
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 80,
-          "end": 91
+          "start": 81,
+          "end": 92
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 93,
-          "end": 93
+          "start": 94,
+          "end": 94
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 95,
-          "end": 110
+          "start": 96,
+          "end": 111
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 112,
-          "end": 113
+          "start": 113,
+          "end": 114
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 115,
-          "end": 134
+          "start": 116,
+          "end": 139
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 136,
-          "end": 137
+          "start": 141,
+          "end": 142
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 139,
-          "end": 149
+          "start": 144,
+          "end": 154
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 151,
-          "end": 686
+          "start": 156,
+          "end": 705
         }
       ]
     },
@@ -20173,6 +20457,56 @@
       ]
     },
     {
+      "id": "server.pilots.convert",
+      "path": "server/src/game/pilots/convert.ts",
+      "group": "server/game/pilots",
+      "lines": 105,
+      "owns": "a guest registering: their whole profile (in play, or kept past their 3 days) moves to the new account's profile, once; the kept guest record is consumed",
+      "needs": "Pilots (sessions, store, guests, converting, now, host), pilots/{persist, session, lease}; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the profile goes only to an account that has none (never merged), and only once: the kept record is gone with it, and a second try, or two guests into one account, are refused",
+          "test": "server/src/game/pilots/convert.test.ts"
+        },
+        {
+          "text": "a guest past their 3 days is registered from the kept record, never played",
+          "test": "server/src/game/pilots/convert.test.ts"
+        }
+      ],
+      "extend": "none: what a profile holds is not looked at (it is moved whole); the account itself is the lobby's",
+      "exports": [
+        "Converted",
+        "convertGuest"
+      ],
+      "sections": [
+        {
+          "name": "Converted",
+          "kind": "type",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "refuse",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "convertGuest",
+          "kind": "function",
+          "start": 22,
+          "end": 41
+        },
+        {
+          "name": "run",
+          "kind": "function",
+          "start": 43,
+          "end": 105
+        }
+      ]
+    },
+    {
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
@@ -20287,8 +20621,8 @@
       "id": "server.pilots.guests",
       "path": "server/src/game/pilots/guests.ts",
       "group": "server/game/pilots",
-      "lines": 139,
-      "owns": "guest pilots kept for a while by their browser's guest key (the join's guestKey): a guest who joins again (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all",
+      "lines": 164,
+      "owns": "guest pilots kept for a while by their browser's guest key (the join's guestKey): a guest who joins again (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all; and a guest's lifetime: wiped after GUEST_KEEP_MS unused, at most GUEST_LIFE_MS old (then GUEST_GRACE_MS only to register)",
       "needs": "ProfileStore (loadDoc / saveDoc only: never the accounts' saves); npm: node crypto, @space-game/common",
       "events": "",
       "invariants": [
@@ -20297,7 +20631,11 @@
           "test": "server/src/game/pilots/guests.test.ts"
         },
         {
-          "text": "kept GUEST_KEEP_MS at most, GUEST_KEEP_MAX at most (the oldest go first)",
+          "text": "kept GUEST_KEEP_MS since last used, GUEST_KEEP_MAX at most (the oldest go first); a connected guest is never wiped",
+          "test": "server/src/game/pilots/guests.test.ts"
+        },
+        {
+          "text": "a guest older than GUEST_LIFE_MS is handed back as expired (to register, not to play) for GUEST_GRACE_MS, then gone; a record taken by `consume` is gone for good (a guest registers once)",
           "test": "server/src/game/pilots/guests.test.ts"
         },
         {
@@ -20308,73 +20646,76 @@
       "extend": "none: what a guest keeps is their profile; Pilots decides when one is put or taken",
       "exports": [
         "GUEST_DOC",
+        "GUEST_GRACE_MS",
         "GUEST_KEEP_MAX",
         "GUEST_KEEP_MS",
         "GUEST_KEEP_PER_IP",
+        "GUEST_LIFE_MS",
         "GUEST_WRITE_MS",
         "GuestKeep",
+        "TakenGuest",
         "guestIdOf"
       ],
       "sections": [
         {
-          "name": "GUEST_KEEP_MS",
-          "kind": "const",
-          "start": 18,
-          "end": 19
-        },
-        {
           "name": "GUEST_KEEP_MAX",
           "kind": "const",
-          "start": 20,
-          "end": 21
+          "start": 24,
+          "end": 25
         },
         {
           "name": "GUEST_KEEP_PER_IP",
           "kind": "const",
-          "start": 22,
-          "end": 26
+          "start": 26,
+          "end": 30
         },
         {
           "name": "GUEST_DOC",
           "kind": "const",
-          "start": 27,
-          "end": 28
+          "start": 31,
+          "end": 32
         },
         {
           "name": "GUEST_WRITE_MS",
           "kind": "const",
-          "start": 29,
-          "end": 30
+          "start": 33,
+          "end": 34
         },
         {
           "name": "KEY",
           "kind": "const",
-          "start": 32,
-          "end": 33
+          "start": 36,
+          "end": 37
         },
         {
           "name": "guestIdOf",
           "kind": "function",
-          "start": 35,
-          "end": 39
+          "start": 39,
+          "end": 43
         },
         {
           "name": "addressKey",
           "kind": "function",
-          "start": 41,
-          "end": 45
+          "start": 45,
+          "end": 49
         },
         {
           "name": "Kept",
           "kind": "interface",
-          "start": 47,
-          "end": 47
+          "start": 51,
+          "end": 52
+        },
+        {
+          "name": "TakenGuest",
+          "kind": "interface",
+          "start": 54,
+          "end": 55
         },
         {
           "name": "GuestKeep",
           "kind": "class",
-          "start": 49,
-          "end": 139
+          "start": 57,
+          "end": 164
         }
       ]
     },
@@ -20572,8 +20913,8 @@
       "id": "server.pilots.session",
       "path": "server/src/game/pilots/session.ts",
       "group": "server/game/pilots",
-      "lines": 153,
-      "owns": "a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest, detach (save, release), adopt (a lingering session moves to a new connection)",
+      "lines": 175,
+      "owns": "a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest (and tell them how long they have), detach (save, release), adopt (a lingering session moves to a new connection)",
       "needs": "Pilots (sessions, store, bank, banking, guests, frozen, devStash, opts, host), pilots/{cargo, death, persist, lease}; npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -20592,7 +20933,8 @@
         "attach",
         "detach",
         "login",
-        "resumeGuest"
+        "resumeGuest",
+        "takeKept"
       ],
       "sections": [
         {
@@ -20611,19 +20953,25 @@
           "name": "resumeGuest",
           "kind": "function",
           "start": 83,
-          "end": 112
+          "end": 111
+        },
+        {
+          "name": "takeKept",
+          "kind": "function",
+          "start": 113,
+          "end": 134
         },
         {
           "name": "detach",
           "kind": "function",
-          "start": 114,
-          "end": 130
+          "start": 136,
+          "end": 152
         },
         {
           "name": "adopt",
           "kind": "function",
-          "start": 132,
-          "end": 153
+          "start": 154,
+          "end": 175
         }
       ]
     },
@@ -21380,7 +21728,7 @@
       "id": "server.gameserver.messages",
       "path": "server/src/gameServer/messages.ts",
       "group": "server/gameServer",
-      "lines": 233,
+      "lines": 235,
       "owns": "the client message table and the dev message handlers (teleport, spawn), chat and input forwarding",
       "needs": "GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs",
       "events": "",
@@ -21406,56 +21754,56 @@
         {
           "name": "buildMessageHandlers",
           "kind": "function",
-          "start": 33,
-          "end": 124
+          "start": 34,
+          "end": 126
         },
         {
           "name": "devToolsOpen",
           "kind": "function",
-          "start": 126,
-          "end": 129
+          "start": 128,
+          "end": 131
         },
         {
           "name": "handleMessage",
           "kind": "function",
-          "start": 131,
-          "end": 140
+          "start": 133,
+          "end": 142
         },
         {
           "name": "handleDevTeleport",
           "kind": "function",
-          "start": 142,
-          "end": 172
+          "start": 144,
+          "end": 174
         },
         {
           "name": "handleDevSpawn",
           "kind": "function",
-          "start": 174,
-          "end": 183
+          "start": 176,
+          "end": 185
         },
         {
           "name": "handleChat",
           "kind": "function",
-          "start": 185,
-          "end": 218
+          "start": 187,
+          "end": 220
         },
         {
           "name": "handleInput",
           "kind": "function",
-          "start": 220,
-          "end": 223
+          "start": 222,
+          "end": 225
         },
         {
           "name": "applyInputToEntity",
           "kind": "function",
-          "start": 225,
-          "end": 228
+          "start": 227,
+          "end": 230
         },
         {
           "name": "recordSelfHashes",
           "kind": "function",
-          "start": 230,
-          "end": 233
+          "start": 232,
+          "end": 235
         }
       ]
     },
@@ -22869,7 +23217,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 113,
+      "lines": 115,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -22895,19 +23243,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 78
+          "end": 80
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 80,
-          "end": 91
+          "start": 82,
+          "end": 93
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 93,
-          "end": 113
+          "start": 95,
+          "end": 115
         }
       ]
     },
@@ -23257,6 +23605,55 @@
           "kind": "function",
           "start": 316,
           "end": 321
+        }
+      ]
+    },
+    {
+      "id": "server.net.handlers.guest-account",
+      "path": "server/src/net/handlers/guestAccount.ts",
+      "group": "server/net/handlers",
+      "lines": 56,
+      "owns": "the convertGuest message: a guest registers, the lobby-made account takes their pilot, and the connection is the account's from then on",
+      "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx (userDB, pilots, social, contrib), ClientConnection, net/auth setRanks; @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the account is the one the lobby vouches for by session token, never a name the client says",
+          "test": "server/src/game/pilots/convert.test.ts"
+        },
+        {
+          "text": "the types it registers are part of the pinned dispatched set",
+          "test": "server/src/golden/structure.test.ts"
+        }
+      ],
+      "extend": "the move itself is game/pilots/convert.ts; this checks who asks and tells the client",
+      "exports": [
+        "registerGuestAccountHandlers"
+      ],
+      "sections": [
+        {
+          "name": "TOKEN_MAX",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "registerGuestAccountHandlers",
+          "kind": "function",
+          "start": 24,
+          "end": 29
+        },
+        {
+          "name": "fail",
+          "kind": "function",
+          "start": 31,
+          "end": 33
+        },
+        {
+          "name": "convert",
+          "kind": "function",
+          "start": 35,
+          "end": 56
         }
       ]
     },

@@ -10,6 +10,7 @@ import type { SocialServerMessage } from '../socialProtocol.js';
 import type { ContribServerMessage } from '../contributorProtocol.js';
 import type { BossServerMessage } from '../bossProtocol.js';
 import type { FieldServerMessage } from '../fieldProtocol.js';
+import type { GuestServerMessage } from '../guestProtocol.js';
 import type { MinesServerMessage } from '../minesProtocol.js';
 import type { ClampServerMessage } from '../clampProtocol.js';
 import type { TutorialServerMessage } from '../tutorialProtocol.js';
@@ -96,7 +97,8 @@ export type ServerMessage =
   | TutorialServerMessage
   | GunRangeServerMessage
   | CombatServerMessage
-  | UpdateServerMessage;
+  | UpdateServerMessage
+  | GuestServerMessage;
 
 /**
  * The ships of a client's system it doesn't have in view (further than the

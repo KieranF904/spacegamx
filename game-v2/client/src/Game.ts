@@ -24,6 +24,7 @@ import { tickInput, sendNeutralInput, newInputSendState, forgetSession, type Inp
 import { guestKey, guestName } from './network/guestId';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { lobbyInbox } from './network/inbox';
+import { initGuestBanner, hideGuestBanner } from './ui/guest/guestBanner';
 import { setText, setStyle } from './ui/domWrite';
 import { Application, Text } from 'pixi.js';
 import { NetworkManager } from './network/NetworkManager';
@@ -396,6 +397,17 @@ this.boostHudEl = document.getElementById('boostHud');
     this.loginUI.onLogin = (username, password) => this.handleLogin(username, password);
     this.loginUI.onRegister = (username, password, email) => this.handleRegister(username, password, email);
     this.loginUI.onPlayAsGuest = () => this.handleGuestPlay();
+    // (A guest registering from the game: the lobby makes the account, the server moves the pilot; ui/guest/guestBanner.ts)
+    initGuestBanner({
+      send: (m) => this.network.send(m),
+      register: (username, email, password) => lobbyAuth('register', { username, email, password }),
+      registered: (token, username) => {
+        this.authToken = token;
+        this.state.playerName = username;
+        try { localStorage.setItem('authToken', token); } catch { /* storage unavailable: this session only */ }
+      },
+      leave: () => location.reload(),
+    });
     void this.resumeSession();
     
     // Setup server browser callbacks
@@ -1144,6 +1156,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
   private onDisconnected(info?: DisconnectInfo): void {
     console.log('Disconnected from server', info ?? '');
     this.loggedIn = false;
+    hideGuestBanner();
     if (this.w.tutorialUI) resetTutorialUI(this.w.tutorialUI);
     resetRangeState();
     this.loading?.cancel();

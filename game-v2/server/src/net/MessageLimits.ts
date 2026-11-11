@@ -49,6 +49,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   weaponGroups: { per: 60, burst: 10 },
   // Items moved into the repair bank and the profile saved
   bankDeposit: { per: 120, burst: 20 },
+  // The lobby's account made and the profile moved and saved (a guest registers once)
+  convertGuest: { per: 6, burst: 3 },
   // Popups on other people's screens
   partyInvite: { per: 20, burst: 6 },
   tradeRequest: { per: 20, burst: 6 },

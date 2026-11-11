@@ -10,6 +10,7 @@ import type { SocialClientMessage } from '../socialProtocol.js';
 import type { ClientContribMessage } from '../contributorProtocol.js';
 import type { ClientBossDevMessage } from '../bossProtocol.js';
 import type { FieldClientMessage } from '../fieldProtocol.js';
+import type { GuestClientMessage } from '../guestProtocol.js';
 import type { WeaponGroupsClientMessage } from '../weaponGroupsProtocol.js';
 import type { MinesClientMessage } from '../minesProtocol.js';
 import type { ClampClientMessage } from '../clampProtocol.js';
@@ -211,7 +212,8 @@ export type ClientMessage =
   | MinesClientMessage
   | ClampClientMessage
   | TutorialClientMessage
-  | GunRangeClientMessage;
+  | GunRangeClientMessage
+  | GuestClientMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only

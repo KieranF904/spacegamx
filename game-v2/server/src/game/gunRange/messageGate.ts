@@ -34,7 +34,7 @@ export const RANGE_GATE = {
   clampDock: 'refuse', clampSwap: 'refuse', clampUndock: 'refuse', tow: 'refuse', mineDrop: 'refuse',
   // Items, money and trade
   itemMove: 'refuse', itemStore: 'refuse', itemJettison: 'refuse', itemUse: 'refuse', scrapItem: 'refuse', quickbarSet: 'refuse',
-  restockLoadout: 'refuse', ammoPrefer: 'refuse', bankDeposit: 'refuse', craft: 'refuse', refine: 'refuse', fabOrder: 'refuse',
+  restockLoadout: 'refuse', ammoPrefer: 'refuse', bankDeposit: 'refuse', convertGuest: 'refuse', craft: 'refuse', refine: 'refuse', fabOrder: 'refuse',
   fabOrderCancel: 'refuse', gemCut: 'refuse', gemSocket: 'refuse', gemUnsocket: 'refuse', marketBuy: 'refuse', marketSell: 'refuse',
   marketSellAll: 'refuse', marketScan: 'refuse', vendorBuy: 'refuse', vendorOpen: 'refuse', tradeRequest: 'refuse', tradeRespond: 'refuse',
   tradeOffer: 'refuse', tradeAccept: 'refuse', tradeCancel: 'refuse', outpostCharter: 'refuse', outpostUpgrade: 'refuse', skillUp: 'refuse',

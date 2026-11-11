@@ -33,6 +33,8 @@
   "friendRequest",
   "friends",
   "gained",
+  "guestConverted",
+  "guestStatus",
   "gunRangeState",
   "gunSync",
   "hangar",

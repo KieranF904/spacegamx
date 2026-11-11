@@ -102,7 +102,7 @@ function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
 }
 
 /** An account's ranks on its connection: owner > admin > pilot (an owner passes every admin check) */
-function setRanks(ctx: ServerCtx, conn: ClientConnection, user: { is_admin: boolean; is_owner?: boolean }): void {
+export function setRanks(ctx: ServerCtx, conn: ClientConnection, user: { is_admin: boolean; is_owner?: boolean }): void {
   conn.isOwner = !!user.is_owner;
   conn.isAdmin = user.is_admin || conn.isOwner || ctx.guestAdmin;
 }

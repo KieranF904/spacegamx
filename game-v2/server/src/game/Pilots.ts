@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots
  * owns:       each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts
- * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs
+ * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
  * invariants: guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  *             a death puts the same design back, the bank paying for the rebuild — server/src/game/repairBank.test.ts
@@ -36,6 +36,7 @@ import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
 import * as freezer from './pilots/freeze.js';
 import * as session from './pilots/session.js';
+import * as convert from './pilots/convert.js';
 import { GuestKeep } from './pilots/guests.js';
 import type { LeaseResult } from '../profile/lease.js';
 
@@ -129,6 +130,10 @@ export interface Session {
   leaseRefused?: { count: number; retryAt: number; toldAt: number }; // saves the lease refused in a row: how many, retry time, last told (wall ms)
   /** Their saved profile is still loading: the one in hand isn't theirs, so it's never saved */
   loading?: boolean;
+  /** A guest past their 3 days (pilots/convert.ts): nothing is played or saved as them, only registered; the kept record holds the pilot */
+  guestBlocked?: boolean;
+  /** A guest is being registered (pilots/convert.ts): one at a time */
+  converting?: boolean;
   /** Where they last paid a docking fee, and when (a berth is paid once per visit) */
   dockPaid?: { station: string; at: number };
 }
@@ -174,10 +179,12 @@ export class Pilots {
 
   /** Guests kept a while by their browser's key (pilots/guests.ts) */
   readonly guests: GuestKeep;
+  /** @internal pilots/convert.ts: the accounts a guest is being registered into right now */
+  readonly converting = new Set<number>();
 
   constructor(readonly host: PilotHost, readonly econ: Economy, readonly ships: ShipBridge, readonly store: ProfileStore, readonly opts: PilotsOptions) {
     this.now = opts.now ?? (() => Date.now());
-    this.guests = new GuestKeep(store, () => this.now());
+    this.guests = new GuestKeep(store, () => this.now(), (id) => this.guestLive(id));
     this.bank = new RepairBanks(econ, opts.starter.blueprint);
     this.banking = new BankSessions<Session>(this.bank, {
       world: host.world,
@@ -261,6 +268,18 @@ export class Pilots {
    * kept (a new guest: the fresh profile they were given stands), or they left or signed in meanwhile
    */
   resumeGuest(conn: PilotConn): Promise<boolean> { return session.resumeGuest(this, conn); }
+
+  /**
+   * A guest registers (the lobby has made the account, `userId`): their whole profile, as it is in play or (past their 3 days)
+   * as it is kept, becomes that account's, once, and only into an account with no profile yet. The error is for the guest
+   */
+  convertGuest(conn: PilotConn, userId: number, username: string): Promise<{ ok: true } | { ok: false; error: string }> { return convert.convertGuest(this, conn, userId, username); }
+
+  /** Is someone connected as this guest id (a guest in play is never wiped as idle) */
+  private guestLive(id: string): boolean {
+    for (const c of this.sessions.keys()) if (c.guestId === id) return true;
+    return false;
+  }
 
   /** Take the account for this game server (one server per account at a time); refused while another holds it */
   claimLease(userId: number): Promise<LeaseResult> { return lease.claim(this, userId); }
