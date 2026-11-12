@@ -1,7 +1,7 @@
 /**
  * @contract protocol.contributor
- * owns:       the contributor-note messages: pin, edit and remove notes and shapes on the map (rank, ownership and
- *             limits are checked on the server)
+ * owns:       the contributor-note messages: pin, edit and remove notes and shapes on the map, comment and vote on
+ *             them (rank, ownership and limits are checked on the server)
  * needs:      type-only import of world/contributorNotes
  * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
  *             name — server/src/golden/structure.test.ts
@@ -30,13 +30,22 @@ export type ClientContribMessage =
   /** Clearing up: several at once, as one change (those you may delete; the rest are left) */
   | { type: 'contrib'; op: 'deleteMany'; ids: string[] }
   /** Open, done or won't do (the author or an admin) */
-  | { type: 'contrib'; op: 'status'; id: string; status: NoteStatus; resolution?: string };
+  | { type: 'contrib'; op: 'status'; id: string; status: NoteStatus; resolution?: string }
+  /** A comment on anyone's note `id` */
+  | { type: 'contrib'; op: 'comment'; id: string; text: string }
+  /** Your own comment off note `id` (admins: anyone's) */
+  | { type: 'contrib'; op: 'commentDelete'; id: string; commentId: string }
+  /** Thumbs up (1) or down (-1) on someone else's note, or 0 to take your vote back */
+  | { type: 'contrib'; op: 'vote'; id: string; value: 1 | -1 | 0 };
 
 /** You were made a contributor (or aren't one any more) while signed in */
 export interface ServerContribRankMessage { type: 'contribRank'; on: boolean }
-/** The notes in a system (answering overlay or list) */
+/**
+ * The notes in a system (answering overlay or list). Every note a client is sent is that viewer's copy
+ * (noteForViewer, world/contributorFeedback.ts): its comments, the vote counts and their own vote, never who voted
+ */
 export interface ServerContribNotesMessage { type: 'contribNotes'; system: string; notes: ContributorNote[] }
-/** A note was made or changed */
+/** A note was made or changed (its text, status, comments or votes) */
 export interface ServerContribNoteMessage { type: 'contribNote'; note: ContributorNote }
 export interface ServerContribNoteGoneMessage { type: 'contribNoteGone'; id: string }
 /** How your last op went (`id`: the note it made or changed) */

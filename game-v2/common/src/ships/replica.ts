@@ -74,7 +74,7 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
   IN.q = aimQ(c.targetAngle);
   IN.jumpDist = c.jumpDist ?? -1;
   ENV.tick = tick; ENV.tuning = tuning; ENV.gravity = env.gravity; ENV.terrain = env.terrain ?? null; ENV.hazard = env.hazard;
-  FIELDS.central = env.central; FIELDS.lodestones = env.lodestones;
+  FIELDS.central = env.central; FIELDS.lodestones = env.lodestones; FIELDS.landmarks = env.landmarks;
   ENV.clamp = id >= 0 ? env.clamp : undefined;
   const m = stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));
   if (s.jumpPrime || body.jumpPrime !== undefined) body.jumpPrime = s.jumpPrime;

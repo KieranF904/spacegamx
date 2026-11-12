@@ -71,7 +71,7 @@ export interface ContextHost {
   /** The dock key; the station whose docking ring we're in */
   dock(): void;
   stationInRange(): string | null;
-  /** The interact key (X), with its own checks */
+  /** The interact key, with its own checks */
   interact(): void;
   /** What X would take you down to from here (Game.planetBelow) */
   planetBelow(): string | null;

@@ -24,7 +24,7 @@
 
 import type { Graphics } from 'pixi.js';
 import { beamLook } from '../rendering/weapons/weaponStyles';
-import { drawCone, drawStrands, sputterGain } from './beamLookFx';
+import { drawCone, drawStrands, softGlow, sputterGain } from './beamLookFx';
 import { pulseIntensity, beamFalloff, effectiveRange, type PulseProfile, type WeaponTuning } from '@space-game/common';
 import { offSurface, type SurfaceNormal } from '../rendering/weapons/impactAim';
 import { AnchorList, rideStep, type ImpactAnchor, type PoseSource } from '../rendering/weapons/impactAnchor';
@@ -227,7 +227,7 @@ export class PulseFx {
         else this.helix(g, x, y, ux, uy, nx, ny, eff, wid, L.helix, a, run.part);
       }
       // Its muzzle: the glow it fires from (and an afterglow as it dies)
-      g.circle(x, y, wid * (1.2 + 2.2 * k)).fill({ color: L.mid, alpha: 0.42 * a });
+      softGlow(g, x, y, wid * (1.5 + 2.7 * k), L.mid, 1.1 * a);
       if (hit && land > 0.01) {
         // On the hull: a hot glow where it burns (dimmer the further out), and a scorch left behind
         g.circle(hx, hy, wid * (1.4 + 2.4 * k) * (0.5 + 0.5 * land)).fill({ color: L.mid, alpha: 0.35 * a * land });

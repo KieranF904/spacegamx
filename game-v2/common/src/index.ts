@@ -39,9 +39,11 @@ export * from './asteroid/generation.js';
 export * from './asteroid/orbit.js';
 export * from './world/planets.js';
 export * from './world/nests.js';
+export * from './world/landmarks.js';
 export * from './world/populations.js';
 export * from './world/pockets.js';
 export * from './world/contributorNotes.js';
+export * from './world/contributorFeedback.js';
 export * from './world/gates.js';
 export * from './world/denVents.js';
 

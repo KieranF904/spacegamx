@@ -61,7 +61,7 @@ export function renderBackground(rend: Renderer, delta: number): void {
     if (range) { rend.chamber = new ChamberView(range, rend.lighting, () => boundKeyName('interact', settings.data.bindings)); rend.terrainLayer.addChildAt(rend.chamber.container, 0); }
   }
   rend.terrainView?.update(Math.min(0.1, delta));
-  rend.chamber?.update();
+  rend.chamber?.update(rend.cameraX, rend.cameraY);
   if (rend.city?.bastion) { const vb = rend.viewBox(); rend.city.bastion.update(Math.min(0.1, delta), { night: rend.surface.night, zoom: rend.cameraZoom, angle: rend.cameraAngle, entities: rend.state.entities.ofType(EntityType.ShipBody), view: { x: rend.cameraX, y: rend.cameraY, hw: vb.hw, hh: vb.hh } }); }
   const lightKey = `${rend.currentSystemId}|${rend.systemVisuals.has(rend.currentSystemId)}`;
   if (lightKey !== rend.lightKey) {

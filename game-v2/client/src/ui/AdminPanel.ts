@@ -4,7 +4,7 @@
  *
  *   Me       where you are and where the cursor is; god mode, hidden from
  *            hostiles, free camera; free build in the hangar (dev servers
- *            only: shown when the server allows it); repair, credits, XP, skill points;
+ *            only: shown when the server allows it); repair, credits, XP, a level, skill points;
  *            teleport to a system and point, or to any station; Give items
  *            opens the item browser (AdminGive.ts)
  *   Players  everyone online (●), then the accounts that aren't (search by
@@ -406,6 +406,7 @@ export class AdminPanel {
         <button class="adm-btn" data-cmd="heal">Repair ship</button>
         <button class="adm-btn" data-cmd="credits" data-args='{"n":10000}'>+10k cr</button>
         <button class="adm-btn" data-cmd="xp" data-args='{"n":1000}'>+1k XP</button>
+        <button class="adm-btn" data-cmd="levelup" title="The XP your next level needs">+1 level</button>
         <button class="adm-btn" data-cmd="skillpoints" data-args='{"n":1}'>+1 skill pt</button>
       </div>
       ${devBankHtml(!!this.info?.freeBuild)}
@@ -612,6 +613,7 @@ export class AdminPanel {
             { label: p.hidden ? 'Visible to hostiles' : 'Hidden from hostiles', run: () => this.cmd('hide', { ...who, on: !p.hidden }) },
             { label: '+10,000 credits', run: () => this.cmd('credits', { ...who, n: 10000 }) },
             { label: '+1,000 XP', run: () => this.cmd('xp', { ...who, n: 1000 }) },
+            { label: '+1 level', run: () => this.cmd('levelup', who) },
             { label: 'Give items…', run: () => this.openGive({ to: p.id }) },
             { label: p.contributor ? 'Remove contributor rank' : 'Make contributor (map notes)', run: () => this.accountCmd('contributor', { ...who, on: !p.contributor }) },
             { label: 'Send to my cursor (F3 spot)…', run: () => this.pick(`send ${p.name} there`, (q) => this.cmd('tp', { ...who, x: Math.round(q.x), y: Math.round(q.y), system: this.deps.state.systemId })) },

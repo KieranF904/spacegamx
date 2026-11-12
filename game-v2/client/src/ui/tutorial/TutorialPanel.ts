@@ -22,7 +22,7 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.tp { position: fixed; top: 0; left: 0; transform: translate(var(--tx, 0px), var(--ty, 10px)); transition: transform 0.22s ease-out; z-index: 2100; width: min(440px, calc(100vw - 32px)); box-sizing: border-box;
+.tp { position: fixed; top: 0; left: 0; transform: translate(var(--tx, 0px), var(--ty, 26px)); transition: transform 0.22s ease-out; z-index: 2100; width: min(440px, calc(100vw - 32px)); box-sizing: border-box;
   padding: 10px 14px 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(16, 30, 52, 0.94), rgba(8, 16, 30, 0.94));
   border: 1px solid rgba(251, 191, 36, 0.55); box-shadow: 0 0 26px rgba(251, 191, 36, 0.12), 0 10px 34px rgba(0,0,0,0.5);
   color: #e5ecf7; font: 13px 'Segoe UI', system-ui, sans-serif; line-height: 1.45; }

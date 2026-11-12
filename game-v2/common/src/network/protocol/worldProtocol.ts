@@ -190,6 +190,11 @@ export interface ServerIgniteMessage {
   bodyId: number;
   part: number;
   ticks: number;
+  /**
+   * A spreading fire's (a Burn modifier's, ships/fire.ts): its generation + 1 (1: the shot's own fire; 2 and up: one
+   * that spread from a part beside it, or burned on past its time). Absent on any other fire
+   */
+  gen?: number;
 }
 
 /**
@@ -220,6 +225,11 @@ export interface ServerDetonationMessage {
   from?: [number, number];
   /** A mob's burst: which kind (data/mobs.json) */
   mob?: string;
+  /**
+   * A blast where a shot left a hull it went right through (a weapon modifier's piercing shot with a blast: server
+   * game/Weapons.ts, bridge/beamFx.ts): the shot's heading there, whole degrees 0..359. Absent on every other detonation
+   */
+  out?: number;
 }
 
 /**

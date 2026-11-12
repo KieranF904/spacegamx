@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Corner Conduit III
+Mk III · Square · 1 cell
+Hull · mass64 hp · 1.0
+Armour · build3 · 2.5 pts
+Holds10 energy
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+Effectscarries 4 weapon effects and 900 treated E a second; over that the weakest effects are dropped and the rest weakened to fit
+
+== partStats (stats rows) ==
+GradeMk III
+Carriespasses power between the parts it touches
+Hull · mass64 hp · 1.0
+Armour · build3 · 2.5 pts
+Rating scoretoughness 64
+
+== familyLabel ==
+Relays
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Carries four weapon effects
+
+== keyStats ==
+holds 10 · power line · 4 effects
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":63.75,"mass":1,"firepower":0,"toughness":63.75,"armour":3}

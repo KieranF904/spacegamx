@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { join } from 'path';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
+import { execFileSync } from 'child_process';
 import * as bitecs from 'bitecs';
 import { Position, Station, ServerMessage, stationPositionAt, type NoteDraft } from '@space-game/common';
 import { GameData } from '../data/GameData.js';
@@ -142,6 +143,145 @@ describe('contributor rank', () => {
     expect(server.contrib.get(id)).toBeUndefined();
   });
 
+  it('an edit is marked with its time (and who, when it wasn\'t the author) and keeps the note\'s comments and votes', async () => {
+    const { server, join, clock } = world();
+    const a = await join('alice', 11); a.conn.isContributor = true;
+    const b = await join('bob', 12); b.conn.isContributor = true;
+    const boss = await join('boss', 1);
+    a.send({ op: 'create', note: draft() });
+    const id = of(a.got, 'contribResult').at(-1)!.id!;
+    expect(server.contrib.get(id)!.editedAt).toBeUndefined();
+    b.send({ op: 'vote', id, value: 1 });
+    b.send({ op: 'comment', id, text: 'Bigger' });
+    clock.t += 60_000;
+    a.send({ op: 'update', id, note: draft({ text: 'Twice the size' }) });
+    const mine = server.contrib.get(id)!;
+    expect(mine.editedAt).toBe(new Date(clock.t).toISOString());
+    expect(mine.editedBy).toBeUndefined();
+    expect(mine.createdAt).not.toBe(mine.editedAt);
+    clock.t += 60_000;
+    boss.send({ op: 'update', id, note: draft({ title: 'Tidied' }) });
+    const n = server.contrib.get(id)!;
+    expect(n).toMatchObject({ title: 'Tidied', author: 'alice', authorId: 11, editedBy: 'boss', editedAt: new Date(clock.t).toISOString() });
+    expect(n.comments).toHaveLength(1);
+    expect(n.voters).toEqual({ u12: 1 });
+    // The status alone isn't an edit of what it says
+    boss.send({ op: 'status', id, status: 'done' });
+    expect(server.contrib.get(id)!.editedAt).toBe(n.editedAt);
+    // The author's own edit after an admin's is theirs again
+    a.send({ op: 'update', id, note: draft({ title: 'Mine again' }) });
+    expect(server.contrib.get(id)!.editedBy).toBeUndefined();
+  });
+
+  it('contributors see each other\'s notes, with the counts and their own vote, never who voted', async () => {
+    const { server, join } = world();
+    const a = await join('alice', 11); a.conn.isContributor = true;
+    const b = await join('bob', 12); b.conn.isContributor = true;
+    const c = await join('cy', 13); c.conn.isContributor = true;
+    const pilot = await join('pilot', 5);
+    for (const p of [a, b, c, pilot]) p.send({ op: 'overlay', on: true, system: 'sol' });
+    a.send({ op: 'create', note: draft() });
+    const id = of(a.got, 'contribResult').at(-1)!.id!;
+    expect(of(b.got, 'contribNote').at(-1)!.note).toMatchObject({ id, author: 'alice', comments: [], votes: { up: 0, down: 0, mine: 0 } });
+
+    b.send({ op: 'vote', id, value: 1 });
+    c.send({ op: 'vote', id, value: -1 });
+    expect(of(b.got, 'contribNote').at(-1)!.note.votes).toEqual({ up: 1, down: 1, mine: 1 });
+    expect(of(c.got, 'contribNote').at(-1)!.note.votes).toEqual({ up: 1, down: 1, mine: -1 });
+    expect(of(a.got, 'contribNote').at(-1)!.note.votes).toEqual({ up: 1, down: 1, mine: 0 });
+    for (const p of [a, b, c]) expect(JSON.stringify(of(p.got, 'contribNote'))).not.toContain('voters');
+    // A list says the same
+    c.send({ op: 'list', system: '*' });
+    const listed = of(c.got, 'contribNotes').at(-1)!.notes;
+    expect(listed.map((n) => n.id)).toEqual([id]);
+    expect(listed[0].votes).toEqual({ up: 1, down: 1, mine: -1 });
+    expect(listed[0].voters).toBeUndefined();
+    // A pilot without the rank gets none of it, and can't vote or comment
+    pilot.send({ op: 'vote', id, value: 1 });
+    pilot.send({ op: 'comment', id, text: 'Me too' });
+    expect(of(pilot.got, 'contribNote')).toHaveLength(0);
+    expect(of(pilot.got, 'contribResult').every((r) => !r.ok && r.text === 'Contributors only')).toBe(true);
+    expect(server.contrib.get(id)).toMatchObject({ voters: { u12: 1, u13: -1 } });
+    expect(server.contrib.get(id)!.comments ?? []).toHaveLength(0);
+  });
+
+  it('one vote an account a note: changed, taken back, never on your own, only up, down or none', async () => {
+    const { server, join } = world();
+    const a = await join('alice', 11); a.conn.isContributor = true;
+    const b = await join('bob', 12); b.conn.isContributor = true;
+    const boss = await join('boss', 1);
+    a.send({ op: 'create', note: draft() });
+    const id = of(a.got, 'contribResult').at(-1)!.id!;
+    const voters = () => server.contrib.get(id)!.voters ?? {};
+
+    b.send({ op: 'vote', id, value: 1 });
+    b.send({ op: 'vote', id, value: 1 });
+    expect(voters()).toEqual({ u12: 1 });
+    b.send({ op: 'vote', id, value: -1 });
+    expect(voters()).toEqual({ u12: -1 });
+    boss.send({ op: 'vote', id, value: 1 });
+    expect(voters()).toEqual({ u12: -1, u1: 1 });
+    b.send({ op: 'vote', id, value: 0 });
+    expect(voters()).toEqual({ u1: 1 });
+
+    a.send({ op: 'vote', id, value: 1 });
+    expect(of(a.got, 'contribResult').at(-1)).toMatchObject({ ok: false, text: "You can't vote on your own note" });
+    for (const bad of [2, -5, '1', null, 0.5]) b.send({ op: 'vote', id, value: bad });
+    b.send({ op: 'vote', id: 'n_nosuch', value: 1 });
+    expect(of(b.got, 'contribResult').slice(-6).every((r) => !r.ok)).toBe(true);
+    expect(voters()).toEqual({ u1: 1 });
+    // An admin can't vote on their own either
+    boss.send({ op: 'create', note: draft({ title: "Boss's" }) });
+    const bid = of(boss.got, 'contribResult').at(-1)!.id!;
+    boss.send({ op: 'vote', id: bid, value: 1 });
+    expect(server.contrib.get(bid)!.voters).toBeUndefined();
+  });
+
+  it('comments: anyone with the rank adds one, cleaned and limited; its author or an admin deletes it', async () => {
+    const { server, join, clock } = world();
+    const a = await join('alice', 11); a.conn.isContributor = true;
+    const b = await join('bob', 12); b.conn.isContributor = true;
+    const boss = await join('boss', 1);
+    for (const p of [a, b]) p.send({ op: 'overlay', on: true, system: 'sol' });
+    a.send({ op: 'create', note: draft() });
+    const id = of(a.got, 'contribResult').at(-1)!.id!;
+    const comments = () => server.contrib.get(id)!.comments ?? [];
+
+    b.send({ op: 'comment', id, text: '  Make it <b>bigger</b>\u0007 ' });
+    clock.t += 5000;
+    a.send({ op: 'comment', id, text: 'Will do' });
+    expect(comments().map((c) => [c.author, c.authorId, c.text])).toEqual([['bob', 12, 'Make it <b>bigger</b>'], ['alice', 11, 'Will do']]);
+    expect(comments()[1].at).toBe(new Date(clock.t).toISOString());
+    expect(of(a.got, 'contribNote').at(-1)!.note.comments).toHaveLength(2);
+    // The note's own times don't move for a comment
+    expect(server.contrib.get(id)!.updatedAt).toBe(server.contrib.get(id)!.createdAt);
+
+    for (const bad of ['', '   ', 'x'.repeat(501), 7, undefined]) { clock.t += 5000; b.send({ op: 'comment', id, text: bad }); }
+    clock.t += 5000;
+    b.send({ op: 'comment', id: 'n_nosuch', text: 'hello' });
+    expect(of(b.got, 'contribResult').slice(-6).every((r) => !r.ok)).toBe(true);
+    expect(comments()).toHaveLength(2);
+
+    // Alice can't delete bob's comment, though the note is hers; bob can; an admin can delete anyone's
+    const [bobs, alices] = comments();
+    clock.t += 5000;
+    a.send({ op: 'commentDelete', id, commentId: bobs.id });
+    expect(of(a.got, 'contribResult').at(-1)!.ok).toBe(false);
+    a.send({ op: 'commentDelete', id, commentId: 'c_nosuch' });
+    expect(of(a.got, 'contribResult').at(-1)!.text).toBe('No such comment');
+    expect(comments()).toHaveLength(2);
+    b.send({ op: 'commentDelete', id, commentId: bobs.id });
+    expect(comments().map((c) => c.id)).toEqual([alices.id]);
+    boss.send({ op: 'commentDelete', id, commentId: alices.id });
+    expect(comments()).toEqual([]);
+    expect(of(b.got, 'contribNote').at(-1)!.note.comments).toEqual([]);
+
+    // A note keeps so many comments
+    for (let i = 0; i < 52; i++) { clock.t += 4000; b.send({ op: 'comment', id, text: `c${i}` }); }
+    expect(comments()).toHaveLength(50);
+    expect(of(b.got, 'contribResult').at(-1)!.text).toMatch(/50 comments already/);
+  });
+
   it('clears up many at once (one change against the rate limit), leaving those that aren\'t yours', async () => {
     const { server, join, clock } = world();
     const a = await join('alice', 11); a.conn.isContributor = true;
@@ -245,5 +385,54 @@ describe('contributor notes on disk', () => {
     expect(c.get(id)?.status).toBe('done');
     expect(c.contributors()).toEqual([expect.objectContaining({ id: 77, username: 'Mapper' })]);
     c.close();
+  });
+
+  it('notes stored before comments and votes load unchanged, as none of either; new ones round-trip', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'contrib-'));
+    // (As production's notes.json is today)
+    const old = {
+      id: 'n_537d9df105', author: 'alice', authorId: 11, createdAt: '2026-11-11T23:49:05.282Z', updatedAt: '2026-11-11T23:49:05.282Z', status: 'open',
+      system: 'sol', title: 'contributor circle', text: "here's a circle", shape: { kind: 'circle', radius: 5622 }, color: '#38bdf8',
+      anchor: { kind: 'orbit', around: { kind: 'center' }, radius: 40188.39, phaseDeg: 175.38, periodMinutes: 330, direction: 1 },
+    };
+    const broken = { ...old, id: 'n_broken', comments: 'junk', voters: { u5: 7 }, votes: { up: 9, down: 0, mine: 1 } };
+    writeFileSync(join(dir, 'notes.json'), JSON.stringify({ version: 1, notes: [old, broken] }));
+    const me: Conn = { username: 'alice', userId: 11, isAdmin: false, isContributor: true, sent: [] };
+    const bob: Conn = { username: 'bob', userId: 12, isAdmin: false, isContributor: true, sent: [] };
+    const a = new ContributorNotes(host([me, bob]), contribFileStore(dir));
+    expect(a.get(old.id)).toEqual(old);
+    // A hand-edited note's bad comments, voters and a stray tally are dropped, the note kept
+    expect(a.get('n_broken')).toEqual({ ...old, id: 'n_broken' });
+    a.handle(bob, { op: 'list', system: 'sol' });
+    const sent = of(bob.sent, 'contribNotes').at(-1)!.notes.find((n) => n.id === old.id)!;
+    expect(sent).toEqual({ ...old, comments: [], votes: { up: 0, down: 0, mine: 0 } });
+
+    a.handle(bob, { op: 'vote', id: old.id, value: 1 });
+    a.handle(bob, { op: 'comment', id: old.id, text: 'Good spot' });
+    a.handle(me, { op: 'update', id: old.id, note: draft({ title: 'Circle, edited' }) });
+    await a.flush();
+    a.close();
+    const disk = JSON.parse(readFileSync(join(dir, 'notes.json'), 'utf-8'));
+    expect(disk.version).toBe(1);
+    const saved = disk.notes.find((n: any) => n.id === old.id);
+    expect(saved).toMatchObject({ title: 'Circle, edited', voters: { u12: 1 }, comments: [{ author: 'bob', authorId: 12, text: 'Good spot' }] });
+    expect(saved.votes).toBeUndefined();
+    expect(typeof saved.editedAt).toBe('string');
+    const b = new ContributorNotes(host([me, bob]), contribFileStore(dir));
+    expect(b.get(old.id)).toEqual(saved);
+    b.close();
+
+    // The terminal script prints the votes and comments from that file
+    const script = join(__dirname, '../../../scripts/contributor-notes.mjs');
+    const out = execFileSync(process.execPath, [script, '--file', join(dir, 'notes.json'), '--status', 'all', '--tick', '0'], { encoding: 'utf-8' });
+    expect(out).toContain('"Circle, edited"');
+    expect(out).toContain('Votes: 1 up, 0 down (score +1)');
+    expect(out).toMatch(/Comments \(1\):\n\s+bob \(.* UTC\): Good spot/);
+    const json = JSON.parse(execFileSync(process.execPath, [script, '--file', join(dir, 'notes.json'), '--status', 'all', '--tick', '0', '--json'], { encoding: 'utf-8' }));
+    const j = json.notes.find((n: any) => n.id === old.id);
+    expect(j.votes).toEqual({ up: 1, down: 0 });
+    expect(j.voters).toBeUndefined();
+    expect(j.comments).toHaveLength(1);
+    expect(j.positionNow).toBeTruthy();
   });
 });

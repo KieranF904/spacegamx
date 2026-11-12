@@ -10,6 +10,7 @@
  */
 
 import { MACHINE_FAB, machineBit, MACHINE_REF, P_SELECTOR, TOW_BIT, type PortsLayout, type PortsState } from './portsTypes.js';
+import { portsRapidShot } from './portsMods.js';
 
 // ================================================================ state
 export function createPortsState(L: PortsLayout): PortsState {
@@ -111,7 +112,8 @@ export function matOf(L: PortsLayout, e: PortsState, p: number): number {
   return f;
 }
 export const W = (L: PortsLayout) => L.feeds.length;
-export const effShot = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.shot[p] * L.mShot[p * W(L) + f]) : L.shot[p]; };
+/** (A gun with Rapid live pays less a shot: power/portsMods.ts) */
+export const effShot = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p), s = f ? Math.round(L.shot[p] * L.mShot[p * W(L) + f]) : L.shot[p]; return L.mod ? portsRapidShot(L, e, p, s) : s; };
 export const effDamage = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mDamage[p * W(L) + f] : 1; };
 export const effCycle = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mCycle[p * W(L) + f] : 1; };
 export const effDischarge = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.discharge[p] * L.mDischarge[p * W(L) + f]) : L.discharge[p]; };

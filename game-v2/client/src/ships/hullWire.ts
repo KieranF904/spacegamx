@@ -33,7 +33,7 @@ export interface HullDone { id: number; full: WireGeometry; far: WireGeometry; b
  * What a job makes, by version (assetCache.ts: intact hulls are kept): bump it whenever the hull build's output changes
  * (hullBuild, skeletonBuild, bakeHull, ShipGeometry's fields). Changes to the ship data are caught without it
  */
-export const HULL_GEOMETRY_VERSION = 1;
+export const HULL_GEOMETRY_VERSION = 2;
 
 const LIT = ['pos', 'nrm', 'col', 'slot'], SHIP = ['part', 'kind', 'tone', 'hullMat', 'grade', 'engine', 'expo', 'bend', 'dep'];
 

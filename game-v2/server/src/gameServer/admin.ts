@@ -56,6 +56,7 @@ export function createAdminHost(gs: GameServer): AdminHost {
     },
     addCredits: (c, n) => gs.pilots.addCredits(C(c), n),
     addXp: (c, n) => gs.pilots.addXp(C(c), n),
+    levelUp: (c) => gs.pilots.levelUp(C(c)),
     give: (c, items) => {
       // (what won't fit in the hold goes to station storage, not lost)
       const left = gs.pilots.give(C(c), items, { source: 'admin' });

@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Combiner III
+Mk III · Square · 1 cell
+Hull · mass192 hp · 1.4
+Armour · build3 · 2.5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Holds10 energy
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+Effectscarries 4 weapon effects and 900 treated E a second; over that the weakest effects are dropped and the rest weakened to fit
+
+== partStats (stats rows) ==
+GradeMk III
+Carriespasses power between the parts it touches
+Hull · mass192 hp · 1.4
+Armour · build3 · 2.5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 192
+
+== familyLabel ==
+Relays
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Carries four weapon effects
+
+== keyStats ==
+holds 10 · power line · 4 effects
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 24","why":"Unlocks at level 24 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 24","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":191.76,"mass":1.4,"firepower":0,"toughness":191.76,"armour":3,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

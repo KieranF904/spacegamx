@@ -53,7 +53,7 @@ const MISSING_ALPHA = 0.34, BUILDING_ALPHA = 0.5;
 const LOOSE_ALPHA = 0.2, LOOSE_LINE = 0xc4b5fd;
 
 const STYLE = `
-.fo { position: fixed; right: 0; top: 0; bottom: 0; width: 308px; z-index: 880; display: none; flex-direction: column; padding: 8px 8px 8px 10px;
+.fo { position: fixed; right: 0; top: 18px; bottom: 0; width: 308px; z-index: 880; display: none; flex-direction: column; padding: 8px 8px 8px 10px;
   background: rgba(8, 14, 26, 0.93); border-left: 1px solid #1f2a40; color: #cfe0f5; font: 12px 'Segoe UI', system-ui, sans-serif; color-scheme: dark; }
 .fo-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .fo-head b { flex: 1; letter-spacing: 0.4px; color: #e5ecf7; }
@@ -514,7 +514,7 @@ export class FieldOverlay {
     return false;
   }
 
-  /** 1-4 over a standing weapon: its weapon groups on the live ship (ships/weaponGroups/fieldEditor.ts) */
+  /** 1-5 over a standing weapon: its weapon groups on the live ship (ships/weaponGroups/fieldEditor.ts) */
   private groupKey(code: string): boolean {
     const v = this.view(), ship = this.deps.ship();
     if (!v || !ship || !this.mouse) return false;

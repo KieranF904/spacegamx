@@ -35,6 +35,8 @@ const ICONS: Record<string, string> = {
   make: '<circle cx="8" cy="8" r="5.5"/><path d="M8.8 4L6 8.6h2.6L7.4 12l3-5H7.8z"/>',
   store: '<rect x="3" y="5" width="9" height="6" rx="1"/><path d="M12 7v2M14 7.2v1.6M5.5 8h3"/>',
   link: '<circle cx="3.5" cy="8" r="1.6"/><circle cx="12.5" cy="4.5" r="1.6"/><circle cx="12.5" cy="11.5" r="1.6"/><path d="M5 8h2.5l3.5-3M7.5 8l3.5 3"/>',
+  // (weapon modifiers: a mount on its line, a block on its socket)
+  mods: '<path d="M4.5 1.5v3.2M4.5 11.3v3.2"/><rect x="2.2" y="4.7" width="4.6" height="6.6" rx="1"/><path d="M6.8 8h1.7"/><path d="M11.3 5.2L14.1 8l-2.8 2.8L8.5 8z"/>',
   // shields
   wall: '<path d="M2 4v8M14 4v8M2 8h12"/><path d="M5 6v4M8 6v4M11 6v4" opacity=".6"/>',
   arc: '<path d="M2.5 11.5A6.5 6.5 0 0 1 13.5 11.5"/><path d="M5 12.5a4 4 0 0 1 6 0" opacity=".6"/>',

@@ -277,9 +277,14 @@ describe('stations and docking', () => {
     t.send({ type: 'shipEdit', blueprint: arrow });
     expect(lastEdit(got).ok).toBe(true);
     t.send({ type: 'undock' } as any);
+    server.step();
+    const out = [Position.x[pid] - Position.x[central], Position.y[pid] - Position.y[central]];
+    const left = [Position.x[central], Position.y[central]];
     for (let i = 0; i < 60; i++) server.step();
-    // Undocked: the station moves on without us
-    expect(Math.hypot(Position.x[central] + 300 - Position.x[pid], Position.y[central] - Position.y[pid])).toBeGreaterThan(5);
+    // Undocked inside the station's tracking zone: it is carried along with it (landmark tracking, common world/landmarks.ts),
+    // so it stays where it came out, beside the station, while the station travels on
+    expect(Math.hypot(Position.x[central] - left[0], Position.y[central] - left[1])).toBeGreaterThan(50);
+    expect(Math.hypot(Position.x[pid] - Position.x[central] - out[0], Position.y[pid] - Position.y[central] - out[1])).toBeLessThan(1);
   });
 
   it('a docked ship is inside its station: held at its centre, out of every fight, and back out where it came in', () => {

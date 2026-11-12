@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Double Mount
+Mk II · Panel · 2 cells
+Hull · mass71 hp · 1.8
+Armour · build2 · 3.2 pts
+Holds20 energy
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+Sockets2 sockets: a modifier touching a socket changes the shots of the guns down its line; it takes one kind of modifier, or the kinds of one recipe, which fuse into a new effect
+Treatstreats 30 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws
+Upkeepburns 1 E a second for each filled socket; out of power it still passes power, with no effect
+
+== partStats (stats rows) ==
+GradeMk II
+Carriespasses power between the parts it touches
+Hull · mass71 hp · 1.8
+Armour · build2 · 3.2 pts
+Rating scoretoughness 71
+
+== familyLabel ==
+Modifiers
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+Two sockets; fuses recipes
+
+== keyStats ==
+holds 20 · power line · 2 sockets · treats 30 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws · burns 1 E a second for each filled socket; out of power it still passes power, with no effect
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":2,"hp":70.5,"mass":1.8,"firepower":0,"toughness":70.5,"armour":2}

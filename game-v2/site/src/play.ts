@@ -27,7 +27,7 @@ import net from 'net';
 import type { Duplex } from 'stream';
 
 /** Paths the Vite dev server answers for the game (proxy mode) */
-export const DEV_GAME_PREFIXES = ['/src/', '/@vite/', '/@fs/', '/@id/', '/node_modules/', '/sfx/', '/__ships/', '/@react-refresh'];
+export const DEV_GAME_PREFIXES = ['/src/', '/@vite/', '/@fs/', '/@id/', '/node_modules/', '/sfx/', '/__ships/', '/@react-refresh', '/support.html', '/fonts/'];
 
 export function isDevGamePath(pathname: string): boolean {
   return DEV_GAME_PREFIXES.some((p) => pathname === p.replace(/\/$/, '') || pathname.startsWith(p));

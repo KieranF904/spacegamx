@@ -44,6 +44,7 @@ const GROUPS: Record<Exclude<CompTab, 'weapons'>, { sub: SubDef; match: string[]
     { sub: { id: 'make', label: 'Generators' }, match: ['reactor'] },
     { sub: { id: 'store', label: 'Storage', hint: 'Batteries, capacitors and drive cells' }, match: ['battery', 'capacitor', 'drive_cell'] },
     { sub: { id: 'link', label: 'Links', hint: 'Relays, feeds and chargers' }, match: ['relay', 'feed'] },
+    { sub: { id: 'mods', label: 'Modifiers', hint: 'Mounts, modifiers and hoppers' }, match: ['modifier'] },
   ],
   shields: [
     { sub: { id: 'wall', label: 'Walls' }, match: ['shieldwall'] },

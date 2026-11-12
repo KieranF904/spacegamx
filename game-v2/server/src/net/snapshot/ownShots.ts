@@ -16,7 +16,7 @@
  * rows too: their rows carry where they are. Whether a gun fired at all (energy, ammunition, its clip) and its spread
  * are in the event (the shells' ids, the ammunition code; spread is seeded by the shell: shellSeed).
  */
-import { firesStraight, gunShell, ownShotWireOf, type FireRecord } from '@space-game/common';
+import { firesStraight, gunShell, gunCode, ownShotWireOf, type FireRecord } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 
 /**
@@ -47,7 +47,7 @@ export class OwnShotLog {
     this.stats.derived += f.ids.length;
     this.stats.fireRowsSaved++;
     // (what the record would have cost as JSON: [owner, ago, part+ammo, aimQ, ...ids])
-    this.stats.fireBytesSaved += JSON.stringify([f.owner, 0, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]).length + 1;
+    this.stats.fireBytesSaved += JSON.stringify([f.owner, 0, gunCode(f.part, f.ammo ?? 0, !!f.aug, f.fx), f.aimQ, ...f.ids]).length + 1;
   }
 
   /** Its wire name for a shell of its own it works out (undefined: not one) */
@@ -90,6 +90,6 @@ export function ownVolleyExact(ships: ShipBridge, f: FireRecord): boolean {
   // (no shells: a charge gun's tell or a pulse, which its own gun state shows)
   if (!f.ids.length) return false;
   const ship = ships.get(f.owner);
-  const sh = ship ? gunShell(ships.tuning, ship, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0)) : null;
+  const sh = ship ? gunShell(ships.tuning, ship, gunCode(f.part, f.ammo ?? 0, !!f.aug, f.fx)) : null;
   return !!sh && firesStraight(sh.def) && !sh.def.lob && !sh.def.arm;
 }

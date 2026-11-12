@@ -10,7 +10,7 @@
  */
 import {
   ReplicaMode, laneRecords, laneFireRow, lanePilot, lanePilotless, lanePd, laneRemap, laneHash, unpackGunSync, unpackGunRow, gunRowId, ownStructure,
-  isOtherShotWire, TELL_NONE, TELL_PD, TRIG_BUTTONS,
+  isOtherShotWire, TELL_NONE, TELL_PD, TRIG_BUTTONS, GUN_FX,
   type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ReplicaSideSteps, type GunCtlRows,
   type ServerGunSyncMessage, type ServerSnapshotMessage, type ShipDerived, type ShipReplicaSet, type ShipState, type ShipTuning, type SimEnv,
   type SimEvent, type SimInput, type Step, type FieldEnv,
@@ -21,6 +21,8 @@ export interface OtherGunsHost {
   ship(id: number): ShipState | undefined;
   tuning: ShipTuning;
   self(): number;
+  /** A ship's held beam burned on a confirmed tick, with these weapon modifier effects live (a mask over its gun's own; 0 none): what it is drawn with */
+  beamLit?(id: number, part: number, mask: number): void;
 }
 
 /** Ticks of lane states and events kept */
@@ -242,6 +244,7 @@ export class OtherGuns implements ReplicaSideSteps {
         if (told.has(`${id}:${t}`) || (l.toldFrom !== undefined && t >= l.toldFrom)) { this.stats.told++; continue; }
         const evs = t > l.from ? this.eventsAt(id, t) : l.carry.get(t);
         if (!evs?.length) continue;
+        if (this.host.beamLit) for (const ev of evs) if (ev.k === 'fx' && ev.fx === GUN_FX.beam) this.host.beamLit(id, ev.part, ev.mask ?? 0);
         laneRecords(evs, ship, this.host.tuning, RECS);
         for (const r of RECS) { (m.fire ??= []).push(laneFireRow(id, m.tick, r)); this.stats.derived++; }
       }

@@ -4,18 +4,19 @@ import { html, raw, SafeHtml } from '../html.js';
 import { renderMarkdown, safeUrl } from '../markdown.js';
 import { postImages } from '../postImages.js';
 import type { AdminUser } from '../lobby.js';
+import { newsletterCountsLine, type NewsletterCounts } from './newsletter.js';
 import type { ApiToken, Comment, Post, SharedShip, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
 import { SUGGESTION_STATUSES } from '../store/types.js';
 import { csrfField, empty, fmtDate, layout, STATUS_LABEL, statusBadge, when, type PageCtx } from './layout.js';
 
-export type Tab = 'overview' | 'activity' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'ships' | 'pilots' | 'tokens';
+export type Tab = 'overview' | 'activity' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'ships' | 'pilots' | 'tokens' | 'donations' | 'chat';
 const TABS: [Tab, string, string][] = [
-  ['overview', 'Overview', '/admin'], ['activity', 'Activity', '/admin/activity'], ['posts', 'Posts', '/admin/posts'], ['comments', 'Comments', '/admin/comments'],
+  ['overview', 'Overview', '/admin'], ['activity', 'Activity', '/admin/activity'], ['chat', 'Chat', '/admin/chat'], ['posts', 'Posts', '/admin/posts'], ['comments', 'Comments', '/admin/comments'],
   ['suggestions', 'Suggestions', '/admin/suggestions'], ['shoutbox', 'Shoutbox', '/admin/shoutbox'], ['ships', 'Shared ships', '/admin/ships'],
-  ['pilots', 'Pilots & bans', '/admin/pilots'], ['tokens', 'API tokens', '/admin/tokens'],
+  ['pilots', 'Pilots & bans', '/admin/pilots'], ['tokens', 'API tokens', '/admin/tokens'], ['donations', 'Donations', '/admin/donations'],
 ];
 /** The owner's tabs (app.ts requireOwner) */
-const OWNER_TABS: Tab[] = ['tokens'];
+const OWNER_TABS: Tab[] = ['tokens', 'donations'];
 
 const isOwner = (ctx: PageCtx) => !!ctx.user?.isOwner;
 
@@ -219,12 +220,13 @@ export function adminTokens(ctx: PageCtx, d: { tokens: ApiToken[]; created?: { n
     : html`<p class="dim">No tokens yet.</p>`}`, notice);
 }
 
-export function adminPilots(ctx: PageCtx, d: { users: AdminUser[]; total: number; search: string; enabled: boolean; error?: string }, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
+export function adminPilots(ctx: PageCtx, d: { users: AdminUser[]; total: number; search: string; enabled: boolean; error?: string; newsletter?: NewsletterCounts | null }, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
   const banText = (u: AdminUser) => u.ban ? (u.ban.until === null ? 'for good' : `until ${new Date(u.ban.until).toISOString().slice(0, 16).replace('T', ' ')} UTC`) : '';
   return shell(ctx, 'pilots', 'Pilots & bans', html`
   <h1>Pilots &amp; bans</h1>
   <p class="dim">Accounts are the lobby's; these use its admin routes (the same ones the in-game admin tools use). A ban stops sign-in on the site and in the game, and ends live sessions.
     Admins ban pilots; the owner can also ban admins, grant and revoke admin, and delete accounts. Nobody bans the owner here.</p>
+  ${newsletterCountsLine(d.newsletter ?? null)}
   ${!d.enabled ? html`<p class="form-error">LOBBY_ADMIN_SECRET isn't set, so these tools are off.</p>` : html`
   <form method="get" action="/admin/pilots" class="inline-form" role="search">
     <label for="ps">Name starts with</label><input id="ps" name="q" value="${d.search}" maxlength="20">

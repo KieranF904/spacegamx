@@ -15,7 +15,7 @@ export interface RingGroup {
   model: FireModel;
   /** Weapon kind (tuning.weapons key): what its ammo is looked up by */
   kind: string;
-  /** The weapon groups the guns are in (ships/weaponGroups.ts, a 4-bit mask; a group is one mask) */
+  /** The weapon groups the guns are in (ships/weaponGroups.ts, a 5-bit mask; a group is one mask) */
   wg: number;
   /** In neither the left nor the right button's selected group (drawn dim); a mining laser group while the right button is on a group */
   dim: boolean;

@@ -1735,6 +1735,15 @@
       },
       "time": 100
     },
+    "cannon_mauler": {
+      "inputs": {
+        "steel_plate": 4,
+        "barrel_assembly": 2,
+        "copper_wire": 2,
+        "servo_motor": 1
+      },
+      "time": 120
+    },
     "fabricator_field": {
       "inputs": {
         "alloy_plate": 4,
@@ -1867,6 +1876,213 @@
         "power_coupling": 1
       },
       "time": 120
+    },
+    "mod_mount": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 3
+      },
+      "time": 0
+    },
+    "mod_mount_double": {
+      "inputs": {
+        "steel_plate": 3,
+        "power_coupling": 2,
+        "coil_winding": 1
+      },
+      "time": 60
+    },
+    "mod_mount_triple": {
+      "inputs": {
+        "titanium_plate": 6,
+        "power_coupling": 6,
+        "coil_winding": 6,
+        "capacitor_cell": 2
+      },
+      "time": 100
+    },
+    "mod_coil": {
+      "inputs": {
+        "alloy_plate": 1,
+        "coil_winding": 1,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "mod_resonator": {
+      "inputs": {
+        "alloy_plate": 1,
+        "capacitor_cell": 1,
+        "copper_wire": 3
+      },
+      "time": 0
+    },
+    "mod_chamber": {
+      "inputs": {
+        "steel_plate": 2,
+        "servo_motor": 1,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "mod_prism": {
+      "inputs": {
+        "alloy_plate": 1,
+        "crystal_lens": 1,
+        "copper_wire": 3
+      },
+      "time": 0
+    },
+    "mod_arc": {
+      "inputs": {
+        "steel_plate": 2,
+        "coil_winding": 4,
+        "capacitor_cell": 4,
+        "copper_wire": 6
+      },
+      "time": 50
+    },
+    "mod_condenser": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 6,
+        "power_coupling": 5,
+        "copper_wire": 1
+      },
+      "time": 50
+    },
+    "mod_brand": {
+      "inputs": {
+        "steel_plate": 2,
+        "crystal_lens": 5,
+        "coil_winding": 3,
+        "power_coupling": 1
+      },
+      "time": 50
+    },
+    "mod_rail": {
+      "inputs": {
+        "titanium_plate": 4,
+        "coil_winding": 4,
+        "capacitor_cell": 2,
+        "power_coupling": 1
+      },
+      "time": 50
+    },
+    "hopper_arcsalt": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 4
+      },
+      "time": 0
+    },
+    "hopper_cryo": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 4
+      },
+      "time": 0
+    },
+    "hopper_pyre": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 4
+      },
+      "time": 0
+    },
+    "power_conduit_2": {
+      "inputs": {
+        "alloy_plate": 4,
+        "copper_wire": 4
+      },
+      "time": 0
+    },
+    "power_corner_2": {
+      "inputs": {
+        "alloy_plate": 4,
+        "copper_wire": 8,
+        "insulated_polymer": 4
+      },
+      "time": 0
+    },
+    "power_joiner_bank_2": {
+      "inputs": {
+        "steel_plate": 12,
+        "capacitor_cell": 8,
+        "copper_wire": 8
+      },
+      "time": 60
+    },
+    "power_splitter_bank_2": {
+      "inputs": {
+        "steel_plate": 12,
+        "capacitor_cell": 8,
+        "copper_wire": 8
+      },
+      "time": 60
+    },
+    "power_passthrough_2": {
+      "inputs": {
+        "alloy_plate": 4,
+        "copper_wire": 8,
+        "insulated_polymer": 8
+      },
+      "time": 0
+    },
+    "power_combiner_2": {
+      "inputs": {
+        "steel_plate": 8,
+        "power_coupling": 4,
+        "insulated_polymer": 4
+      },
+      "time": 0
+    },
+    "power_conduit_3": {
+      "inputs": {
+        "alloy_plate": 14,
+        "copper_wire": 14
+      },
+      "time": 50
+    },
+    "power_corner_3": {
+      "inputs": {
+        "alloy_plate": 14,
+        "copper_wire": 28,
+        "insulated_polymer": 14
+      },
+      "time": 50
+    },
+    "power_joiner_bank_3": {
+      "inputs": {
+        "steel_plate": 42,
+        "capacitor_cell": 28,
+        "copper_wire": 28
+      },
+      "time": 100
+    },
+    "power_splitter_bank_3": {
+      "inputs": {
+        "steel_plate": 42,
+        "capacitor_cell": 28,
+        "copper_wire": 28
+      },
+      "time": 100
+    },
+    "power_passthrough_3": {
+      "inputs": {
+        "alloy_plate": 14,
+        "copper_wire": 28,
+        "insulated_polymer": 28
+      },
+      "time": 50
+    },
+    "power_combiner_3": {
+      "inputs": {
+        "steel_plate": 28,
+        "power_coupling": 14,
+        "insulated_polymer": 14
+      },
+      "time": 50
     }
   }
 }

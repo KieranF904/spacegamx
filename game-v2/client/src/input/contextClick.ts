@@ -1,6 +1,6 @@
 /**
  * The right-click menu, the pure part (ContextActions.ts drives it):
- *   pressing     the menu modifier (Z, rebindable) + right-click opens
+ *   pressing     the menu modifier (the contextMenu action's key, rebindable) + right-click opens
  *                the menu; a plain right-click is the mining laser and the
  *                right-hand guns, firing at once
  *   picking      everything under the cursor, nearest kind first: people, then

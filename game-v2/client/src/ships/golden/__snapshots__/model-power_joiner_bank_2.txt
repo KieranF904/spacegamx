@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Joiner Bank II
+Mk II · Panel · 2 cells
+Hull · mass147 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Holds300 energy
+Effectscarries 3 weapon effects and 300 treated E a second; over that the weakest effects are dropped and the rest weakened to fit
+
+== partStats (stats rows) ==
+GradeMk II
+Hull · mass147 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 147
+
+== familyLabel ==
+Batteries
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+Carries three weapon effects
+
+== keyStats ==
+holds 300 · 3 effects
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":2,"hp":146.64000000000001,"mass":2.8,"firepower":0,"toughness":146.64000000000001,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

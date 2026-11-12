@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.draw
  * owns:       one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost
- * needs:      HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common
+ * needs:      HangarHost, hangarOverlays, hangarMarks, hangarModMarks; npm: @space-game/common
  * invariants: layer order is grid, turret arcs, parts, placed marks, mounting, groups, overlays, ghost — client/src/ships/hangar/hangarDraw.test.ts
  * extend:     a new overlay is one block in draw() and one toggle in HangarHost.overlays
  */
@@ -14,6 +14,7 @@ import { gradeGlow, partColors } from '../hullPreview2d';
 import { HangarLitView } from '../HangarLitView';
 import { drawDecor2d } from '../partDecor';
 import { drawPlacedMarks, drawHandMarks, drawHoverCover } from './hangarMarks';
+import { drawModMarks, drawHandModMarks } from './hangarModMarks';
 import type { HangarHost } from './host';
 
 function arrow(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {
@@ -122,6 +123,7 @@ export function draw(host: HangarHost): void {
     ctx.textAlign = 'start';
   }
   drawPlacedMarks(host, sx, sy);
+  drawModMarks(host, sx, sy);
   // Guns that break their mounting rules (a ship fitted before a rule changed), engines with a blocked exhaust: what's wrong, in red
   host.geoms.forEach((g, i) => {
     const broken = host.mountingBroken.get(i);
@@ -199,6 +201,7 @@ if (d && host.overlays.com && d.mass > 0) {
       ctx.lineWidth = 2;
       ctx.stroke();
       drawHandMarks(host, cand, g, sx, sy, !!problem);
+      drawHandModMarks(host, cand, g, sx, sy);
       // Its mounting rules: the edge it bolts on at, the cells its barrel needs clear
       if (cand.facing) host.drawMounting(g, host.candidateMounting(cand, g), sx, sy, true);
       if (cand.facing && host.overlays.arcs && weaponMount(host.deps.catalog, cand) === 'turret') {

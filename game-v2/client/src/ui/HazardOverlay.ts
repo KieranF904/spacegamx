@@ -42,7 +42,7 @@ export class HazardOverlay {
     this.layers = document.createElement('div');
     this.layers.style.cssText = 'position: fixed; inset: 0; pointer-events: none; z-index: 5;';
     this.chips = document.createElement('div');
-    this.chips.style.cssText = 'position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: none; z-index: 950;';
+    this.chips.style.cssText = 'position: fixed; top: 28px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; pointer-events: none; z-index: 950;';
     this.horizonChip = document.createElement('div');
     this.horizonChip.className = 'hazard-chip';
     this.horizonChip.style.cssText = 'color: #ff5a5a; animation: hazardBlink 0.6s linear infinite; display: none;';

@@ -6,6 +6,9 @@
  *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
  * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
  *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ *             a Burn modifier's fire (ignite with `fire`) spreads along the hull's joins by common ships/fire.ts, its
+ *             damage the igniter's, never past its caps, and everyone near is told of each part that catches or
+ *             burns on; a fire without `fire` burns as it always did — server/src/game/burnSpread.test.ts
  * extend:     a new damage effect is a function here reached as b.<name> from other modules; the hit rule itself is
  *             common hitRules.ts
  */
@@ -24,6 +27,7 @@ import {
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
   nearestParts, castParts, partDistance, standing, seededRng, hashInts, MARK_TAKEN, partHit, newPartHit, struckStands,
   type HitMods, type CoverMemo, crossShaped, shieldUp, type ShapedCross,
+  hullNeighbours, stepFires, partsBehind, hashUnit, FIRE_STEP, Rotation, type FireSpread, type PartFire,
 } from '@space-game/common';
 import { GLANCING, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 import { dhypot, dpow } from '@space-game/common';
@@ -417,21 +421,98 @@ export function empAt(b: BridgeCtx, systemNum: number, x: number, y: number, rad
 }
 
 /**
+ * A part on fire (ShipBridge.burns). `fire`: a Burn modifier's, which spreads over the hull (common ships/fire.ts:
+ * its generation, the time its spell was lit for, the shot it came of); `told`: the tick a held beam's was last told
+ */
+export interface Burn extends PartFire { eid: number; radius: number; source: number; hit?: HitInfo; held?: number; told?: number }
+
+/**
  * Set the part nearest (x, y) burning for `ticks`. Returns the part (or -1).
  * Burning parts take `dps`; when one is gone the fire jumps to a neighbour
- * within `radius` cells.
+ * within `radius` cells. `held`: a held beam's fire (its key, beamFx.ts gunRay), lit again each damage step: it burns
+ * at the beam's rate now, where any other fire on a part already burning keeps the hotter of the two.
+ * `fire`: it spreads (a Burn modifier's: common ships/fire.ts). Each shot's fire is its own: lit again, the part's
+ * fire is that shot's first generation, with its own time and parts to spend.
  */
-export function ignite(bridge: BridgeCtx, eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1): number {
+export function ignite(bridge: BridgeCtx, eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1, held = -1, fire?: FireSpread): number {
   const ship = bridge.bodies.get(eid);
   if (!ship || ship.kind !== 'ship') return -1;
   // The part the shot struck, or the one whose outline is nearest the point
   const part = struckStands(ship, struck) ? struck : bridge.closestPart(eid, ship, x, y);
   if (part < 0) return -1;
-  const until = bridge.host.getTick() + ticks;
-  const cur = bridge.burns.find((b) => b.eid === eid && b.part === part);
-  if (cur) { cur.until = Math.max(cur.until, until); cur.dps = Math.max(cur.dps, dps); }
-  else bridge.burns.push({ eid, part, until, dps, radius, source, hit });
+  const now = bridge.host.getTick(), until = now + ticks;
+  let cur = bridge.burns.find((b) => b.eid === eid && b.part === part);
+  if (cur && held >= 0 && cur.held === held) { cur.until = until; cur.dps = dps; }
+  else if (cur) { cur.until = Math.max(cur.until, until); cur.dps = Math.max(cur.dps, dps); cur.held = undefined; }
+  else bridge.burns.push((cur = held >= 0 ? { eid, part, until, dps, radius, source, hit, held } : { eid, part, until, dps, radius, source, hit }));
+  if (fire) {
+    // (a held beam's is lit again every step: one shot's fire until that one has had its time, then another's)
+    const again = held >= 0 && cur.fire && cur.ev && now - cur.ev.born < fire.total;
+    if (!again) { cur.fire = fire; cur.gen = 0; cur.ev = { born: now, lit: 1 }; }
+    cur.ticks = ticks;
+  }
   return part;
+}
+
+/** Tell everyone near a part is alight (a fire no hit record tells): a held beam's, lit again six times a second, once in a while */
+const HELD_TELL = 30;
+function tellFire(bridge: BridgeCtx, eid: number, part: number, ticks: number, fire: FireSpread | undefined, held = -1): void {
+  if (held >= 0) {
+    const b = bridge.burns.find((o) => o.eid === eid && o.part === part), now = bridge.host.getTick();
+    if (b && b.told !== undefined && now - b.told < HELD_TELL) return;
+    if (b) b.told = now;
+    bridge.host.fireLit?.(eid, part, HELD_TELL + ticks, fire ? 1 : undefined);
+    return;
+  }
+  bridge.host.fireLit?.(eid, part, ticks, fire ? 1 : undefined);
+}
+
+/** ignite, and everyone near told (for a fire that no shell's hit record carries: a beam's, a blast's, an arc's) */
+export function igniteTold(bridge: BridgeCtx, eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1, held = -1, fire?: FireSpread): number {
+  const part = ignite(bridge, eid, x, y, dps, ticks, radius, source, hit, struck, held, fire);
+  if (part >= 0) tellFire(bridge, eid, part, ticks, fire, held);
+  return part;
+}
+
+/**
+ * The layers a piercing shot lights: the parts its line (x0, y0)-(x1, y1) meets behind `struck` in the hull, up to
+ * `layers` - 1 of them, each `keep` cooler than the one before (`dps`: the struck part's fire, lit by the caller).
+ * Returns the parts lit, nearest first; everyone near is told of each
+ */
+export function igniteLayers(bridge: BridgeCtx, eid: number, x0: number, y0: number, x1: number, y1: number, struck: number, layers: number, keep: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, fire?: FireSpread): number[] {
+  const ship = bridge.bodies.get(eid);
+  if (!ship || ship.kind !== 'ship' || layers <= 1) return [];
+  const behind = partsBehind(bridge.geometry(ship), (i) => ship.hp[i] > 0 && !ship.detached[i] && standing(bridge.catalog, ship, i), bridge.tuning.cellSize, ship.derived.com,
+    Position.x[eid], Position.y[eid], Rotation.angle[eid], x0, y0, x1, y1, struck, layers - 1);
+  let d = dps;
+  for (const part of behind) {
+    d *= keep;
+    if (ignite(bridge, eid, x0, y0, d, ticks, radius, source, hit, part, -1, fire) >= 0) tellFire(bridge, eid, part, ticks, fire);
+  }
+  return behind;
+}
+
+/**
+ * A blast's fire: each standing part of each ship it reaches may catch (`by.chance` at the blast's middle, falling to
+ * three tenths of it at its edge, as a blast's damage does), nearest first, at most `by.max` parts a blast. One roll a
+ * part, from the shooter, the ship, the part and the tick. Returns how many it lit; everyone near is told of each
+ */
+export function blastIgnite(b: BridgeCtx, systemNum: number, x: number, y: number, radius: number, by: { chance: number; max: number }, dps: number, ticks: number, source: number, hit?: HitInfo, fire?: FireSpread): number {
+  const cs = b.tuning.cellSize, tick = b.host.getTick();
+  let lit = 0;
+  for (const [eid, ship] of b.bodies) {
+    if (lit >= by.max) break;
+    if (ship.kind !== 'ship' || eid === source || InSystem.systemId[eid] !== systemNum || fartherThan(Position.x[eid] - x, Position.y[eid] - y, radius + ship.derived.radius)) continue;
+    if (b.isJumping(ship) || b.intangible.has(eid) || b.dormant.has(eid)) continue;
+    if (source >= 0 && b.host.canDamage && !b.host.canDamage(source, eid)) continue;
+    const [gx, gy] = b.worldToGrid(eid, ship, x, y);
+    for (const { i, d } of nearestParts(b.geometry(ship), (k) => ship.hp[k] > 0 && !ship.detached[k] && standing(b.catalog, ship, k), gx, gy, radius / cs)) {
+      if (lit >= by.max) break;
+      if (hashUnit(source, eid, i, tick) >= by.chance * (1 - 0.7 * ((d * cs) / radius))) continue;
+      if (ignite(b, eid, x, y, dps, ticks, 0, source, hit, i, -1, fire) >= 0) { lit++; tellFire(b, eid, i, ticks, fire); }
+    }
+  }
+  return lit;
 }
 
 /** Parts on fire now (for the snapshot effects): [body, part] pairs */
@@ -508,7 +589,26 @@ export function nearestPart(b: BridgeCtx, eid: number, ship: ShipState, x: numbe
   return best;
 }
 
+/** A ship's spreading fires stepped (common ships/fire.ts stepFires): out, on, or onto the parts joined to them; everyone near told of each */
+function spreadFires(bridge: BridgeCtx, tick: number): void {
+  let ships: number[] | undefined;
+  for (const b of bridge.burns) if (b.fire && !ships?.includes(b.eid)) (ships ??= []).push(b.eid);
+  if (!ships) return;
+  for (const eid of ships) {
+    if (!SimPass.on(InSystem.systemId[eid])) continue;
+    const ship = bridge.bodies.get(eid);
+    const mine = bridge.burns.filter((b) => b.eid === eid);
+    // (a ship gone, or no longer one: its fires end below)
+    if (!ship || ship.kind !== 'ship') continue;
+    const adj = hullNeighbours(bridge.catalog, ship.blueprint);
+    stepFires(eid, mine, adj, (i) => ship.hp[i] > 0 && !ship.detached[i], tick, (from) => ({ eid, part: from.part, until: 0, dps: 0, radius: 0, source: from.source, hit: from.hit }),
+      (f) => bridge.host.fireLit?.(eid, f.part, f.until - tick, (f.gen ?? 0) + 1));
+    bridge.burns = bridge.burns.filter((b) => b.eid !== eid).concat(mine);
+  }
+}
+
 export function stepBurns(bridge: BridgeCtx, tick: number): void {
+  spreadFires(bridge, tick);
   const keep: typeof bridge.burns = [];
   for (const b of bridge.burns) {
     // (Another pass's: crowd dilation, sim/SystemClocks.ts)
@@ -516,6 +616,8 @@ export function stepBurns(bridge: BridgeCtx, tick: number): void {
     const ship = bridge.bodies.get(b.eid);
     if (!ship || tick >= b.until || ship.kind !== 'ship') continue;
     if (ship.hp[b.part] <= 0 || ship.detached[b.part]) {
+      // (a spreading fire goes out with its part: what it lit beside it burns on)
+      if (b.fire) continue;
       // Spread to the nearest part still standing, if it's close enough
       const [px, py] = bridge.partWorld(b.eid, ship, b.part);
       const next = bridge.nearestPart(b.eid, ship, px, py, b.part);

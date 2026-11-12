@@ -173,6 +173,12 @@ export class AccountRoutes {
 
   /** An account was deleted (by its pilot or an admin): the lobby's other stores forget it (the inbox) */
   onAccountDeleted: ((userId: number) => void) | null = null;
+  /** A new account was made by /auth/register: the account and the request's body (set by the lobby's entry) */
+  onRegistered: ((user: UserRecord, body: Record<string, unknown>) => Promise<void>) | null = null;
+  /** More fields for /auth/account's answer (never ones it already has), set by the lobby's entry */
+  accountExtra: ((user: UserRecord) => Promise<Record<string, unknown>>) | null = null;
+  /** More fields for /auth/validate's answer (never ones it already has), set by the lobby's entry */
+  validateExtra: ((user: UserRecord) => Promise<Record<string, unknown>>) | null = null;
   /** Sign-ins, sign-outs and account changes, for the activity feed (../activity): never passwords, emails or tokens */
   onActivity: ((type: string, player: string, detail: string, other?: string) => void) | null = null;
 
@@ -229,7 +235,11 @@ export class AccountRoutes {
         else if (result.error === 'Invalid username or password') { this.failures.record(here); this.nameFailures.record(name); }
       }
       if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
-      if (action === 'register') notifier.registered(result.user.username);
+      if (action === 'register') {
+        notifier.registered();
+        // (What else the sign-up form sent, for the lobby's other parts: the newsletter answer)
+        try { await this.onRegistered?.(result.user, body); } catch (err) { console.error('[Accounts] after-register hook failed:', err); }
+      }
       this.onActivity?.(action === 'login' ? 'signin' : 'register', result.user.username, action === 'login' ? 'Signed in' : 'New account');
       this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, ...ranks(result.user) });
       return true;
@@ -239,7 +249,10 @@ export class AccountRoutes {
       if (!user) { this.sendJson(res, 401, { success: false, error: 'Invalid or expired session' }); return true; }
       const banned = banMessage(user);
       if (banned) { this.sendJson(res, 403, { success: false, error: banned, banned: true }); return true; }
-      this.sendJson(res, 200, { success: true, id: user.id, username: user.username, ...ranks(user) });
+      // (What else the lobby knows of the account: donorContributor, from the donations)
+      let extra: Record<string, unknown> = {};
+      try { extra = (await this.validateExtra?.(user)) ?? {}; } catch (err) { console.error('[Accounts] validate extra failed:', err); }
+      this.sendJson(res, 200, { ...extra, success: true, id: user.id, username: user.username, ...ranks(user) });
       return true;
     }
     if (ACCOUNT_ACTIONS.includes(action)) { await this.handleAccount(req, res, action, body); return true; }
@@ -266,7 +279,9 @@ export class AccountRoutes {
     if (banned) { this.sendJson(res, 403, { success: false, error: banned, banned: true }); return; }
 
     if (action === 'account') {
-      this.sendJson(res, 200, { success: true, id: user.id, username: user.username, email: user.email, ...ranks(user), createdAt: user.created_at });
+      let extra: Record<string, unknown> = {};
+      try { extra = (await this.accountExtra?.(user)) ?? {}; } catch (err) { console.error('[Accounts] account extra failed:', err); }
+      this.sendJson(res, 200, { ...extra, success: true, id: user.id, username: user.username, email: user.email, ...ranks(user), createdAt: user.created_at });
       return;
     }
     if (action === 'logout-all') {

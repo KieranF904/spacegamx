@@ -46,16 +46,18 @@ Object.assign(BEAM_LOOKS, {
       },
     },
   },
-  // A thin spill of gold: the faintest splash
+  // A shaft of gold light with dust glittering in it, a lamp's spill at the muzzle and a spot on what it lights: a light splash
   laser_searchlight: {
-    width: 0.45, outer: 0xb8860b, mid: 0xfde68a, core: 0xfffbeb, cone: 5, coneLen: 1100,
+    width: 0.8, outer: 0xd9a514, mid: 0xfde68a, core: 0xfffbeb, cone: 3.5, coneLen: 260,
+    shaft: { color: 0xfde68a, spread: 0.9, dust: 1 },
     burn: {
       every: 12, color: 0xfde68a, hit: {
         liquid: {
-          blobs: { count: 1, size: 1.6, speed: 2.8, cone: 40, pull: 0.2, life: 34 },
-          film: { length: 10, thickness: 2, creep: 0.18, life: 48 }, hot: 0xfff0b8, cool: 0x5a4210,
+          blobs: { count: 1, size: 1.8, speed: 3, cone: 45, pull: 0.2, life: 36 },
+          film: { length: 12, thickness: 2.4, creep: 0.18, life: 52 }, hot: 0xfff0b8, cool: 0x5a4210,
         },
-        spray: { count: 1, speed: 5, cone: 30, life: 8, color: 0xfff4c0 }, scatter: 30,
+        spray: { count: 3, speed: 5.5, cone: 40, life: 11, color: 0xfff4c0 }, scatter: 34,
+        light: { radius: 80, power: 0.5 },
       },
     },
   },

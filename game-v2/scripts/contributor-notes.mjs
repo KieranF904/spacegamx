@@ -21,8 +21,9 @@
  * Output is sorted by author, then system: each note's author, system, title
  * and full text, its shape with sizes in world units, how it moves (orbit
  * radius about what, period, phase, or the body it's attached to), its
- * position now, status and dates. --json prints the same notes as JSON with
- * `positionNow` added.
+ * position now, status and dates, its votes (thumbs up and down) and its
+ * comments. --json prints the same notes as JSON with `positionNow` and the
+ * `votes` counts added (who voted is left out).
  *
  * Marking a note leaves an op in the server's data/contributor/inbox/; the
  * server applies it within a few seconds (or at its next start) and tells
@@ -106,6 +107,7 @@ async function main() {
   const lib = join(ROOT, 'common', 'dist', 'world', 'contributorNotes.js');
   if (!existsSync(lib)) fail('Build common first: npm run build:common');
   const { filterNotes, formatNotes, noteAnchorPosition } = await import(pathToFileURL(lib).href);
+  const { noteTally, noteComments } = await import(pathToFileURL(join(ROOT, 'common', 'dist', 'world', 'contributorFeedback.js')).href);
 
   const { notes: file, clock, where } = load(a);
   const notes = Array.isArray(file?.notes) ? file.notes : [];
@@ -138,7 +140,7 @@ async function main() {
   const { tick, note } = tickNow(a, clock);
   const list = filterNotes(notes, { author: a.author, system: a.system, status: a.status });
   if (a.json) {
-    console.log(JSON.stringify({ tick, source: where, notes: list.map((n) => ({ ...n, positionNow: noteAnchorPosition(n.anchor, bodiesOf(n.system) ?? {}, tick) })) }, null, 2));
+    console.log(JSON.stringify({ tick, source: where, notes: list.map(({ voters, ...n }) => ({ ...n, comments: noteComments(n), votes: noteTally({ voters }), positionNow: noteAnchorPosition(n.anchor, bodiesOf(n.system) ?? {}, tick) })) }, null, 2));
     return;
   }
   const what = [a.author && `author ${a.author}`, a.system && `system ${a.system}`, `status ${a.status}`].filter(Boolean).join(', ');

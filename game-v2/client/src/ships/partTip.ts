@@ -18,6 +18,7 @@ import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
 import { FIRE_SENTENCE, REGROW_SENTENCE, MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
 import { esc } from '../ui/escape';
+import { modTipHtml } from './modTip';
 
 export interface PartTipCtx {
   catalog: Catalog;
@@ -26,6 +27,8 @@ export interface PartTipCtx {
   /** The design's derived state and this part's index in it (power, gun timing, turret window) */
   derived?: ShipDerived | null;
   index?: number;
+  /** The design's parts (index is into them): what its weapon modifiers do on this ship (modTip.ts) */
+  parts?: readonly PlacedPart[];
   /** Where it stands: placed on the grid, or picked from the palette */
   state?: 'built' | 'ghost' | 'new' | 'wrecked' | 'palette';
   /** Planned only: nothing joins it to the core yet, so nothing builds it */
@@ -156,6 +159,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     const text = (r.warn ? `<span style="color:#fbbf24">${esc(r.text)}</span>` : esc(r.text)) + (r.dim ? ` · <span style="color:#8ea0bd; font-weight:400">${esc(r.dim)}</span>` : '');
     html += row(esc(r.label), text);
   }
+  // Weapon modifiers on this ship: a gun's effects, a mount's sockets, a block or hopper at work, a line's load (modTip.ts)
+  html += modTipHtml(i, c);
   if ((fn.range ?? 0) > 0 && !fn.weapon) html += row('Scan range', `${n0(fn.range!)} m`);
   // Jump coils (and the core's own): cells of hull served, and how the ship's coils stand against its hull
   const coilCells = p.fn === 'core' ? jumpTuning(tuning).coreCapacity : (fn.jumpCapacity ?? 0) * st.area;

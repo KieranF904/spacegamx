@@ -58,12 +58,12 @@ const W = [
   ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'Light, quick starter cannon' }, { set: { damage: 18, speed: 54, life: 133 } }, 'Starter cannon with light, quick shells.'],
   ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'Slow armour-piercing cannon' }, { mul: { speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 }, set: { damage: 88 } }, 'Fires one slow, heavy, armour-piercing shell a second.'],
   ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { spread: x(3.3 / 1.8) }, set: { damage: 20, speed: 62, life: 116 } }, 'Paired cannon turret. Fires a burst of 8 heavy rounds, then reloads.'],
-  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'Charged long-range cannon' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150) }, add: { pen: 1 }, set: { spread: 0 } }, 'Hold to charge. When full it fires one long-range shot by itself.'],
+  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'Charged long-range cannon' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150), size: xp(1.5) }, add: { pen: 1 }, set: { spread: 0 } }, 'Hold to charge. When full it fires one long-range shot by itself.'],
   ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { hp: 1.3, mass: 1.6, demand: 4.17, blurb: 'Heavy two-shot cannon' }, { mul: { damage: xp(180 / 14), speed: xp(32 / 48), size: xp(2.2) }, add: { pen: 1 } }, 'Fires 2 huge, slow shells, then takes a long time to reload.'],
-  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, { blurb: 'Steady-stream autocannon' }, { set: { damage: 11, speed: 62, life: 87 } }, 'Fires a steady stream of shells at a fixed rate.'],
+  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, { blurb: 'Steady-stream autocannon' }, { set: { damage: 11, speed: 110, life: 49 } }, 'Fires a steady stream of shells at a fixed rate.'],
   // (The Chainsaw's draw is its demand x 4 / its beat: 22.4 keeps its spun-up 22.4 E a second per cell at the 8-tick beat, as 10.5 did at 3.75)
-  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4, blurb: 'Spin-up autocannon' }, { mul: { spread: x(1.5) }, set: { damage: 11 } }, 'Fire rate rises from 2.5 to 7.5 shots a second while you hold fire.'],
-  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25, blurb: 'Accurate burst autocannon' }, { mul: { spread: x(0.4) }, set: { damage: 12, speed: 88, life: 61 } }, 'Fires accurate bursts of 6 fast shots, then reloads.'],
+  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4, blurb: 'Spin-up autocannon' }, { mul: { spread: x(1.5) }, set: { damage: 11, speed: 100, life: 54 } }, 'Fire rate rises from 2.5 to 7.5 shots a second while you hold fire.'],
+  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25, blurb: 'Accurate burst autocannon' }, { mul: { spread: x(0.4) }, set: { damage: 18, speed: 130, life: 41 } }, 'Fires accurate bursts of 6 fast shots, then reloads.'],
   ['flak_burst', 'Burst', 'flak', 'sq', 4, { blurb: 'Airburst flak turret' }, {}, 'Fires a flak shell that bursts at your aim point, or sooner near a target. Good against swarms and missiles.'],
   ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4, blurb: 'Four-shell flak clip' }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'Fires 4 flak shells in a row that burst at your aim point, or sooner near a target, then reloads.'],
   // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
@@ -81,16 +81,16 @@ const W = [
   // Overpulse a clip of 6 at 10 t, 13 dmg at 96; their demand, and so their draw, stays.)
   ['laser_glint', 'Glint', 'laser', 'sq', 9, { blurb: 'Long-range charged pulse laser' }, {}, 'Charges, then fires a long-range pulse that hits hardest at its peak.'],
   ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2), blurb: 'Short ramping held beam' }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'Short held beam. Its damage rises the longer it stays on one part, and starts over if it slips off.'],
-  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round), blurb: 'Long beam that marks targets' }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'Long, thin beam that does little damage. What it lights takes 20% more damage from everyone for 2 s.'],
+  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round), blurb: 'Long beam that marks targets' }, { set: { dps: 50, range: 7650, width: 8, pulse: null, falloff: null } }, 'Long, thin beam that does little damage. What it lights takes 20% more damage from everyone for 2 s.'],
   ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30), blurb: 'Shield-stripping pulse bursts' }, { set: { burst: 2, damage: 14, speed: 84, life: 60 } }, 'Fires bursts of 2 bolts that do extra damage to shields and less to hull.'],
-  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2), blurb: 'Shield-shredding pulse clip' }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5, damage: 13, speed: 96, life: 53 } }, 'Fires a clip of 6 fast bolts, then reloads. Very strong against shields, weak against hull.'],
+  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2), blurb: 'Shield-shredding pulse clip' }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.7, damage: 13, speed: 96, life: 53 } }, 'Fires a clip of 6 fast bolts, then reloads. Very strong against shields, weak against hull.'],
   ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Homing missile launcher' }, {}, 'Fires a missile that homes on the ship nearest your cursor. Point defence stops it with 1 hit.'],
   ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 2, int: 0.41, blurb: 'Small homing rockets in pairs' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'Fires pairs of small rockets while you hold fire. They home on the ship nearest your cursor. Point defence stops each with 1 hit. One round a pair.'],
-  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'Heavy missile you steer' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'Fires a slow, heavy missile. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs 2 hits.'],
+  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'Heavy missile you steer' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 90 }, intercept: 2 } }, 'Fires a slow, heavy missile. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs 2 hits.'],
   // (Railguns, rework section 4: the Needle's slug 62 dmg, pierce 2, speed 150, 75 ticks; the Coilgun five slugs of 16 in a 12 degree cone, pierce 1,
   // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
   // draws is its draw x its interval, so RAIL_E sets each demand to give 14 E and 120 E a shot)
-  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, { blurb: 'Piercing slug railgun' }, {}, 'Fires a long thin slug that goes through 2 ships. Uses slugs from your cargo and needs no power.'],
+  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, { blurb: 'Piercing slug railgun' }, { set: { damage: 90 } }, 'Fires a long thin slug that goes through 2 ships. Uses slugs from your cargo and needs no power.'],
   ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8, blurb: 'Close-range rail shotgun' }, { set: { ammo: null, damage: 25, burst: 3, spread: 3, jitter: 0, life: 18, pierce: 1 } }, 'Fires 3 heavy slugs in a tight cone. Short range. Needs no ammo.'],
   ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2, blurb: 'Heavy piercing railgun' }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'Fires a slug that goes through 3 ships at full damage, with a shock ring at each. Needs no ammo.'],
   ['emp_hush', 'Hush', 'emp', 'sq', 15, { blurb: 'Single-target EMP' }, {}, 'Fires an orb that bursts on its fuse or beside a ship, switching off its engines and guns for 2 s.'],
@@ -526,7 +526,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120, emp_hush: 25, arc_spark: 13.5, legendary_cinder_bloom: 14, legendary_prism: 16, legendary_phase: 30, legendary_singularity: 210 };
   // (Held beams' energy a second, section 4: demand x the piece's area. Tesla: a zap every 12 ticks of 14 damage, chaining)
   const BEAM_E = { arc_tesla: 30, legendary_frostbite: 24 };
-  const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10, zap: 12 } };
+  const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 50 }, arc_tesla: { dps: 70, range: 660, width: 10, zap: 12 } };
   // (Hush bursts on its fuse: 90 ticks of flight, or on proximity)
   BEAM_SET.emp_hush = { life: 90 };
   for (const m of models) {
@@ -665,7 +665,7 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
     autocannon_chainsaw: { takes: ['coolant', 'flux'] },
     pulse_overpulse: { takes: ['coolant', 'accelerant'] },
     laser_cutter: { profile: { burst: true, ...PULSE(3, 0.5) }, takes: ['lens', 'coolant'] },
-    laser_searchlight: { profile: PULSE(4, 0.3, 0.25), takes: ['lens'] },
+    laser_searchlight: { profile: PULSE(4, 0.1, 0.25), takes: ['lens'] },
     railgun_spear: { profile: { steady: 30, passive: 5 }, takes: ['damping', 'overcharge'] },
     railgun_rail_driver: { takes: ['accelerant', 'coolant'] },
     lance_lance: { profile: { burst: true, passive: 20, ...PULSE(2, 1, 0.4, 0.15) }, takes: ['lens', 'coolant'] },
@@ -765,6 +765,22 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
     guide: { name: 'Slurry Cannon', blurb: 'Feed-fired heavy cannon', piece: 'rect2', order: guideOrder++ },
   });
+  // The Mauler: a mid-level big-bore cannon on a steady beat (30% faster than the Hammer's), its shells a fifth slower
+  // than the Hammer's and bursting where they land. No armour piercing: its blast is its reach
+  MOUNT.cannon_mauler = 'fixed';
+  MOUNTING.cannon_mauler = { attach: 'back', clear: ahead(2) };
+  const maulerDesc = 'Big-bore cannon on a steady beat. Its slow, bright shells burst where they hit.';
+  models.push({
+    ...base('cannon_mauler', 'Mauler', 'cannon', ['block2'], 14, 'steel', {}),
+    weapon: 'cannon', ...mounted('cannon_mauler', maulerDesc), hpScale: r2(FNS.get('weapon').hpScale * 1.2), massScale: 1.3, demand: 4, priority: 2, fireInterval: 46,
+    weaponMods: { mul: { speed: xp(30 / 48), size: xp(2) }, set: { damage: 64, splash: { radius: 100, damage: 34 } } }, blast: BLAST.weapon,
+    fire: { model: 'cycle', interval: 46, shot: 26, intake: 40, buffer: 1 },
+    ports: ports('in', 'S', [0], 48),
+    // (Enemy designs' legacy block cannons stay Bastions)
+    noStandIn: true,
+    rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
+    guide: { name: 'Mauler', blurb: 'Explosive mid-size cannon', piece: 'block2', order: guideOrder++ },
+  });
   // Ways to arm a ship (docs/design/energy-ports-2026-11.md section 17). Three kinds of gun, by what they ask of the ship:
   // - simple: fires off any line (a Cell Reactor at its port). Cheap, many of them.
   // - dual: the same, and a second input with its own buffer (`augment`): wire a rated line into it (`floor` E/s: a lone
@@ -778,16 +794,16 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   // Ammunition guns pay in rounds and stay simple; support guns and legendaries keep their ways.
   const ROLE = {
     simple: ['cannon_pip', 'autocannon_rattler', 'laser_glint', 'pulse_strobe', 'autocannon_stinger', 'flak_burst', 'mortar_lobber', 'missile_dart',
-      'railgun_needle', 'torpedo_eel', 'missile_swarm', 'mortar_quake', 'missile_hammerhead', 'torpedo_leviathan'],
+      'railgun_needle', 'torpedo_eel', 'missile_swarm', 'mortar_quake', 'missile_hammerhead', 'torpedo_leviathan', 'cannon_mauler'],
     dual: ['cannon_hammer', 'cannon_twinlink', 'autocannon_chainsaw', 'railgun_coilgun', 'arc_spark', 'pulse_overpulse', 'flak_cloudmaker', 'laser_searchlight', 'cannon_slurry'],
     heavy: ['cannon_longbarrel', 'cannon_bastion', 'railgun_spear', 'railgun_rail_driver', 'laser_cutter', 'arc_tesla'],
     super: ['lance_lance'],
   };
   // (Heavy and super: draw E/s on a ports ship, and damage x. The floor is 85% of the draw, spread over the gun's ports)
   const HEAVY = {
-    cannon_longbarrel: { draw: 170, damage: 3 }, cannon_bastion: { draw: 170, damage: 1.8 }, railgun_spear: { draw: 170, damage: 1.6 },
-    railgun_rail_driver: { draw: 170, damage: 1.8 }, laser_cutter: { draw: 170, damage: 2.6 }, arc_tesla: { draw: 100, damage: 1.3 },
-    lance_lance: { draw: 260, damage: 2.5 },
+    cannon_longbarrel: { draw: 170, damage: 3.6 }, cannon_bastion: { draw: 170, damage: 1.8 }, railgun_spear: { draw: 170, damage: 1.6 },
+    railgun_rail_driver: { draw: 170, damage: 1.8 }, laser_cutter: { draw: 170, damage: 1.5 }, arc_tesla: { draw: 100, damage: 1.3 },
+    lance_lance: { draw: 260, damage: 1.8 },
   };
   // (Augments. side/cell: its input, in the gun's own frame (S cell 1: the back of a 2-wide gun's right cell, which its main
   // input gives up); rate: E/s it takes; floor: E/s its line must deliver while it fills; cost: E a shot (a beam: E/s);
@@ -795,7 +811,7 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   // (Damage x on a ports ship for the guns that had no place in any scenario: the Rattler and Strobe as cheap swarm turrets,
   // the Twinlink's stream; the Coilgun's base is a short-range pattern that its Choke turns into a real gun; the Slurry
   // Cannon's feed is its infrastructure)
-  const DUAL = { railgun_coilgun: 0.55, cannon_slurry: 1.35, cannon_twinlink: 1.25, autocannon_rattler: 1.4, pulse_strobe: 1.2 };
+  const DUAL = { railgun_coilgun: 1, cannon_slurry: 1.35, cannon_twinlink: 1.25, autocannon_rattler: 1.4, pulse_strobe: 1.2 };
   const AUG = (name, say, side, cell, rate, floor, cost, mods, buffer) => ({ name, say, side, ...(cell ? { cell } : {}), rate, floor, cost, ...(buffer ? { buffer } : {}), mods });
   // (Heavier shots 2026-11: the Twinlink's, Chainsaw's, Overpulse's and Rail Driver's augments cost more a shot as the guns fire fewer,
   // heavier rounds, so the E a second stays; a clip gun's augment buffer is its clip)
@@ -942,6 +958,81 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
 }
 // ---- (end shaped shields)
 
+// ---- Weapon modifiers (docs/design/weapon-modifiers-2026-11.md; common/src/ships/power/portsMods.ts). Mounts are line
+// parts with sockets; a modifier block against a socket treats the power passing; special modifiers also use up a hopper's
+// material or extra power; line parts come in tiers that carry more effects. The effects' numbers are tuning.json
+// `modifiers`. Costs are existing materials until the modifier materials have a source. Appended last, so no other
+// model's order moves.
+{
+  const MT = TUNING.modifiers;
+  const ports = (dir, side, cells, rate) => cells.map((cell) => ({ dir, side, cell, rate }));
+  const ALL = [{ side: 'N' }, { side: 'E' }, { side: 'S' }, { side: 'W' }];
+  const push = (id, name, family, piece, level, material, fields, description, look) => models.push({
+    ...base(id, name, family, [piece], level, material, {}), ...fields, noStandIn: true, description,
+    rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category: 'power', fabOrder: next('power'), ...look,
+    guide: { name, blurb: description.split(/[.:]/)[0], ...(piece !== 'sq' ? { piece } : {}), order: guideOrder++ },
+  });
+  // The line parts there already are tier I
+  const LINE_I = ['power_conduit', 'power_diode', 'power_corner', 'power_combiner', 'power_passthrough', 'power_joiner_bank', 'power_splitter_bank',
+    'power_joiner_elbow', 'power_joiner_end', 'power_joiner_cross', 'power_splitter_elbow', 'power_splitter_tee', 'power_splitter_end'];
+  for (const id of LINE_I) {
+    const m = models.find((x) => x.id === id);
+    if (!m) throw new Error(`modifiers: no line part ${id}`);
+    m.lineTier = 1;
+  }
+  // Mounts: power in at one end and out at the other at a conduit's rate; `hold` E a socket kept back for upkeep
+  const MOUNT_LOOK = { color: '#5d6f8c', decor: 'none', glow: '#9db4ff' };
+  const MOUNTS = [
+    ['mod_mount', 'Mount', 'sq', 2, 24, { hpScale: 0.53 }, [...ports('in', 'S', [0], 200), ...ports('out', 'N', [0], 200)], [{ side: 'E' }],
+      'Power line with one socket on its right side (flip it for the left). A modifier against the socket changes the shots of the guns down the line. Treats 24 E a second.'],
+    ['mod_mount_double', 'Double Mount', 'rect2', 12, 30, { hpScale: 0.47, massScale: 0.9 }, [...ports('in', 'W', [0], 200), ...ports('out', 'E', [0], 200)], [{ side: 'N', cell: 0 }, { side: 'N', cell: 1 }],
+      'Power line with two sockets on its front, in at its left end and out at its right. Two modifiers of a recipe fuse into a new effect. Each socket treats 30 E a second.'],
+    ['mod_mount_triple', 'Triple Mount', 'rect2', 24, 40, { hpScale: 0.73, massScale: 1.3 }, [...ports('in', 'W', [0], 200), ...ports('out', 'E', [0], 200)], [{ side: 'N', cell: 0 }, { side: 'N', cell: 1 }, { side: 'S', cell: 0 }],
+      'Power line with three sockets, two on its front and one at its back left; in at its left end and out at its right. Each socket treats 40 E a second.'],
+  ];
+  for (const [id, name, piece, level, treat, scale, pts, sockets, description] of MOUNTS)
+    push(id, name, 'modifier', piece, level, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, ...scale, ports: pts, modMount: { treat, upkeep: 1, hold: 2, sockets } }, description, MOUNT_LOOK);
+  // Modifier blocks: inert until a mount's socket faces them
+  const say = (kind) => MT.say[MT.kinds[kind].effect];
+  const BLOCKS = [
+    ['mod_coil', 'Coil', 'coil'], ['mod_resonator', 'Resonator', 'resonator'], ['mod_chamber', 'Chamber', 'chamber'], ['mod_prism', 'Prism', 'prism'],
+  ];
+  for (const [id, name, kind] of BLOCKS)
+    push(id, name, 'modifier', 'sq', 4, 'alloy', { plug: kind, hpScale: 0.4, massScale: 0.8 },
+      `Modifier: ${say(kind).name}. ${say(kind).say}. Works against a mount's socket.`, { color: '#3d4658', decor: 'none', glow: say(kind).color });
+  // Specials: three use up a hopper's material (joined by their sides, or by pipes), the Rail Driver power from a line of its own
+  const MATS = { arcsalt: 'Arc Salt', cryo: 'Cryo Fluid', pyre: 'Pyre Gel' };
+  const SPECIALS = [['mod_arc', 'Arc Lattice', 'arc'], ['mod_condenser', 'Condenser', 'condenser'], ['mod_brand', 'Brand', 'brand'], ['mod_rail', 'Rail Driver Module', 'rail']];
+  for (const [id, name, kind] of SPECIALS) {
+    const needs = MT.kinds[kind].needs, look = { color: '#4a3f5c', decor: 'none', glow: say(kind).color };
+    if (needs.mat) push(id, name, 'modifier', 'sq', 20, 'alloy', { plug: kind, feedPoints: ALL, hpScale: 0.53, massScale: 1.2 },
+      `Special modifier: ${say(kind).name}. ${say(kind).say}. Works against a mount's socket and uses ${MATS[needs.mat]} from a hopper touching it or piped to it.`, look);
+    else push(id, name, 'modifier', 'sq', 20, 'alloy', { plug: kind, store: 20, intake: needs.power, ports: ports('in', 'S', [0], needs.power), hpScale: 0.53, massScale: 1.2 },
+      `Special modifier: ${say(kind).name}. ${say(kind).say}. Works against a mount's socket and uses extra power from a line of its own into its back.`, look);
+  }
+  // Hoppers: what the specials use up. Not a feed and not power; filled at a station
+  const HOPPERS = [['arcsalt', '#5ef2e0'], ['cryo', '#8fd3ff'], ['pyre', '#ff5a4a']];
+  for (const [mat, color] of HOPPERS)
+    push(`hopper_${mat}`, `${MATS[mat]} Hopper`, 'modifier', 'sq', 14, 'alloy', { hopper: { mat, holds: 60 }, feedPoints: ALL, hpScale: 0.73, massScale: 1.5 },
+      `A hopper of ${MATS[mat]} for the special modifier that uses it. Holds 60. Touch it to the modifier or join them with pipes. Refilled at a station.`, { color: '#4b5563', decor: 'none', glow: color });
+  // Line tiers II and III: tougher, faster, and they carry more effects (tuning.json modifiers.lines)
+  const TIERS = [[2, 'II', 1.3, 1.5, 8, 4], [3, 'III', 1.7, 2.5, 20, 12]];
+  const TIERED = ['power_conduit', 'power_corner', 'power_joiner_bank', 'power_splitter_bank', 'power_passthrough', 'power_combiner'];
+  for (const [tier, mark, hpMul, rateMul, minLevel, levelUp] of TIERS) for (const src of TIERED) {
+    const m = models.find((x) => x.id === src), id = `${src}_${tier}`, name = `${m.name} ${mark}`, line = MT.lines[tier - 1];
+    const level = Math.max(minLevel, m.unlock.level + levelUp), mul = (v) => Math.round(v * rateMul);
+    const description = `${m.name}, tier ${mark}: carries ${line.fx} weapon effects and ${line.cap} treated E a second. Tougher, and passes power faster.`;
+    const { guide, ...rest } = m;
+    models.push({
+      ...rest, ...base(id, name, m.family, m.pieces, level, m.material, {}), discharge: mul(m.discharge), intake: mul(m.intake), hpScale: r2(m.hpScale * hpMul),
+      ports: m.ports.map((q) => ({ ...q, rate: mul(q.rate) })), lineTier: tier, noStandIn: true, description,
+      rarity: level >= 20 ? 'rare' : 'uncommon', fabOrder: next('power'),
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(guide.piece ? { piece: guide.piece } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end weapon modifiers)
+
 const COMPONENTS = [
   ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount, for shell-firing guns.'],
   ['coil_winding', 'Coil Winding', 'uncommon', 48, { copper_wire: 6, ferrite_plate: 1 }, 40, '#d97706', 'Copper wound on a ferrite core, for railguns, arc and EMP guns and jump coils.'],
@@ -1062,6 +1153,7 @@ Object.assign(RECIPES, {
   feed_selector: { steel_plate: 1, servo_motor: 1, insulated_polymer: 1 },
   engine_reaction_thruster: { steel_plate: 2, servo_motor: 1, insulated_polymer: 1 },
   cannon_slurry: { titanium_plate: 3, barrel_assembly: 2, insulated_polymer: 2, servo_motor: 1 },
+  cannon_mauler: { steel_plate: 4, barrel_assembly: 2, copper_wire: 2, servo_motor: 1 },
 });
 for (const feed of ['overcharge', 'coolant', 'damping', 'flux', 'accelerant', 'lens', 'catalyst', 'reaction', 'burstgel']) RECIPES[`feed_tank_${feed}`] = { steel_plate: 2, insulated_polymer: 1 };
 // (Field machines: the Field Fabricator is starter materials only, so a bare core can build it; docs/design/field-fabrication.md)
@@ -1089,6 +1181,25 @@ Object.assign(RECIPES, {
   shield_shell: { steel_plate: 2, copper_wire: 3, shield_emitter: 2 },
   shield_half_dome: { titanium_plate: 4, copper_wire: 4, shield_emitter: 3, power_coupling: 1 },
 });
+Object.assign(RECIPES, {
+  mod_mount: { alloy_plate: 1, copper_wire: 3 },
+  mod_mount_double: { steel_plate: 3, power_coupling: 2, coil_winding: 1 },
+  mod_mount_triple: { titanium_plate: 6, power_coupling: 6, coil_winding: 6, capacitor_cell: 2 },
+  mod_coil: { alloy_plate: 1, coil_winding: 1, copper_wire: 1 },
+  mod_resonator: { alloy_plate: 1, capacitor_cell: 1, copper_wire: 3 },
+  mod_chamber: { steel_plate: 2, servo_motor: 1, copper_wire: 1 },
+  mod_prism: { alloy_plate: 1, crystal_lens: 1, copper_wire: 3 },
+  mod_arc: { steel_plate: 2, coil_winding: 4, capacitor_cell: 4, copper_wire: 6 },
+  mod_condenser: { steel_plate: 2, insulated_polymer: 6, power_coupling: 5, copper_wire: 1 },
+  mod_brand: { steel_plate: 2, crystal_lens: 5, coil_winding: 3, power_coupling: 1 },
+  mod_rail: { titanium_plate: 4, coil_winding: 4, capacitor_cell: 2, power_coupling: 1 },
+  hopper_arcsalt: { steel_plate: 2, copper_wire: 4 },
+  hopper_cryo: { steel_plate: 2, copper_wire: 4 },
+  hopper_pyre: { steel_plate: 2, copper_wire: 4 },
+});
+// (A line part's tier II costs 4 of its tier I, tier III 14)
+for (const [tier, mul] of [[2, 4], [3, 14]]) for (const src of ['power_conduit', 'power_corner', 'power_joiner_bank', 'power_splitter_bank', 'power_passthrough', 'power_combiner'])
+  RECIPES[`${src}_${tier}`] = Object.fromEntries(Object.entries(RECIPES[src]).map(([k, v]) => [k, v * mul]));
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);
 const KNOWN = new Set([...read('items.json').items.map((d) => d.id), ...read('recipes.json').refining.map((r) => r.id), ...COMPONENTS.map((c) => c[0])]);
@@ -1119,6 +1230,7 @@ const MODEL_SOUND = {
   cannon_longbarrel: { sfx: 'longbarrel_shot' },
   cannon_bastion: { sfx: 'bastion_shot' },
   cannon_slurry: { sfx: 'slurry_shot' },
+  cannon_mauler: { sfx: 'mauler_shot' },
   autocannon_chainsaw: { sfx: 'chainsaw_shot' },
   autocannon_stinger: { sfx: 'stinger_shot' },
   flak_cloudmaker: { sfx: 'cloudmaker_shot' },
@@ -1183,6 +1295,12 @@ const BLURB = {
   mine_bay: 'Drops proximity mines', docking_clamp: 'Locks two ships together', docking_clamp_heavy: 'Heavy ship-to-ship clamp',
   shield_spark_wall: 'Small shield wall', shield_guard_wall: 'Shield wall for a gun', shield_rampart: 'Large deep shield wall',
   shield_visor: 'Tight shield arc', shield_buckler: 'Small shield arc', shield_shell: 'Wide shield arc', shield_half_dome: 'Half-dome shield',
+  mod_mount: 'Power line with a socket', mod_mount_double: 'Two sockets; fuses recipes', mod_mount_triple: 'Three sockets; fuses recipes',
+  mod_coil: 'Modifier: faster shots', mod_resonator: 'Modifier: faster fire', mod_chamber: 'Modifier: blast on hit', mod_prism: 'Modifier: three-shot fan',
+  mod_arc: 'Special: arcs between targets', mod_condenser: 'Special: slow, heavy shots', mod_brand: 'Special: sets targets burning', mod_rail: 'Special: very fast shots',
+  hopper_arcsalt: 'Feeds an Arc Lattice', hopper_cryo: 'Feeds a Condenser', hopper_pyre: 'Feeds a Brand',
+  ...Object.fromEntries(['power_conduit', 'power_corner', 'power_joiner_bank', 'power_splitter_bank', 'power_passthrough', 'power_combiner'].flatMap((id) =>
+    [[`${id}_2`, 'Carries three weapon effects'], [`${id}_3`, 'Carries four weapon effects']])),
 };
 for (const [id, blurb] of Object.entries(BLURB)) {
   const m = models.find((x) => x.id === id);

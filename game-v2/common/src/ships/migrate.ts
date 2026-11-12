@@ -36,7 +36,7 @@ const itemOf = (p: { material: string; fn: string; piece: string }) => `part:${p
  */
 export function legacyCandidates(catalog: Catalog, p: { fn: string; piece: string }, maxLevel?: number): FunctionDef[] {
   const fam = catalog.legacyFamily.get(p.fn);
-  const all = fam ? catalog.families.get(fam) ?? [] : [];
+  const all = fam ? (catalog.families.get(fam) ?? []).filter((m) => !m.noStandIn) : [];
   const capped = maxLevel === undefined ? all : all.filter((m) => (m.unlock?.level ?? Infinity) <= maxLevel);
   const list = capped.length ? capped : all;
   const want = sizeClass(catalog, p.piece);

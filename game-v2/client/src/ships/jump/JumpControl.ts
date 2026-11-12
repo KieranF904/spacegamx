@@ -1,15 +1,16 @@
 /**
  * @contract client.ship.jump
- * owns:       the local jump drive as the client sees it: phase, reach, landing, aim, charging fields, plus the system's flight world (gravity, star, lodestones, hazards, terrain)
+ * owns:       the local jump drive as the client sees it: phase, reach, landing, aim, charging fields, plus the system's flight world (gravity, star, lodestones, landmarks, hazards, terrain)
  * needs:      JumpControlHost (state, store, isKeyDown, hangarOpen, helm, showMessage), common jump/jumpFields/hazardFlight, terrainFor
  * invariants: reach and landing use the burn's own rules (jumpReachAt, jumpLanding) — server/src/golden/parity.test.ts
  *             a charge under way keeps the aim it was locked with — client/src/ships/jump/JumpControl.test.ts
+ *             the replica env carries systemInfo's landmarks as sent (the carry both ends step) — server/src/net/own/landmarkCarry.test.ts
  * extend:     a new system-wide flight field is one more field set in onSystemInfo and read by replicaEnv
  */
 
 import {
   jumpPhase, jumpTuning, jumpReachAt, jumpLanding, jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, inSolarRing, lodestonePosition, hazardFlight,
-  FRICTION, EntityType, type ServerMessage, type ShipTuning, type JumpTuning, type JumpField, type LodestoneData, type GravityWell, type Terrain, type HazardRules, type ReplicaEnv, type ShipDerived,
+  FRICTION, EntityType, landmarkZoneAt, type Landmark, type ServerMessage, type ShipTuning, type JumpTuning, type JumpField, type LodestoneData, type GravityWell, type Terrain, type HazardRules, type ReplicaEnv, type ShipDerived,
 } from '@space-game/common';
 import hazardData from '../../../../data/hazards.json';
 import type { GameState } from '../../state/GameState';
@@ -40,6 +41,8 @@ export class JumpControl {
   central: { type?: string; radius?: number } | null = null;
   /** This system's stillstones (their fields charge the drive too: common/src/ships/jumpFields.ts), from systemInfo */
   lodestones: LodestoneData[] = [];
+  /** This system's moving landmarks (common world/landmarks.ts: the own step and every replica's carry ships in their zones), from systemInfo */
+  landmarks: Landmark[] = [];
   /** The system as hazards see it (ratings, the star's radius, the central body), from systemInfo */
   hazardSys: { hazardRatings?: Record<string, number>; starRadius?: number; centralBody?: { type?: string } } | null = null;
   hazardFor = (d: ShipDerived, x: number, y: number) => (this.hazardSys ? hazardFlight(HAZARD_RULES, this.hazardSys, d, x, y) : undefined);
@@ -104,6 +107,17 @@ export class JumpControl {
     if (f.lodestone?.id !== id) return 0;
     const ph = this.localJump();
     return ph.phase === 'cooldown' ? 0.3 + 0.7 * ph.progress : ph.phase === 'ready' ? 1 : 0.6;
+  }
+
+  /**
+   * The landmark the local ship is carried with now (landmark tracking), and how strongly (1: held exactly; less: the
+   * fade band). Null in open space
+   */
+  heldBy(): { name: string; weight: number } | null {
+    const me = this.h.state.entities.get(this.h.state.playerId);
+    if (!me || !this.landmarks.length) return null;
+    const z = landmarkZoneAt(this.landmarks, Math.floor(this.h.state.getRawServerTick()), me.x, me.y);
+    return z ? { name: this.landmarks[z.i].name, weight: z.w } : null;
   }
 
   /** This system's stillstones (the map and markers draw them) */
@@ -202,7 +216,7 @@ export class JumpControl {
 
   /** The world the replicas fly in (gravity, the central body, lodestones, hazards, a surface's rock): the gun lanes' too */
   replicaEnv(): ReplicaEnv {
-    return { gravity: this.gravity, central: this.central, lodestones: this.lodestones, hazard: this.hazardFor, terrain: this.terrain };
+    return { gravity: this.gravity, central: this.central, lodestones: this.lodestones, landmarks: this.landmarks, hazard: this.hazardFor, terrain: this.terrain };
   }
 
   /** systemInfo: the new system's well, central body, rock, stillstones and hazards */
@@ -212,6 +226,8 @@ export class JumpControl {
     // A surface's rock (pushed out of it in prediction, as the server does)
     this.terrain = terrainFor(msg.systemId);
     this.lodestones = msg.lodestones ?? [];
+    this.landmarks = msg.landmarks ?? [];
+    this.h.state.landmarks = this.landmarks;
     this.hazardSys = msg.hazardRatings ? { hazardRatings: msg.hazardRatings, starRadius: msg.hazardRadius, centralBody: { type: msg.centralBody.type } } : null;
   }
 

@@ -60,6 +60,8 @@ class FakeLobby implements Lobby {
     this.users = this.users.filter((x) => x !== u);
     return { ok: true as const, id: u.id };
   }
+  async setNewsletter() { return { ok: true as const }; }
+  async newsletterCounts() { return null; }
   private admin(u: FakeUser): AdminUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin, isOwner: !!u.isOwner, createdAt: '', ban: null }; }
   async findUser(username: string) { const u = this.users.find((x) => x.username.toLowerCase() === username.toLowerCase()); return u ? this.admin(u) : null; }
   async listUsers() { return { ok: true as const, users: this.users.map((u) => this.admin(u)), total: this.users.length }; }
@@ -230,7 +232,7 @@ describe('site routes', () => {
 
     const v = new Browser();
     await v.page('/register');
-    expect((await v.req('/register', { method: 'POST', form: { username: 'vega', email: 'v@x.io', password: 'pw', next: '/updates/first-light' } })).location).toBe('/updates/first-light?ok=registered');
+    expect((await v.req('/register', { method: 'POST', form: { username: 'vega', email: 'v@x.io', password: 'pw', newsletter: 'no', next: '/updates/first-light' } })).location).toBe('/updates/first-light?ok=registered');
     await v.page('/updates/first-light');
     const c = await v.req('/updates/first-light/comments', { method: 'POST', form: { body: 'nice <script>alert(1)</script>' } });
     expect(c.status).toBe(303);
@@ -250,7 +252,7 @@ describe('site routes', () => {
 
     const o = new Browser();
     await o.page('/register');
-    await o.req('/register', { method: 'POST', form: { username: 'orrin', email: 'o@x.io', password: 'pw' } });
+    await o.req('/register', { method: 'POST', form: { username: 'orrin', email: 'o@x.io', password: 'pw', newsletter: 'no' } });
     await o.page('/suggestions');
     expect(JSON.parse((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).text)).toEqual({ votes: 2, voted: true });
     expect(JSON.parse((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).text).votes).toBe(2);
@@ -327,7 +329,7 @@ describe('site routes', () => {
   it('account: change password and email, delete (with confirmation) unsigns content', async () => {
     const b = new Browser();
     await b.page('/register');
-    await b.req('/register', { method: 'POST', form: { username: 'dusty', email: 'd@x.io', password: 'pw' } });
+    await b.req('/register', { method: 'POST', form: { username: 'dusty', email: 'd@x.io', password: 'pw', newsletter: 'no' } });
     await b.page('/account');
     expect((await b.req('/account/password', { method: 'POST', form: { password: 'pw', newPassword: 'a', repeat: 'b' } })).text).toContain('don&#39;t match');
     expect((await b.req('/account/password', { method: 'POST', form: { password: 'pw', newPassword: 'pw2', repeat: 'pw2' } })).location).toBe('/account?ok=password');
@@ -350,7 +352,7 @@ describe('site routes', () => {
 
     const v = new Browser();
     await v.page('/register');
-    await v.req('/register', { method: 'POST', form: { username: 'pixel', email: 'p@x.io', password: 'pw', next: '/updates/pictures' } });
+    await v.req('/register', { method: 'POST', form: { username: 'pixel', email: 'p@x.io', password: 'pw', newsletter: 'yes', next: '/updates/pictures' } });
     const page = await v.page('/updates/pictures');
     expect(page.text).toContain('<span class="pic"><img src="/uploads/aaaa00.png"');
     expect(page.text).not.toContain('<span class="pic"><img src="/uploads/cccc00.png"'); // inside a link: left alone

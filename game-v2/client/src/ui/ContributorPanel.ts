@@ -19,18 +19,23 @@
  * go. A placed note you don't want: Discard. The list's Delete all shown
  * clears what the filters show, as one change.
  *
- * The list shows this system's notes, filtered by author and status: fly
- * there (autopilot), look (the camera goes to it; Esc back), edit or delete
- * your own (admins: anyone's) and set its status. The server checks all of it
- * (server/src/game/ContributorNotes.ts); notes come only while the overlay is
- * on. scripts/contributor-notes.mjs fetches them for the terminal.
+ * The list shows everyone's notes, here or in every system, filtered by
+ * author (Mine, Everyone's, one person's) and status, newest or most liked
+ * first: fly there (autopilot), look (the camera goes to it; Esc back), edit
+ * or delete your own (admins: anyone's) and set its status. Click a row, or
+ * someone else's note in space, for its detail view: the note in full, a
+ * thumbs up or down (not on your own), and its comments (contributorModel.ts
+ * has the list's rules and the detail view's markup). The server checks all
+ * of it (server/src/game/ContributorNotes.ts); notes come only while the
+ * overlay is on. scripts/contributor-notes.mjs fetches them for the terminal.
  */
 
 import {
-  nearestNoteBody, noteAnchorPosition, orbitThrough, NOTE_LIMITS,
+  nearestNoteBody, noteAnchorPosition, orbitThrough, NOTE_LIMITS, NOTE_FEEDBACK_LIMITS,
   type ClientMessage, type ContributorNote, type NoteAnchor, type NoteBodies, type NoteDraft, type NoteShape, type NoteShapeKind,
-  type NoteStatus, type PlanetData, type StarSystemData, type StationData,
+  type NoteSort, type NoteStatus, type PlanetData, type StarSystemData, type StationData,
 } from '@space-game/common';
+import { MINE, STATUS_WORD, detailHtml, listNotes, nextVote, noteAuthors, noteControls, noteCounts, rowMeta, type NoteScope } from './contributorModel';
 import type { GameState } from '../state/GameState';
 import type { SystemMap } from './systemMapLazy';
 import type { AutoDest } from '../ships/Autopilot';
@@ -38,6 +43,8 @@ import { drawDraft, drawNotes, noteAt } from '../rendering/contributorDraw';
 import systemsData from '../../../data/systems.json';
 import stationsData from '../../../data/stations.json';
 import { esc } from './escape';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 
 export interface ContributorDeps {
   send(msg: ClientMessage): void;
@@ -68,7 +75,6 @@ const SHAPES: { kind: NoteShapeKind; label: string; tip: string }[] = [
   { kind: 'arrow', label: '➚', tip: 'Arrow (drag to the head)' }, { kind: 'polygon', label: '⬠', tip: 'Polygon (click the corners, right-click or Enter closes it)' },
 ];
 const COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#f87171', '#e2e8f0'];
-const STATUS_WORD: Record<NoteStatus, string> = { open: 'Open', done: 'Done', wontdo: "Won't do" };
 
 const fmt = (n: number) => (Math.abs(n) >= 10000 ? `${(n / 1000).toFixed(Math.abs(n) >= 100000 ? 0 : 1)}k` : `${Math.round(n)}`);
 
@@ -126,6 +132,19 @@ select.ctb-in { padding: 3px 4px; }
 .ctb-note .acts { display: flex; gap: 4px; margin-left: 15px; flex-wrap: wrap; }
 .ctb-tag { font-size: 9px; padding: 0 5px; border-radius: 4px; background: rgba(45, 212, 191, 0.18); color: #99f6e4; font-weight: 400; }
 .ctb-tag.done { background: rgba(134, 239, 172, 0.18); color: #bbf7d0; } .ctb-tag.wontdo { background: rgba(248, 113, 113, 0.18); color: #fecaca; }
+.ctb-tag.you { background: rgba(255, 255, 255, 0.14); color: #e2e8f0; }
+.ctb-note .t .cnt { margin-left: auto; font-weight: 400; font-size: 10px; color: #9fb3b1; white-space: nowrap; }
+.ctb-list { max-height: 46vh; overflow: auto; }
+.ctb-dt { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; margin: 8px 0 2px; overflow-wrap: anywhere; }
+.ctb-dt i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.ctb-dsub { color: #7c8f8d; font-size: 11px; margin-bottom: 6px; }
+.ctb-dtext { white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(0,0,0,0.25); border-radius: 7px; padding: 6px 8px; margin: 4px 0; max-height: 30vh; overflow: auto; }
+.ctb-count { padding: 1px 6px; color: #9fb3b1; font-size: 11px; }
+.ctb-comments { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.ctb-cmt { padding: 4px 6px; border-radius: 7px; background: rgba(255,255,255,0.04); }
+.ctb-cmt .who { display: flex; gap: 4px; align-items: center; color: #7c8f8d; font-size: 11px; }
+.ctb-cmt .who b { color: #99f6e4; font-weight: 600; }
+.ctb-cmt .txt { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 2px; }
 .ctb-veil { position: fixed; inset: 0; z-index: 2300; cursor: crosshair; display: none; }
 .ctb-veil.on { display: block; }
 /* Selecting notes (the panel open): just over the world, under the HUD and windows */
@@ -180,6 +199,13 @@ export class ContributorPanel {
   // The list
   private filterAuthor = '';
   private filterStatus: NoteStatus | 'all' = 'open';
+  private scope: NoteScope = 'here';
+  private sort: NoteSort = 'newest';
+  /** The note whose detail view is up (its votes and comments), in place of the form and list */
+  private detail: string | null = null;
+  private commentText = '';
+  /** A comment sent, not yet answered (the box clears when it's taken) */
+  private posting = false;
   private focus: string | null = null;
   private looking: string | null = null;
   private listKey = '';
@@ -255,6 +281,7 @@ export class ContributorPanel {
     this.fab.classList.toggle('lit', on);
     this.system = this.deps.state.systemId;
     this.deps.send({ type: 'contrib', op: 'overlay', on, system: this.system });
+    if (on && this.scope === 'all') this.deps.send({ type: 'contrib', op: 'list', system: '*' });
     if (!on) this.stopLooking();
   }
 
@@ -277,6 +304,7 @@ export class ContributorPanel {
     this.notes.delete(id);
     if (this.editing?.id === id) this.clearForm();
     if (this.looking === id) this.stopLooking();
+    if (this.detail === id) { this.detail = null; this.render(); return; }
     this.renderList();
   }
 
@@ -284,6 +312,8 @@ export class ContributorPanel {
     this.message = { ok, text };
     if (ok && this.saving) this.clearForm();
     this.saving = false;
+    if (ok && this.posting) this.commentText = '';
+    this.posting = false;
     this.render();
   }
 
@@ -324,7 +354,7 @@ export class ContributorPanel {
   private selectDown(sx: number, sy: number, p: { x: number; y: number }, button: number): void {
     if (button === 2) {
       // Let go: stop editing (unsaved moves are dropped), clear the selection
-      if (this.editing || this.focus) { this.clearForm(); this.focus = null; this.armed = null; this.message = null; this.render(); }
+      if (this.editing || this.focus || this.detail) { this.clearForm(); this.focus = null; this.detail = null; this.armed = null; this.message = null; this.render(); }
       return;
     }
     if (button !== 0) return;
@@ -333,11 +363,11 @@ export class ContributorPanel {
     this.focus = n.id;
     this.armed = null;
     if (this.mayEdit(n)) {
-      if (this.editing?.id !== n.id) this.edit(n);
+      if (this.editing?.id !== n.id || this.detail) this.edit(n);
       if (this.draft) this.drag = { from: p, at0: { ...this.draft.at }, moved: false };
     } else {
-      this.message = { ok: true, text: `${n.title}: by ${n.author} (only they or an admin can change it)` };
-      this.render();
+      // Someone else's: read it, vote, comment
+      this.openDetail(n.id);
     }
   }
 
@@ -396,15 +426,21 @@ export class ContributorPanel {
     this.canvasClear = false;
     const scale = this.deps.zoom();
     const toScreen = (x: number, y: number) => this.deps.worldToScreen(x, y);
-    drawNotes(ctx, this.here(), { toScreen, scale, w, h, tick: this.deps.state.getRawServerTick(), bodies: systemBodies(this.system), focus: this.focus ?? this.editing?.id });
+    drawNotes(ctx, this.here(), { toScreen, scale, w, h, tick: this.deps.state.getRawServerTick(), bodies: systemBodies(this.system), focus: this.focus ?? this.editing?.id, mine: this.isMine });
     this.drawPlacing(ctx, toScreen, scale);
   }
+
+  private viewer() {
+    return { name: this.deps.me(), isAdmin: this.deps.isAdmin() };
+  }
+
+  private isMine = (n: ContributorNote): boolean => n.author.toLowerCase() === this.deps.me().toLowerCase();
 
   private drawOnMap(ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number, S: number, w: number, h: number): void {
     this.mapScale = S;
     if (!this.overlay && !this.placing && !this.draft) return;
     const toScreen = (x: number, y: number) => ({ x: sx(x), y: sy(y) });
-    if (this.overlay) drawNotes(ctx, this.here(), { toScreen, scale: S, w, h, tick: this.deps.state.getRawServerTick(), bodies: systemBodies(this.system), focus: this.focus ?? this.editing?.id });
+    if (this.overlay) drawNotes(ctx, this.here(), { toScreen, scale: S, w, h, tick: this.deps.state.getRawServerTick(), bodies: systemBodies(this.system), focus: this.focus ?? this.editing?.id, mine: this.isMine });
     this.drawPlacing(ctx, toScreen, S);
   }
 
@@ -428,7 +464,7 @@ export class ContributorPanel {
     this.veil.classList.add('on');
     this.deps.map.placeHook = { down: (x, y, b) => this.placeDown(x, y, b), move: (x, y) => this.placeMove(x, y), up: (x, y, b) => this.placeUp(x, y, b) };
     const what = SHAPES.find((s) => s.kind === this.shape)!.tip;
-    this.banner.textContent = `${what}: click in space or on the map (M) · Esc cancels`;
+    this.banner.textContent = `${what}: click in space or on the map (${boundKeyName('map', settings.data.bindings)}) · Esc cancels`;
     this.banner.classList.add('on');
     this.render();
   }
@@ -615,6 +651,7 @@ export class ContributorPanel {
   }
 
   private edit(n: ContributorNote): void {
+    this.detail = null;
     this.editing = n;
     this.form = { title: n.title, text: n.text, sizeHint: n.sizeHint ?? '' };
     this.color = n.color;
@@ -637,7 +674,7 @@ export class ContributorPanel {
   }
 
   private mayEdit(n: ContributorNote): boolean {
-    return this.deps.isAdmin() || n.author.toLowerCase() === this.deps.me().toLowerCase();
+    return noteControls(n, this.viewer()).edit;
   }
 
   private readForm(): void {
@@ -663,7 +700,7 @@ export class ContributorPanel {
       this.finishPolygon();
       return;
     }
-    if ((e.code === 'Delete' || e.code === 'Backspace') && this.isOpen && !this.placing && this.editing) {
+    if ((e.code === 'Delete' || e.code === 'Backspace') && this.isOpen && !this.placing && this.editing && !this.detail) {
       e.preventDefault(); e.stopPropagation();
       this.deleteNote(this.editing);
       return;
@@ -701,6 +738,10 @@ export class ContributorPanel {
     if (!this.isOpen) return;
     // (Keep what's typed across re-renders)
     if (this.body.querySelector('[data-k="title"]')) this.readForm();
+    if (this.detail) {
+      if (this.notes.has(this.detail)) { this.renderDetail(); return; }
+      this.detail = null;
+    }
     const sys = SYSTEMS.find((s) => s.id === this.system);
     const labels = this.movementLabels();
     const moves: Movement[] = [...(this.editing ? ['keep' as const] : []), 'fixed', 'orbit-centre', 'orbit-body', 'attached'];
@@ -720,7 +761,7 @@ export class ContributorPanel {
       <div class="ctb-row">${SHAPES.map((s) => `<button class="ctb-btn shape${this.shape === s.kind ? ' on' : ''}" data-shape="${s.kind}" title="${esc(s.tip)}">${s.label}</button>`).join('')}</div>
       <div class="ctb-row">
         <button class="ctb-btn${this.placing ? ' on' : ''}" data-a="place">${this.placing ? 'Click to place… (Esc)' : this.draft ? (this.editing ? 'Re-place it' : 'Place again') : 'Place it…'}</button>
-        <span class="ctb-hint">${this.draft ? `at ${fmt(this.draft.at.x)}, ${fmt(this.draft.at.y)}` : 'in space or on the map (M)'}</span>
+        <span class="ctb-hint">${this.draft ? `at ${fmt(this.draft.at.x)}, ${fmt(this.draft.at.y)}` : `in space or on the map (${esc(boundKeyName('map', settings.data.bindings))})`}</span>
       </div>
       ${shape ? this.sizeFields(shape) : ''}
       ${this.draft || this.editing ? `
@@ -737,10 +778,14 @@ export class ContributorPanel {
         <input type="color" class="ctb-in" data-k="color" value="${this.color}" style="width:34px;padding:0;height:20px">
         <span class="sp ctb-grow"></span><button class="ctb-btn" data-a="save">${this.editing ? 'Save changes' : 'Save note'}</button></div>
       <div class="ctb-msg ${this.message?.ok ? 'ok' : 'bad'}">${esc(this.message?.text ?? '')}</div>
-      <div class="ctb-sec">Notes here</div>
+      <div class="ctb-sec">Notes</div>
       <div class="ctb-row">
-        <select class="ctb-in ctb-grow" data-k="author"></select>
+        <select class="ctb-in ctb-grow" data-k="author" title="Whose notes"></select>
         <select class="ctb-in" data-k="status">${(['open', 'done', 'wontdo', 'all'] as const).map((s) => `<option value="${s}"${s === this.filterStatus ? ' selected' : ''}>${s === 'all' ? 'Any status' : STATUS_WORD[s]}</option>`).join('')}</select>
+      </div>
+      <div class="ctb-row">
+        <select class="ctb-in ctb-grow" data-k="scope"><option value="here"${this.scope === 'here' ? ' selected' : ''}>This system</option><option value="all"${this.scope === 'all' ? ' selected' : ''}>Every system</option></select>
+        <select class="ctb-in" data-k="sort"><option value="newest"${this.sort === 'newest' ? ' selected' : ''}>Newest first</option><option value="liked"${this.sort === 'liked' ? ' selected' : ''}>Most liked first</option></select>
       </div>
       <div class="ctb-list"></div>
       <div class="ctb-row ctb-bulk"></div>`;
@@ -793,23 +838,99 @@ export class ContributorPanel {
     }));
     q<HTMLSelectElement>('[data-k="author"]')?.addEventListener('change', (e) => { this.filterAuthor = (e.target as HTMLSelectElement).value; this.renderList(); });
     q<HTMLSelectElement>('[data-k="status"]')?.addEventListener('change', (e) => { this.filterStatus = (e.target as HTMLSelectElement).value as NoteStatus | 'all'; this.renderList(); });
+    q<HTMLSelectElement>('[data-k="sort"]')?.addEventListener('change', (e) => { this.sort = (e.target as HTMLSelectElement).value === 'liked' ? 'liked' : 'newest'; this.renderList(); });
+    q<HTMLSelectElement>('[data-k="scope"]')?.addEventListener('change', (e) => {
+      this.scope = (e.target as HTMLSelectElement).value === 'all' ? 'all' : 'here';
+      // (Every system's notes are asked for once; changes to any note come anyway while the overlay is on)
+      if (this.scope === 'all' && this.overlay) this.deps.send({ type: 'contrib', op: 'list', system: '*' });
+      this.renderList();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // The detail view: a note in full, its votes and its comments
+
+  private openDetail(id: string): void {
+    if (this.detail !== id) { this.commentText = ''; this.posting = false; }
+    this.detail = id;
+    this.focus = id;
+    this.armed = null;
+    this.message = null;
+    this.render();
+  }
+
+  private renderDetail(): void {
+    const n = this.notes.get(this.detail ?? '');
+    if (!n) { this.detail = null; this.render(); return; }
+    // (What's typed, the caret and the scroll survive a redraw: other people's comments and votes arrive while you write)
+    const was = this.body.querySelector<HTMLTextAreaElement>('[data-k="comment"]');
+    const caret = was && document.activeElement === was ? [was.selectionStart, was.selectionEnd] : null;
+    const top = this.body.querySelector('.ctb-detail') ? this.body.scrollTop : 0;
+    this.body.innerHTML = detailHtml(n, {
+      viewer: this.viewer(), now: Date.now(), systemName: SYSTEMS.find((s) => s.id === n.system)?.name ?? n.system, here: n.system === this.system,
+      canWarp: this.deps.canWarp ? this.deps.canWarp() : this.deps.isAdmin(), looking: this.looking === n.id, armed: this.armed, commentText: this.commentText, message: this.message,
+    });
+    this.listKey = '';
+    this.wireDetail(n);
+    this.body.scrollTop = top;
+    const box = this.body.querySelector<HTMLTextAreaElement>('[data-k="comment"]');
+    if (caret && box) { box.focus(); box.setSelectionRange(caret[0], caret[1]); }
+  }
+
+  private wireDetail(n: ContributorNote): void {
+    const post = () => {
+      const text = this.commentText.trim();
+      if (!text) { this.message = { ok: false, text: 'Type a comment first' }; this.renderDetail(); return; }
+      this.posting = true;
+      this.deps.send({ type: 'contrib', op: 'comment', id: n.id, text: text.slice(0, NOTE_FEEDBACK_LIMITS.comment) });
+    };
+    const box = this.body.querySelector<HTMLTextAreaElement>('[data-k="comment"]');
+    box?.addEventListener('input', () => { this.commentText = box.value; });
+    box?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); post(); } });
+    this.body.querySelectorAll<HTMLElement>('[data-d]').forEach((b) => {
+      const act = b.dataset.d;
+      if (act === 'status') { b.addEventListener('change', () => this.sendStatus(n, (b as HTMLSelectElement).value as NoteStatus)); return; }
+      b.addEventListener('click', () => {
+        const at = noteAnchorPosition(n.anchor, systemBodies(n.system), this.deps.state.getRawServerTick());
+        if (act === 'back') { this.detail = null; this.armed = null; this.message = null; this.render(); }
+        else if (act === 'up' || act === 'down') this.deps.send({ type: 'contrib', op: 'vote', id: n.id, value: nextVote(n.votes?.mine, act === 'up' ? 1 : -1) });
+        else if (act === 'fly' && at) this.deps.flyTo({ kind: 'point', system: n.system, x: at.x, y: at.y, name: n.title });
+        else if (act === 'look') this.look(n);
+        else if (act === 'warp' && at) this.deps.warp(n.system, Math.round(at.x + 600), Math.round(at.y));
+        else if (act === 'edit') this.edit(n);
+        else if (act === 'delete') this.deleteNote(n);
+        else if (act === 'post') post();
+        else if (act === 'uncomment') {
+          const cid = b.closest<HTMLElement>('[data-cid]')?.dataset.cid;
+          if (!cid) return;
+          if (this.armed !== cid) { this.armed = cid; this.renderDetail(); return; }
+          this.armed = null;
+          this.deps.send({ type: 'contrib', op: 'commentDelete', id: n.id, commentId: cid });
+        }
+      });
+    });
+  }
+
+  private sendStatus(n: ContributorNote, status: NoteStatus): void {
+    const resolution = status === 'open' ? '' : (prompt(status === 'done' ? 'What was done? (optional)' : "Why won't it be done? (optional)", n.resolution ?? '') ?? '');
+    this.deps.send({ type: 'contrib', op: 'status', id: n.id, status, resolution: resolution.slice(0, NOTE_LIMITS.resolution) });
   }
 
   private renderList(): void {
     if (!this.isOpen) return;
+    if (this.detail) { this.renderDetail(); return; }
     const box = this.body.querySelector<HTMLElement>('.ctb-list');
     const authorSel = this.body.querySelector<HTMLSelectElement>('[data-k="author"]');
     if (!box || !authorSel) return;
-    const here = this.here();
-    const me = this.deps.me().toLowerCase();
-    const authors = [...new Set(here.map((n) => n.author))].sort((a, b) => a.localeCompare(b));
-    const list = here
-      .filter((n) => (!this.filterAuthor || (this.filterAuthor === '\u0000me' ? n.author.toLowerCase() === me : n.author === this.filterAuthor)) && (this.filterStatus === 'all' || n.status === this.filterStatus))
-      .sort((a, b) => a.author.localeCompare(b.author) || b.createdAt.localeCompare(a.createdAt));
-    const key = JSON.stringify([list.map((n) => n.id + n.updatedAt), authors, this.filterAuthor, this.filterStatus, this.focus, this.looking, this.overlay, this.armed]);
+    const where = { system: this.system, scope: this.scope };
+    const total = this.scope === 'all' ? this.notes.size : this.here().length;
+    const authors = noteAuthors(this.notes.values(), where);
+    const list = listNotes(this.notes.values(), { ...where, author: this.filterAuthor, status: this.filterStatus, sort: this.sort }, this.viewer());
+    const now = Date.now();
+    const key = JSON.stringify([list.map((n) => [n.id, n.updatedAt, noteCounts(n), rowMeta(n, now)]), authors, this.filterAuthor, this.filterStatus, this.scope, this.sort, this.focus, this.looking, this.overlay, this.armed]);
     if (key === this.listKey) return;
     this.listKey = key;
-    authorSel.innerHTML = `<option value="">Everyone's</option><option value="\u0000me"${this.filterAuthor === '\u0000me' ? ' selected' : ''}>Mine</option>`
+    authorSel.innerHTML = `<option value="">Everyone's</option><option value="${MINE}"${this.filterAuthor === MINE ? ' selected' : ''}>Mine</option>`
       + authors.map((a) => `<option value="${esc(a)}"${a === this.filterAuthor ? ' selected' : ''}>${esc(a)}</option>`).join('');
     const bulk = this.body.querySelector<HTMLElement>('.ctb-bulk');
     const deletable = list.filter((n) => this.mayEdit(n));
@@ -824,17 +945,23 @@ export class ContributorPanel {
       });
     }
     if (!this.overlay) { box.innerHTML = '<div class="ctb-hint">Turn the overlay on to see the notes.</div>'; return; }
-    if (!list.length) { box.innerHTML = `<div class="ctb-hint">${here.length ? 'None match the filter.' : 'No notes in this system yet.'}</div>`; return; }
+    if (!list.length) { box.innerHTML = `<div class="ctb-hint">${total ? 'None match the filter.' : this.scope === 'all' ? 'No notes yet.' : 'No notes in this system yet.'}</div>`; return; }
     // (The warp is a dev tool: the server gives it to the owner, or anyone on a dev server)
     const canWarp = this.deps.canWarp ? this.deps.canWarp() : this.deps.isAdmin();
+    const viewer = this.viewer();
     box.innerHTML = list.map((n) => {
-      const mine = this.mayEdit(n);
-      return `<div class="ctb-note${n.status !== 'open' ? ' dim' : ''}${this.focus === n.id ? ' focus' : ''}" data-id="${esc(n.id)}">
-        <div class="t"><i style="background:${esc(n.color)}"></i>${esc(n.title)} <span class="ctb-tag${n.status !== 'open' ? ` ${n.status}` : ''}">${STATUS_WORD[n.status]}</span></div>
-        <div class="sub">${esc(n.author)} · ${esc(n.shape.kind)} · ${esc(n.anchor.kind)} · ${n.createdAt.slice(0, 10)}${n.resolution ? ` · ${esc(n.resolution)}` : ''}</div>
+      const can = noteControls(n, viewer);
+      const mine = can.edit;
+      const cnt = noteCounts(n);
+      const elsewhere = n.system !== this.system;
+      return `<div class="ctb-note${n.status !== 'open' ? ' dim' : ''}${this.focus === n.id ? ' focus' : ''}" data-id="${esc(n.id)}" data-mine="${can.mine ? 1 : 0}" title="Open it: votes and comments">
+        <div class="t"><i style="background:${esc(n.color)}"></i>${esc(n.title)} <span class="ctb-tag${n.status !== 'open' ? ` ${n.status}` : ''}">${STATUS_WORD[n.status]}</span>${can.mine ? '<span class="ctb-tag you">yours</span>' : ''}
+          <span class="cnt" title="Thumbs up, thumbs down, comments">👍 ${cnt.up} · 👎 ${cnt.down} · 💬 ${cnt.comments}</span></div>
+        <div class="sub">${esc(rowMeta(n, now, elsewhere || this.scope === 'all' ? SYSTEMS.find((s) => s.id === n.system)?.name ?? n.system : undefined))} · ${esc(n.shape.kind)}${n.resolution ? ` · ${esc(n.resolution)}` : ''}</div>
         <div class="acts">
+          <button class="ctb-btn sm" data-n="open" title="The note in full, its votes and comments">Open</button>
           <button class="ctb-btn sm" data-n="fly" title="Autopilot there">Fly</button>
-          <button class="ctb-btn sm${this.looking === n.id ? ' on' : ''}" data-n="look" title="Camera to it (Esc: back)">Look</button>
+          ${elsewhere ? '' : `<button class="ctb-btn sm${this.looking === n.id ? ' on' : ''}" data-n="look" title="Camera to it (Esc: back)">Look</button>`}
           ${canWarp ? '<button class="ctb-btn sm" data-n="warp" title="Warp there (dev tool)">Warp</button>' : ''}
           ${mine ? `<button class="ctb-btn sm" data-n="edit">Edit</button>
             <select class="ctb-in" data-n="status" style="font-size:11px;padding:0 2px">${(['open', 'done', 'wontdo'] as const).map((s) => `<option value="${s}"${s === n.status ? ' selected' : ''}>${STATUS_WORD[s]}</option>`).join('')}</select>
@@ -847,22 +974,18 @@ export class ContributorPanel {
       if (!n) return;
       row.addEventListener('click', (e) => {
         if ((e.target as HTMLElement).closest('button, select')) return;
-        this.focus = this.focus === n.id ? null : n.id;
-        this.renderList();
+        this.openDetail(n.id);
       });
       row.querySelectorAll<HTMLElement>('[data-n]').forEach((b) => {
         const act = b.dataset.n;
         if (act === 'status') {
-          b.addEventListener('change', () => {
-            const status = (b as HTMLSelectElement).value as NoteStatus;
-            const resolution = status === 'open' ? '' : (prompt(status === 'done' ? 'What was done? (optional)' : "Why won't it be done? (optional)", n.resolution ?? '') ?? '');
-            this.deps.send({ type: 'contrib', op: 'status', id: n.id, status, resolution: resolution.slice(0, NOTE_LIMITS.resolution) });
-          });
+          b.addEventListener('change', () => this.sendStatus(n, (b as HTMLSelectElement).value as NoteStatus));
           return;
         }
         b.addEventListener('click', () => {
           const at = noteAnchorPosition(n.anchor, systemBodies(n.system), this.deps.state.getRawServerTick());
-          if (act === 'fly' && at) this.deps.flyTo({ kind: 'point', system: n.system, x: at.x, y: at.y, name: n.title });
+          if (act === 'open') this.openDetail(n.id);
+          else if (act === 'fly' && at) this.deps.flyTo({ kind: 'point', system: n.system, x: at.x, y: at.y, name: n.title });
           else if (act === 'look') this.look(n);
           else if (act === 'warp' && at) this.deps.warp(n.system, Math.round(at.x + 600), Math.round(at.y));
           else if (act === 'edit') this.edit(n);

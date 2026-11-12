@@ -2,7 +2,7 @@
 
 import { join as joinPath } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, Input, Health, Station, rangeDoor, type ClientSocket, type GunRangeDef } from '@space-game/common';
+import { Position, Velocity, InSystem, Input, Health, Station, rangeDoor, type ClientSocket, type GunRangeRoomDef, type RangeDoorDef } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
@@ -16,14 +16,14 @@ const dataDir = joinPath(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 export const S = (server: GameServer) => server as any;
 
-export function boot(): { server: GameServer; store: MemoryProfileStore; def: GunRangeDef; num: number } {
+export function boot(): { server: GameServer; store: MemoryProfileStore; def: GunRangeRoomDef; rooms: GunRangeRoomDef[]; num: number } {
   resetGlobals();
   const store = new MemoryProfileStore();
   const server = makeServer({ profileStore: store, clock: () => 1_000_000 });
   const real = S(server).send.bind(server);
   S(server).send = (ws: any, msg: any) => { (ws.said ??= []).push(msg); real(ws, msg); };
   const sys = server.gameData.getSystem('gun_range')!;
-  return { server, store, def: sys.gunRange!, num: server.gameData.getSystemNum('gun_range') };
+  return { server, store, def: sys.gunRange!.rooms[0], rooms: sys.gunRange!.rooms, num: server.gameData.getSystemNum('gun_range') };
 }
 
 export interface Pilot { link: ReturnType<GameServer['connect']>; conn: any; said: any[]; socket: { isOpen(): boolean } }
@@ -69,9 +69,9 @@ export function fireAt(p: Pilot, x: number, y: number, on = true): void {
   Input.cursorDist[eid] = Math.hypot(x - Position.x[eid], y - Position.y[eid]);
 }
 
-/** Fly the pilot to the door's zone (a teleport inside the system) */
-export function toDoor(def: GunRangeDef, p: Pilot): void {
-  const d = rangeDoor(def), eid = p.conn.playerId;
+/** Fly the pilot to a door's zone, the exit's unless one is given (a teleport inside the system) */
+export function toDoor(def: GunRangeRoomDef, p: Pilot, door?: RangeDoorDef): void {
+  const d = rangeDoor(def, door), eid = p.conn.playerId;
   Position.x[eid] = d.x + d.nx * 200; Position.y[eid] = d.y + d.ny * 200; Velocity.x[eid] = 0; Velocity.y[eid] = 0;
 }
 
@@ -81,4 +81,4 @@ export function kill(p: Pilot): void {
 }
 
 /** The range's heavy target (the Redtooth Mammoth), the far one */
-export const heavyOf = (def: GunRangeDef) => def.targets.find((t) => t.ship === 'giant_mammoth')!;
+export const heavyOf = (def: GunRangeRoomDef) => def.targets.find((t) => t.ship === 'giant_mammoth')!;

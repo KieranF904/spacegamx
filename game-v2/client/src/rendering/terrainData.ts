@@ -36,7 +36,7 @@ type SystemRow = { id: string; arena?: ArenaDef; gunRange?: GunRangeDef };
 const SYSTEMS = (systemsData as unknown as { systems: SystemRow[] }).systems;
 /** Boss arenas by system id: their barriers are part of the rock (world/gates.ts), as on the server */
 const ARENAS = new Map(SYSTEMS.flatMap((s) => (s.arena ? [[s.id, s.arena] as const] : [])));
-/** Gun ranges by system id: their chamber walls are solid terrain (gunRange/layout.ts), as on the server */
+/** Gun ranges by system id: their rooms' walls are solid terrain (gunRange/layout.ts), as on the server */
 const RANGES = new Map(SYSTEMS.flatMap((s) => (s.gunRange ? [[s.id, s.gunRange] as const] : [])));
 
 /** A system's boss arena, if it has one */
@@ -44,7 +44,7 @@ export function arenaFor(systemId: string | null | undefined): ArenaDef | null {
   return (systemId && ARENAS.get(systemId)) || null;
 }
 
-/** A system's gun range chamber, if it is one */
+/** A system's gun range (its rooms), if it is one */
 export function gunRangeFor(systemId: string | null | undefined): GunRangeDef | null {
   return (systemId && RANGES.get(systemId)) || null;
 }

@@ -15,7 +15,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge } from './ships/ShipBridge.js';
-import { Economy, StarterKit, starterKit, hazardFlight, type ShipDerived } from '@space-game/common';
+import { Economy, StarterKit, starterKit, hazardFlight, systemLandmarks, jumpTuning, type ShipDerived } from '@space-game/common';
 import { Pilots } from './game/Pilots.js';
 import { Ammo } from './game/Ammo.js';
 import type { GunRange } from './game/gunRange/GunRange.js';
@@ -49,6 +49,7 @@ import { Events } from './game/Events.js';
 import { AdminTools } from './game/AdminTools.js';
 import type { FieldShips } from './game/field/FieldShips.js';
 import { ContributorNotes } from './game/ContributorNotes.js';
+import { AdminChat } from './game/AdminChat.js';
 import { Surfaces } from './game/Surfaces.js';
 import { Sieges } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
@@ -63,7 +64,7 @@ import { Replication } from './net/Replication.js';
 import { SimLod } from './ships/SimLod.js';
 import { SystemMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
-import { RibbonsFile, type Terrain } from '@space-game/common';
+import { RibbonsFile, type Terrain, type Landmark, type PlanetData, type LodestoneData } from '@space-game/common';
 import { MemoryProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { type TickSystem } from './tickOrder.js';
@@ -110,7 +111,7 @@ import { threats, regionThreats } from './gameServer/threats.js';
 import { travelTo } from './gameServer/travel.js';
 import { step, snapshotRound, ownPasses, gameLoop, drainInputQueue, releaseControls, buildTickSystems, tick, fileBeltsLater } from './gameServer/loop.js';
 import { featuresDeps, replicationDeps, lodDeps, crowdDeps, clocksDeps, snapshotDeps, ownChecksDeps, bodiesDeps } from './gameServer/wiring/net.js';
-import { dockingDeps, pilotsOpts, weaponsDeps, marketDeps, servicesDeps, hazardsDeps, warmthDeps, homesDeps, arenaGatesDeps, recoveryDeps, bossDevDeps, densDeps, contribDeps, codexDeps, achievementsDeps, socialDeps, derelictsDeps, tradeDeps } from './gameServer/wiring/game.js';
+import { dockingDeps, pilotsOpts, weaponsDeps, marketDeps, servicesDeps, hazardsDeps, warmthDeps, homesDeps, arenaGatesDeps, recoveryDeps, bossDevDeps, densDeps, contribDeps, adminChatDeps, codexDeps, achievementsDeps, socialDeps, derelictsDeps, tradeDeps } from './gameServer/wiring/game.js';
 
 /**
  * Game Server - Main server with ECS world and systems
@@ -246,6 +247,8 @@ export class GameServer implements ServerCtx {
   readonly admin: AdminTools;
   /** Contributor notes and the contributor rank */
   readonly contrib: ContributorNotes<ClientConnection>;
+  /** Chat with an admin on the website (the lobby link is adminChatLink.ts, started by index.ts) */
+  readonly adminChat: AdminChat<ClientConnection>;
   readonly surfaces: Surfaces;
   readonly sieges: Sieges;
   readonly hangar: Hangar;
@@ -382,6 +385,7 @@ export class GameServer implements ServerCtx {
     this.admin = new AdminTools(createAdminHost(this));
     installTutorialAdmin(this);
     this.contrib = new ContributorNotes<ClientConnection>(contribDeps(this), opts.contributorStore ?? null, opts.clock);
+    this.adminChat = new AdminChat<ClientConnection>(adminChatDeps(this));
     this.surfaces = new Surfaces(createSurfaceHost(this), this.gameData.rulesFile.surfaces, this.gameData.stringsFile);
     this.sieges = new Sieges(createSiegeHost(this), this.gameData.rulesFile.sieges, this.gameData.stringsFile);
     this.surfaces.partyEntry = (conn, surface) => this.sieges.enter(conn, surface);
@@ -711,8 +715,14 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /**
    * What replicas and the jump drive's fields need of a system (built once each:
-   * none of it changes). The empty scene has no lodestones (systemInfo sends none).
+   * none of it changes). The empty scene has no lodestones (systemInfo sends none), and no landmarks. The landmarks
+   * (common world/landmarks.ts: a pilot's ship in a moving one's zone is carried with it) go to clients in systemInfo.
    */
+  private landmarksOf(sys: { id: string; planets?: PlanetData[]; lodestones?: LodestoneData[] }): { landmarks?: Landmark[] } {
+    const list = systemLandmarks(sys, this.gameData.getSystemStations(sys.id), jumpTuning(this.ships.tuning));
+    return list.length ? { landmarks: list } : {};
+  }
+
   replicaEnv(num: number): ReplicaEnv {
     let env = this.replicaEnvs.get(num);
     if (!env) {
@@ -720,6 +730,7 @@ this.devTeleport = opts.devTeleport ?? false;
       const cb = sys?.centralBody;
       this.replicaEnvs.set(num, (env = { gravity: cb?.gravity ?? null, central: cb ?? null, terrain: this.terrainOf(num) ?? null,
         ...(this.scene !== 'empty' && sys?.lodestones?.length ? { lodestones: sys.lodestones } : {}),
+        ...(this.scene !== 'empty' && sys ? this.landmarksOf(sys) : {}),
         ...(sys?.hazardRatings ? { hazard: (d: ShipDerived, x: number, y: number) => hazardFlight(this.gameData.hazardRules, sys, d, x, y) } : {}) }));
     }
     return env;

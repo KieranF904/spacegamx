@@ -112,6 +112,17 @@ type LookFieldValue<S> = S extends 'number' ? number : S extends 'pal' ? [number
 export type PlanetLookData = { -readonly [K in keyof typeof PLANET_LOOK_FIELDS]?: LookFieldValue<(typeof PLANET_LOOK_FIELDS)[K]> };
 
 /**
+ * A moving landmark's tracking zone where the defaults don't suit (world/landmarks.ts: a ship in it is carried with
+ * the landmark): on a station, a planet, a moon or a stillstone, as `tracking`
+ */
+export interface TrackingData {
+  /** Carried with it exactly inside this (world units from its centre) */
+  inner?: number;
+  /** No carry at and past this; absent: twice the inner radius */
+  outer?: number;
+}
+
+/**
  * A planet: scenery on a slow circular orbit about the system centre (fly
  * over it freely). Position at a tick comes from planetPosition().
  */
@@ -132,7 +143,9 @@ export interface PlanetData {
   /** Ring system, as multiples of the planet radius */
   rings?: { inner: number; outer: number; hue?: number };
   /** Moons (a moon with `surface` can be landed on, like a planet) */
-  moons?: { radius: number; distance: number; period: number; phase: number; name?: string; surface?: string }[];
+  moons?: { radius: number; distance: number; period: number; phase: number; name?: string; surface?: string; tracking?: TrackingData }[];
+  /** Its tracking zone's radii, where the defaults don't suit (world/landmarks.ts) */
+  tracking?: TrackingData;
   description?: string;
   /** Its surface (a system id with `surface`): X in orbit close by descends to it */
   surface?: string;
@@ -291,6 +304,8 @@ export interface LodestoneData {
   /** A spot zone of this system centred on it (factions.json can camp a pack there): only a fixed one can have it */
   zone?: string;
   description?: string;
+  /** An orbiting one's tracking zone's radii, where the defaults don't suit (world/landmarks.ts) */
+  tracking?: TrackingData;
 }
 
 /**
@@ -475,7 +490,7 @@ export interface StarSystemData {
   pocket?: PocketData;
   /** A lair boss's enclosed arena: its barrier is solid both ways, passed by interact (world/gates.ts) */
   arena?: import('../world/gates.js').ArenaDef;
-  /** The gun range (server game/gunRange): one shared indoor chamber with walls all round, a door and a target (gunRange/layout.ts) */
+  /** The gun range (server game/gunRange): its rooms, each an indoor chamber with walls all round, its doors and targets (gunRange/layout.ts) */
   gunRange?: import('../gunRange/layout.js').GunRangeDef;
   /** Data-driven visual overrides */
   visuals?: SystemVisualsData;
@@ -666,6 +681,8 @@ export interface StationData {
   defence?: StationDefenceData;
   dockingRadius: number;
   orbit?: OrbitData;
+  /** An orbiting station's tracking zone's radii, where the defaults don't suit (world/landmarks.ts) */
+  tracking?: TrackingData;
   services: StationService[];
   shop?: ShopData;
   /** What the station's market sells, and the price multipliers it pays for items it wants */

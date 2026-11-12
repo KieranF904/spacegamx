@@ -1,9 +1,10 @@
 /**
  * @contract server.gun-range
  * owns:       the gun range: going in from any station (the pilot's own ship and profile set aside, a cheat ship flown),
- *             picking its weapon, leaving at the door with X, and the ways out that aren't the door (death, a disconnect,
- *             being moved out); dying in it (the respawn is back at the door in the same cheat ship); the targets' upkeep;
- *             each visitor's gunRangeState
+ *             picking its weapon, an admin's pick of a library ship, going through a door with X (the exit: out; a door
+ *             to another room: into that room), and the ways out that aren't the door (death, a disconnect, being moved
+ *             out); dying in it (the respawn is back at the exit door of the room they were in, in the same ship); each
+ *             room's targets' upkeep; each visitor's gunRangeState
  * needs:      GunRangeHost, Pilots (freeze, thaw, swapFrozenShip, realProfile, onFrozenDeath), Ammo (setFree),
  *             common gunRange (layout, buildCheatShip, gunRangeOptions), ./target
  * events:     Pilots.onFrozenDeath (the cheat ship destroyed: the profile stays frozen, nothing is lost)
@@ -12,17 +13,26 @@
  *             a pilot leaves docked at the station they came from with their own ship as it was, by the door, or on a
  *             disconnect; dying there is no way out: the respawn is at the door in the same cheat ship and weapon; nobody
  *             but a visitor stays in the range — server/src/game/gunRange/gunRange.test.ts
- * extend:     a new way into or out of the range is a method here that ends in enter() or leave()
+ *             a room's targets stand only while someone is in that room; a pilot changes room only by X at a door that
+ *             leads there, and arrives inside the door that leads back with the ship, the weapon and the modifiers kept;
+ *             X away from every door does nothing; only an admin is sent the library's ships or may fly one, and the real profile is as
+ *             untouched by one as by the cheat ship — server/src/game/gunRange/rooms.test.ts
+ * extend:     a new way into or out of the range is a method here that ends in enter() or leave(); a new room is data
+ *             (systems.json `gunRange.rooms`: nothing here names one)
  *
- * One shared instance (systems.json `gunRange`, a private system): everyone in it sees everyone else. The cheat ship
- * (common gunRange/cheatShip.ts) carries one weapon model the pilot may fit at their level (gunRangeOptions); its guns are
- * always fully powered (Blueprint.range, read by the shared gun step: every client predicts it) and fire their standard
+ * One shared instance (systems.json `gunRange`, a private system) of a few rooms far apart (common gunRange/layout.ts):
+ * everyone in a room sees everyone else in it. An admin (the server's own admin rule) may fly any design of the ship
+ * library instead of the cheat ship, as it is drawn (its weapon groups kept), under the same rules: the range flag, free
+ * ammunition, the throwaway profile. The cheat ship
+ * (common gunRange/cheatShip.ts) carries one weapon model the pilot may fit at their level (gunRangeOptions), with any
+ * weapon modifiers of theirs behind it (gunRangeMods; each at full strength, live on every shot); its guns are
+ * never short of power (Blueprint.range, read by the shared gun step: every client predicts it; a beam still burns in pieces and rests) and fire their standard
  * crate without limit (Ammo.setFree). The profile in play is a throwaway copy (pilots/freeze.ts): saves write the real
  * one, as it went in; gives, takes, XP, credits, stats and quest events all refuse; build, trade, item and dev messages
  * are refused before their handlers (./messageGate.ts, net/dispatch.ts).
  */
 
-import { atRangeDoor, buildCheatShip, gunRangeOptions, rangeDoor, type Catalog, type GunRangeDef, type ServerGunRangeStateMessage, type ServerMessage } from '@space-game/common';
+import { RANGE_EXIT, buildCheatShip, exitDoor, cleanRangeMods, doorArrival, doorTo, gunRangeMods, gunRangeOptions, rangeDoor, rangeDoorAt, type Blueprint, type Catalog, type GunRangeDef, type GunRangeRoomDef, type ModifierTuning, type ServerGunRangeStateMessage, type ServerMessage } from '@space-game/common';
 import type { Pilots, PilotConn } from '../Pilots.js';
 import type { Ammo } from '../Ammo.js';
 import { RangeTarget, type TargetHost } from './target.js';
@@ -36,10 +46,20 @@ export interface RangeBerth {
   state: unknown;
 }
 
+/** A library ship an admin may fly in the range: its id (the file's name), its name, and the picker's group for it */
+export interface RangeShip {
+  id: string;
+  name: string;
+  group: string;
+  blueprint: Blueprint;
+}
+
 export interface GunRangeHost {
   tick(): number;
   readonly catalog: Catalog;
-  /** The range system: its number and chamber (null: this game's data has none) */
+  /** The weapon modifiers' tuning (none: this game's data has no modifiers) */
+  readonly modifiers: ModifierTuning | undefined;
+  /** The range system: its number and rooms (null: this game's data has none) */
   range(): { num: number; def: GunRangeDef } | null;
   send(conn: PilotConn, msg: ServerMessage): void;
   toast(conn: PilotConn, text: string, kind: 'info' | 'good' | 'warn' | 'bad'): void;
@@ -70,12 +90,23 @@ export interface GunRangeHost {
   /** Somebody who doesn't belong in the range: put back at their home station */
   sendHome(conn: PilotConn): void;
   readonly target: TargetHost;
+  /** May this pilot fly the library's ships here (the server's admin rule: on a dev server its guests too, never elsewhere) */
+  admin(conn: PilotConn): boolean;
+  /** The library ships an admin may fly: the plan library, then the dev test ships (none of the retired ones) */
+  ships(): readonly RangeShip[];
 }
 
 interface Visit {
   berth: RangeBerth;
+  /** The room they are in (its place in the def's list) */
+  room: number;
+  /** Flying this library ship instead of the cheat ship (admins only) */
+  ship?: string;
   weapon: string;
   options: string[];
+  /** The weapon modifier effects chosen, and those they may choose */
+  mods: string[];
+  modOptions: string[];
   /** Their own ship's live energy when they went in */
   charge: unknown;
   /** The cheat ship was destroyed: the respawn takes them back to their station */
@@ -84,7 +115,8 @@ interface Visit {
 
 export class GunRange {
   private readonly visits = new Map<PilotConn, Visit>();
-  private targets: RangeTarget[] | null = null;
+  /** Each room's targets, in the def's order (made at the first tick) */
+  private targets: RangeTarget[][] | null = null;
 
   constructor(private readonly host: GunRangeHost, private readonly pilots: Pilots, private readonly ammo: Ammo) {
     pilots.onFrozenDeath = (conn) => this.died(conn);
@@ -92,7 +124,7 @@ export class GunRange {
 
   /** Anyone in, or a target still standing (the tick has work) */
   busy(): boolean {
-    return this.visits.size > 0 || !!this.targets?.some((t) => t.eid >= 0);
+    return this.visits.size > 0 || !!this.targets?.some((room) => room.some((t) => t.eid >= 0));
   }
 
   isVisitor(conn: PilotConn): boolean {
@@ -101,13 +133,24 @@ export class GunRange {
 
   /** Is this entity one of the range's targets */
   isTarget(eid: number): boolean {
-    return !!this.targets?.some((t) => t.isTarget(eid));
+    return !!this.targets?.some((room) => room.some((t) => t.isTarget(eid)));
   }
 
   /** The weapon models this pilot may try (their real profile's level, licences and ships) */
   options(conn: PilotConn): string[] {
     const p = this.pilots.realProfile(conn);
     return p ? gunRangeOptions(this.host.catalog, p) : [];
+  }
+
+  /** The weapon modifier effects this pilot may try (by the same rule, over every part an effect takes) */
+  modOptions(conn: PilotConn): string[] {
+    const p = this.pilots.realProfile(conn);
+    return p ? gunRangeMods(this.host.catalog, this.host.modifiers, p) : [];
+  }
+
+  private ship(weapon: string, mods: readonly string[]): Blueprint | null {
+    const mt = this.host.modifiers;
+    return buildCheatShip(this.host.catalog, weapon, mt && mods.length ? { tuning: mt, effects: mods } : undefined);
   }
 
   // ------------------------------------------------------------ in
@@ -135,40 +178,78 @@ export class GunRange {
     if (!this.pilots.freeze(conn, ship)) return refuse('Fly your own ship to go in (and wait for your save to load)');
     this.ammo.setFree(conn, true);
     this.host.unberth(conn);
-    this.visits.set(conn, { berth, weapon, options, charge });
-    this.atSpawn(conn, r, this.visits.size - 1);
-    this.host.toast(conn, `Gun range: you are flying the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon you can fit. To go back to ${berth.name}, fly to the door and press {interact}.`, 'info');
+    this.visits.set(conn, { berth, room: 0, weapon, options, mods: [], modOptions: this.modOptions(conn), charge });
+    this.atSpawn(conn, r, 0);
+    this.host.toast(conn, `Gun range: you are flying the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon you can fit. To go back to ${berth.name}, fly to the exit door and press {interact}.`, 'info');
     this.sendState(conn);
   }
 
-  /** Inside the door, side by side (so pilots coming in together, or back from a respawn, don't land on each other) */
-  private atSpawn(conn: PilotConn, r: { num: number; def: GunRangeDef }, k: number): void {
-    const sp = r.def.spawn, door = rangeDoor(r.def), off = ((k % 5) - 2) * 180;
+  /**
+   * Inside a room's door (the exit unless `from` names the room they came from: then the door that leads back there),
+   * side by side (so pilots coming in together, or back from a respawn, don't land on each other)
+   */
+  private atSpawn(conn: PilotConn, r: { num: number; def: GunRangeDef }, room: number, from?: string): void {
+    const d = r.def.rooms[room], back = from === undefined ? undefined : doorTo(d, from);
+    const sp = back ? doorArrival(d, back) : d.spawn, door = rangeDoor(d, back);
+    let k = 0;
+    for (const [c, v] of this.visits) { if (c === conn) break; if (v.room === room) k++; }
+    // (Through a door: the one who came stands in the middle of it, where they'd look for themselves)
+    const off = back ? 0 : ((k % 5) - 2) * 180;
     this.host.travel(conn, r.num, sp.x + door.ny * off, sp.y + door.nx * off, sp.angle);
   }
 
-  /** `gunRangeWeapon`: fly this weapon model instead (one of their options) */
-  pick(conn: PilotConn, model: string): void {
+  /** Through a door to the room it leads to (by id): inside that room's door back, in the ship they are flying, weapon and modifiers as they were */
+  private through(conn: PilotConn, v: Visit, r: { num: number; def: GunRangeDef }, to: string): void {
+    const room = r.def.rooms.findIndex((d) => d.id === to);
+    if (room < 0 || room === v.room) return;
+    const from = r.def.rooms[v.room].id;
+    v.room = room;
+    this.host.calm(conn);
+    this.atSpawn(conn, r, room, from);
+    this.sendState(conn);
+  }
+
+  /** `gunRangeShip`: an admin flies this library ship (by id) as it is drawn, in place of the cheat ship. Refused from anyone else */
+  pickShip(conn: PilotConn, id: unknown): void {
     const v = this.visits.get(conn);
-    if (!v || v.dead || typeof model !== 'string' || model === v.weapon) return;
+    if (!v || v.dead) return;
+    if (!this.host.admin(conn)) { this.host.toast(conn, 'Library ships are for admins', 'warn'); return; }
+    const pick = this.host.ships().find((s) => s.id === id);
+    if (!pick) { this.host.toast(conn, 'No such ship in the library', 'warn'); this.sendState(conn); return; }
+    if (v.ship === pick.id) return;
+    // (The range flag: never captured into a profile, its guns under the range's rules. pilots/persist.ts, types.ts Blueprint.range)
+    if (!this.pilots.swapFrozenShip(conn, { ...pick.blueprint, range: true })) return;
+    v.ship = pick.id;
+    this.sendState(conn);
+  }
+
+  /** `gunRangeWeapon`: fly this weapon model instead (one of their options), with these weapon modifiers (`asked` absent: as they were) */
+  pick(conn: PilotConn, model: string, asked?: unknown): void {
+    const v = this.visits.get(conn);
+    if (!v || v.dead || typeof model !== 'string') return;
+    v.modOptions = this.modOptions(conn);
+    const mods = cleanRangeMods(v.modOptions, asked === undefined ? v.mods : asked);
+    if (!v.ship && model === v.weapon && mods.join() === v.mods.join()) return;
     v.options = this.options(conn);
     if (!v.options.includes(model)) { this.host.toast(conn, 'That weapon is not one you can fit yet', 'warn'); this.sendState(conn); return; }
-    const ship = buildCheatShip(this.host.catalog, model);
+    const ship = this.ship(model, mods);
     if (!ship || !this.pilots.swapFrozenShip(conn, ship)) return;
-    v.weapon = model;
+    v.weapon = model; v.mods = mods; v.ship = undefined;
     this.sendState(conn);
   }
 
   // ------------------------------------------------------------ out
 
-  /** X: at the door, out; anywhere else in the range, a reminder. True when the pilot is a visitor (nothing else answers X here) */
+  /** X: at the exit door, out; at a door to another room, into it; anywhere else in the range, a reminder. True when the pilot is a visitor (nothing else answers X here) */
   interact(conn: PilotConn): boolean {
     const v = this.visits.get(conn), r = this.host.range();
     if (!v) return false;
     if (v.dead || !r || !this.host.flying(conn)) return true;
     const at = this.host.where(conn);
-    if (atRangeDoor(r.def, at.x, at.y)) this.leave(conn);
-    else this.host.toast(conn, 'Fly to the door and press {interact} to leave the range.', 'info');
+    const door = rangeDoorAt(r.def.rooms[v.room], at.x, at.y);
+    if (!door) this.host.toast(conn, 'Fly to the exit door and press {interact} to leave the range.', 'info');
+    else if (door.to === RANGE_EXIT) this.leave(conn);
+    else this.through(conn, v, r, door.to);
     return true;
   }
 
@@ -198,13 +279,13 @@ export class GunRange {
     this.host.toast(conn, 'Range ship destroyed. Nothing is lost. Respawn to fly it again at the door.', 'info');
   }
 
-  /** A respawn (net/handlers/flight.ts): one who died in the range is back inside its door, in the same cheat ship and weapon */
+  /** A respawn (net/handlers/flight.ts): one who died in the range is back inside their room's exit door, in the same ship and weapon */
   respawned(conn: PilotConn): void {
     const v = this.visits.get(conn), r = this.host.range();
     if (!v?.dead || !r) return;
     v.dead = false;
     this.host.calm(conn);
-    this.atSpawn(conn, r, [...this.visits.keys()].indexOf(conn));
+    this.atSpawn(conn, r, v.room);
     this.sendState(conn);
   }
 
@@ -215,7 +296,7 @@ export class GunRange {
 
   // ------------------------------------------------------------ the tick
 
-  /** Every tick while busy: the targets kept, and every visitor where they should be (and nobody else in the range) */
+  /** Every tick while busy: each room's targets kept, and every visitor where they should be (and nobody else in the range) */
   tick(): void {
     const r = this.host.range();
     if (!r) return;
@@ -227,24 +308,31 @@ export class GunRange {
       if (!v.dead && this.host.flying(conn) && this.host.systemOf(conn) !== r.num) this.leave(conn);
     }
     if (now % 30 === 0) for (const c of this.host.pilotsIn(r.num)) if (!this.visits.has(c) && this.host.flying(c)) this.host.sendHome(c);
-    this.targets ??= r.def.targets.map((d) => new RangeTarget(this.host.target, d));
-    // (A dead pilot is still a visitor: they respawn at the door, and the targets stay up for them)
-    const occupied = this.visits.size > 0;
-    let changed = false;
-    for (const t of this.targets) if (t.tick(now, occupied)) changed = true;
-    if (changed) for (const [c, v] of this.visits) if (!v.dead) this.sendState(c);
+    this.targets ??= r.def.rooms.map((room) => room.targets.map((d) => new RangeTarget(this.host.target, d)));
+    // (A room's targets stand while anyone is in that room. A dead pilot is still in theirs: they respawn at its door)
+    const inRoom = r.def.rooms.map(() => false);
+    for (const v of this.visits.values()) inRoom[v.room] = true;
+    this.targets.forEach((room, i) => {
+      let changed = false;
+      for (const t of room) if (t.tick(now, inRoom[i])) changed = true;
+      if (changed) for (const [c, v] of this.visits) if (v.room === i && !v.dead) this.host.send(c, this.stateOf(c, false));
+    });
   }
 
   // ------------------------------------------------------------ the state
 
-  private stateOf(conn: PilotConn): ServerGunRangeStateMessage {
+  /** `full`: with an admin's ship list (left out of the states a target's coming and going sends: the client keeps it) */
+  private stateOf(conn: PilotConn, full = true): ServerGunRangeStateMessage {
     const v = this.visits.get(conn), r = this.host.range();
     if (!v || !r) return { type: 'gunRangeState', in: false };
-    const door = rangeDoor(r.def);
+    const d: GunRangeRoomDef = r.def.rooms[v.room], door = rangeDoor(d), admin = this.host.admin(conn);
     return {
-      type: 'gunRangeState', in: true, weapon: v.weapon, options: v.options, station: v.berth.name,
-      door: { x: door.x, y: door.y, reach: r.def.door.reach },
-      targets: r.def.targets.map((t, i) => ({ id: this.targets?.[i]?.eid ?? -1, x: t.x, y: t.y, label: t.label })),
+      type: 'gunRangeState', in: true, weapon: v.weapon, options: v.options, mods: v.mods, modOptions: v.modOptions, station: v.berth.name,
+      room: d.id,
+      ...(v.ship && admin ? { ship: v.ship } : {}),
+      ...(full && admin ? { ships: this.host.ships().map((s) => ({ id: s.id, name: s.name, group: s.group })) } : {}),
+      door: { x: door.x, y: door.y, reach: exitDoor(d).reach },
+      targets: d.targets.map((t, i) => ({ id: this.targets?.[v.room]?.[i]?.eid ?? -1, x: t.x, y: t.y, label: t.label })),
     };
   }
 

@@ -9,7 +9,7 @@
  * forced-mismatch test). What a test compares it with is the server's own record (spawns, hits, state), not another client.
  */
 import {
-  DEFAULT_CAPS, PROTOCOL_VERSION, SIDE, EntityType, Position, Rotation, Velocity, Input, InSystem, INPUT_BOOLS, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  DEFAULT_CAPS, PROTOCOL_VERSION, SIDE, EntityType, Position, Rotation, Velocity, Input, InSystem, INPUT_BOOLS, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, gunCode, gunCodePart, gunCodeAmmo, gunCodeAug, gunCodeFx, shellGunCode, ShipReplicaSet,
   type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
@@ -240,7 +240,7 @@ export class FakeHitsClient {
       for (const e of events) {
         if (e.k !== 'fire' || !ship) continue;
         const aug = (e as { aug?: 1 }).aug;
-        if (e.barrel === 0 && this.ownShells.derivable(ship, e.slot + (aug ? 65536 : 0))) this.ownShells.fired({ tick: t, part: e.slot, aimQ: e.aimQ, ammo: 0, aug });
+        if (e.barrel === 0 && this.ownShells.derivable(ship, gunCode(e.slot, 0, !!aug, e.fx))) this.ownShells.fired({ tick: t, part: e.slot, aimQ: e.aimQ, ammo: 0, aug, fx: e.fx });
         if (this.ownShells.derivable(ship, e.slot)) { const at = client.get(t); if (at) at.push(e.shot); else client.set(t, [e.shot]); }
       }
     }
@@ -428,15 +428,15 @@ export class FakeHitsClient {
     for (const [owner, ago, partAmmo, aimQ, ...ids] of s.fire ?? []) {
       for (const id of ids) this.known.add(id);
       if (owner === this.pid) this.ownFired += ids.length;
-      const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
+      const tick = s.tick - ago, part = gunCodePart(partAmmo), ammo = gunCodeAmmo(partAmmo), aug = gunCodeAug(partAmmo) ? (1 as const) : undefined, fx = gunCodeFx(partAmmo) || undefined;
       // (its own too, CAPS.OWN_SHOTS: from its confirmed ship, replicated to it as to everyone; never its prediction)
       // (its own, CAPS.OWN_SIM: where it was as it fired, before that tick's pulls and contacts: OwnTick.firePose)
       const ship = this.store.get(owner), body = owner === this.pid && this.own.on ? this.own.firePose(tick) : this.reps.preAt(owner, tick);
-      const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, body, this.server.getShips().tuning) : null;
+      const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug, fx }, ship as ShipState, body, this.server.getShips().tuning) : null;
       const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       for (const id of ids) {
         const sh = v?.shells.find((x) => x.id === id);
-        this.shells.set(id, { owner, gun: partAmmo, spawnTick, x: sh?.x ?? 0, y: sh?.y ?? 0, vx: sh?.vx ?? 0, vy: sh?.vy ?? 0 });
+        this.shells.set(id, { owner, gun: v ? shellGunCode(partAmmo, v.def, ids.indexOf(id)) : partAmmo, spawnTick, x: sh?.x ?? 0, y: sh?.y ?? 0, vx: sh?.vx ?? 0, vy: sh?.vy ?? 0 });
         if (sh && isOtherShotWire(id)) { this.otherGuns.built(id, tick + sh.life - 1); this.otherDerived++; this.otherShells.set(id, { owner, tick, part, x: sh.x, y: sh.y, vx: sh.vx, vy: sh.vy }); }
         if (sh) this.selfHits?.addShell(id, owner, partAmmo, spawnTick, sh.x, sh.y, sh.vx, sh.vy, sh.size);
       }

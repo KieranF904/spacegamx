@@ -1,7 +1,8 @@
 /**
  * @contract client.weapon-fx.tracer
  * owns:       drawing every flying shell: its tracer or body, contrail, afterimages, pulse rings, nose light, crackle and pull
- *             field, the lobbed shells' landing marks and the guided shell's guide line
+ *             field, its smoke (a missile's trail, a canister's swept along its path), the lobbed shells' landing marks and the
+ *             guided shell's guide line
  * needs:      FxField (pools, smoke list, line/circle), ShellBodies, WeaponStyle fields, TracerHost (guideTo, state); npm: @space-game/common, pixi.js
  * invariants: a shell that ended at a surface draws nothing past it — client/src/rendering/weapons/visualStop.test.ts
  *             a dying tracer fades and shrinks towards its head linearly over FADE_FRAMES (fadeState) and draws nothing after it — client/src/rendering/weapons/fx/fxInvariants.test.ts
@@ -15,8 +16,12 @@ import type { GameState } from '../../../state/GameState';
 import { ShellBodies, fuseFraction } from '../shellBodies';
 import { sonarPeriod } from '../ordnanceTells';
 import type { FxField } from './FxField';
-import { FADE_FRAMES, TEX, TEX2, mixColor } from './particleTypes';
+import { modFlight } from './mods';
+import { FADE_FRAMES, HIT_CAP, SMOKE_CAP, TEX, TEX2, mixColor } from './particleTypes';
 import type { Shot } from './shotTypes';
+
+/** A tapering tracer's lengths (WeaponStyle.taper), tail to head: the share of the tracer each covers back from the head, its width and its light */
+const TAPER = [{ len: 1, wide: 0.45, lit: 0.6 }, { len: 0.5, wide: 0.7, lit: 0.68 }, { len: 0.18, wide: 1, lit: 0.9 }];
 
 /** A piece of contrail left in the world: it stays where it was laid and fades over `max` frames, long after the shot has gone */
 interface TrailSeg { x0: number; y0: number; x1: number; y1: number; age: number; max: number; width: number; color: number; alpha: number }
@@ -112,6 +117,8 @@ export class TracerFx {
     fr.dx = dx; fr.dy = dy; fr.dl = dl; fr.z = z; fr.alpha = alpha; fr.fade = fade; fr.glowCol = glowCol; fr.coreCol = coreCol;
     this.drawBody(shot, fr, clock);
     this.drawExtras(shot, fr, clock, frames);
+    // Its gun's modifiers, each adding its own layer (fx/mods)
+    if (shot.fx) modFlight(this.f, shot, hx, hy, bx, by, ux, uy, dl, z, alpha, clock, frames);
   }
 
   /** The tracer's lines, halo and head (or the shell's body); an ended shell collapses into its impact point */
@@ -138,18 +145,25 @@ export class TracerFx {
           if (cw > 0 && dl > cw) this.f.line(bx + ox, by + oy, hx + ox - ux * cw * 0.5, hy + oy - uy * cw * 0.5, cw, coreCol, 0.9 * alpha);
           continue;
         }
-        if (st.glowWidth > 0) this.f.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
-        if (st.coreWidth > 0) this.f.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
-        if (st.haloRadius > 0) {
-          this.f.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
-          this.f.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);
+        // (the halo: one soft-edged dot under the tracer, so a dark shell stays dark in its own light)
+        if (st.haloRadius > 0) this.f.circle(g, TEX.dot, hx + ox, hy + oy, st.haloRadius * z * wk * 1.15, shot.glow, 0.34 * alpha);
+        if (st.taper) {
+          // A trail: the whole length thin and faint, then shorter, fatter, brighter lengths laid over it up to the head
+          for (const t of TAPER) {
+            const tx = hx + (bx - hx) * t.len + ox, ty = hy + (by - hy) * t.len + oy;
+            if (st.glowWidth > 0) this.f.line(tx, ty, hx + ox, hy + oy, st.glowWidth * z * wk * t.wide, glowCol, st.glowAlpha * alpha * t.lit);
+            if (st.coreWidth > 0) this.f.line(tx, ty, hx + ox, hy + oy, st.coreWidth * z * wk * t.wide, coreCol, 0.9 * alpha * t.lit);
+          }
+        } else {
+          if (st.glowWidth > 0) this.f.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
+          if (st.coreWidth > 0) this.f.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
         }
         if (st.headRadius > 0) this.f.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, st.headColor ?? 0xffffff, alpha);
       }
     }
   }
 
-  /** What a shell adds beside its body: contrail, afterimages, pulse rings, nose light, guide, cloud, lightning, pull, smoke */
+  /** What a shell adds beside its body: contrail, ember drip, afterimages, pulse rings, nose light, guide, cloud, lightning, pull, smoke */
   private drawExtras(shot: Shot, fr: TracerFrame, clock: number, frames: number): void {
     const st = shot.style, g = this.f.glow;
     const { hx, hy, bx, by, ux, uy, nx, ny, dx, dy, dl, z, alpha, fade } = fr;
@@ -165,6 +179,12 @@ export class TracerFx {
         if (this.trailLen < TRAIL_CAP) this.trailLen++;
       }
       shot.ctX = hx; shot.ctY = hy;
+    }
+    // Embers shed behind an incendiary: each carries a little of the shell's speed, falls behind it and cools
+    const dr = st.drip;
+    if (dr && shot.fading === null && Math.random() < dr.rate * frames * Math.min(1, this.f.particleKeep)) {
+      this.f.sparks.push({ x: hx, y: hy, vx: shot.vx * 0.1 + (Math.random() - 0.5) * 2.4, vy: shot.vy * 0.1 + (Math.random() - 0.5) * 2.4,
+        life: 0, max: dr.life * (0.6 + Math.random() * 0.8), color: dr.hot, width: 1.4 + Math.random(), drag: 0.93, cool: dr.cool });
     }
     // Ghost copies of the head, each further back and fainter
     if (st.afterimages && shot.fading === null) {
@@ -183,6 +203,17 @@ export class TracerFx {
       const q = shot.pulse % 1, r = rp.size * z * (0.3 + 0.7 * q);
       const k2 = (r * 2 * 32) / (28 * DOT_SIZE);
       this.f.extraG.take(TEX2.ring, hx, hy, 0.5, 0.5, rp.color, 0.7 * (1 - q) * alpha, 0, k2, k2);
+    }
+    // Ripples left along its path: a thin ring thrown off on a beat, widening and fading where it was left
+    const rip = st.ripple;
+    if (rip && shot.fading === null) {
+      shot.pulse += frames / rip.every;
+      if (shot.pulse >= 1) {
+        shot.pulse %= 1;
+        if (this.f.shocks.length < HIT_CAP && (this.f.particleKeep >= 1 || Math.random() <= this.f.particleKeep)) {
+          this.f.shocks.push({ x: hx, y: hy, life: 0, max: rip.life, size: rip.size * z, width: 1.2, color: rip.color });
+        }
+      }
     }
     // A light at the nose: a hard blink, or a slow pulse
     const ns = st.nose;
@@ -261,6 +292,21 @@ export class TracerFx {
       this.f.smoke.push({ x: (st.wobble ? hx : shot.head!.x) - shot.vx * 0.5, y: (st.wobble ? hy : shot.head!.y) - shot.vy * 0.5, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
         life: 0, max: st.trail.life * (0.7 + Math.random() * 0.6), size: st.trail.size * (0.6 + Math.random() * 0.5) });
     }
+    // Smoke swept along its path: puffs laid along the stretch it flew this frame, each carried on after the shell and
+    // dragging to a stop (so the trail is densest and still moving just behind it), now and then a hot fleck among them
+    const sw = st.sweep;
+    if (sw && shot.fading === null) {
+      const rnd = Math.random;
+      for (let i = sw.count; i > 0 && this.f.smoke.length < SMOKE_CAP; i--) {
+        if (this.f.particleKeep < 1 && rnd() > this.f.particleKeep) continue;
+        const back = rnd() * Math.max(1, frames), carry = (0.06 + rnd() * 0.2) * (sw.carry ?? 1), off = (rnd() - 0.5) * sw.size * 0.7;
+        this.f.smoke.push({ x: hx - shot.vx * back + nx * off, y: hy - shot.vy * back + ny * off, vx: shot.vx * carry + (rnd() - 0.5) * 0.5, vy: shot.vy * carry + (rnd() - 0.5) * 0.5,
+          life: 0, max: sw.life * (0.6 + rnd() * 0.8), size: sw.size * (0.5 + rnd() * 0.7), color: sw.color, alpha: 0.2 });
+      }
+      if (rnd() < 0.3 * Math.min(1, frames)) {
+        this.f.sparks.push({ x: hx, y: hy, vx: shot.vx * 0.3 + (rnd() - 0.5) * 2, vy: shot.vy * 0.3 + (rnd() - 0.5) * 2, life: 0, max: 14 + rnd() * 14, color: shot.glow, width: 1.4, drag: 0.9, cool: 0x7a2a10 });
+      }
+    }
   }
 
   private drawLandings(shots: Iterable<Shot>): void {
@@ -314,7 +360,7 @@ export class TracerFx {
       sg.age += frames;
       if (sg.age >= sg.max) continue;
       const f = 1 - sg.age / sg.max;
-      this.f.line(sg.x0, sg.y0, sg.x1, sg.y1, sg.width, sg.color, sg.alpha * f);
+      this.f.band(sg.x0, sg.y0, sg.x1, sg.y1, sg.width, sg.color, sg.alpha * f);
     }
     // (Lives differ per style, so only the oldest ones can be dropped from the count)
     while (this.trailLen > 0) {

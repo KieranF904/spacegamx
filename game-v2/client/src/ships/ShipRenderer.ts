@@ -1,6 +1,6 @@
 /**
  * @contract client.ship.renderer
- * owns:       drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights
+ * owns:       drawing modular ships and debris each frame: views per ship, hull slots, fades, labels (put away in a bunch of ships: render/labelCrowd.ts), health bars, lights
  * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
  * invariants: a hull is built once per design, parts attached, colouring and kind, and shared by every ship like it — client/src/ships/rigidHull.test.ts
  *             damage and the hit flash are data the hull shader reads: taking hits builds nothing — client/src/ships/ShipRenderer.test.ts
@@ -32,6 +32,7 @@ import type { ShipDrawCtx } from './features/types';
 import { cameraView } from '../rendering/cameraView';
 import factionsData from '../../../data/factions.json';
 import type { BodyView } from './render/viewTypes';
+import { LabelCrowd } from './render/labelCrowd';
 import {
   FADE, OFFSCREEN_MARGIN, GUN_MIN_PX, STATUS_SLOT, HEADLIGHT, LAMPS_BELOW, BIG_HULL, BUILD_EVERY,
   LABEL_STYLE, TRAFFIC_LABEL_STYLE, HOSTILE_LABEL_STYLE, CALM_LABEL_STYLE, ELITE_LABEL_STYLE, BOSS_LABEL_STYLE,
@@ -52,6 +53,8 @@ export class ShipRenderer {
   private engines: ThrusterFx;
   private partFx = new PartFx();
   private lastFrame = 0;
+  /** Which names show when ships bunch up */
+  private labelCrowd = new LabelCrowd();
   private flamesLayer = new Container();
   /** Under the hulls (fixed barrels), the hulls in a few draws, then over them (flashes, turrets) */
   private underLayer = new Container();
@@ -231,6 +234,7 @@ export class ShipRenderer {
     this.hulls.begin();
     // (Part features' once-a-frame setup: a Tow Beam's tethers are one graphics, cleared here and drawn afresh by each ship's draw)
     this.features?.beginFrame(this.layer);
+    this.labelCrowd.begin();
 
     for (const [eid, ship] of this.bridge.bodies) {
       const entity = this.state.entities.get(eid);
@@ -323,7 +327,9 @@ export class ShipRenderer {
         // Counter-scaled when zoomed out, so it stays readable
         const k = this.renderer.tagScale;
         view.label.scale.set(k);
-        view.label.alpha = view.labelAlpha * view.vis;
+        // In a bunch of ships the names lie over each other and the ships: only the one under the cursor is named (a boss or an elite always)
+        const named = view.named = this.labelCrowd.add(eid, entity.renderX, entity.renderY, (entity.data?.[4] ?? 0) > 0);
+        view.label.alpha = view.labelAlpha * view.vis * named;
         // Below the ship on screen, upright however the camera's rolled (helm)
         const a = cameraView.angle, below = ship.derived.radius + 24, ux = -Math.sin(a), uy = Math.cos(a);
         view.label.x = entity.renderX + ux * below;
@@ -334,10 +340,12 @@ export class ShipRenderer {
           const f = Math.max(0, Math.min(1, (entity.data?.[5] ?? 100) / 100));
           const sh = (entity.data?.[1] ?? 0) / 100;
           const w = 120, x0 = -w / 2;
-          view.bar.position.set(view.label.x + ux * 32 * k, view.label.y + uy * 32 * k);
+          // (its name put away: the bar moves up to where the name was, at half size and fainter)
+          const up = 32 * k * named, small = 0.5 + 0.5 * named;
+          view.bar.position.set(view.label.x + ux * up, view.label.y + uy * up);
           view.bar.rotation = a;
-          view.bar.scale.set(k);
-          view.bar.alpha = view.vis;
+          view.bar.scale.set(k * small);
+          view.bar.alpha = view.vis * (0.6 + 0.4 * named);
           const key = `${f}|${sh}`;
           if (key !== view.barKey) {
             view.barKey = key;
@@ -354,6 +362,8 @@ export class ShipRenderer {
       view.flames.rotation = view.container.rotation;
       this.placeHull(view);
     }
+
+    this.labelCrowd.end(dt, this.renderer.tagScale, cameraView.angle, this.renderer.pointerWorld?.() ?? null);
 
     for (const [eid, view] of this.views) {
       if (seen.has(eid)) continue;
@@ -372,7 +382,7 @@ export class ShipRenderer {
       view.vis = Math.min(view.vis ?? view.fade, view.fade);
       view.container.alpha = view.barrels.alpha = view.flames.alpha = view.vis;
       this.placeHull(view);
-      if (view.label) view.label.alpha = view.labelAlpha * view.vis;
+      if (view.label) view.label.alpha = view.labelAlpha * view.vis * (view.named ?? 1);
       if (view.bar) view.bar.alpha = view.vis;
       if (view.beam) view.beam.visible = false;
       this.leaving[w++] = view;

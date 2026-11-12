@@ -6,6 +6,9 @@
  * invariants: hpWire is a tenth, never rounded to nothing, 0 for gone; shellAmount is def damage times strength and
  *             f32 like the server stores it — common/src/ships/hitRules.test.ts
  *             shellVs, igniteRule and hitEndFx follow their stated rules — common/src/ships/hitRules.test.ts
+ *             a shell that shares its hit between hulls (pierceFracs) lights the part it strikes on every one (its
+ *             fire's heat there is the server's: game/Weapons.ts), and a pass of one without a blast is told as
+ *             before — common/src/ships/hitRules.combos.test.ts
  * extend:     a new hit modifier is a step inside partHit / shellVs, run by the server (bridge/damage.ts hurt) and
  *             the client alike; never a server-only rule
  */
@@ -20,6 +23,7 @@
  *   shellAmount   a shell's damage after its pierce passes (as the server stores it: f32)
  *   shellVs       what a shell hits with (damage type and penetration, its shield and hull scales, its bane)
  *   igniteRule    the part a fire shell sets burning
+ *   passShare     a passing shell's share at a hull; exitHeading: an exit blast's `out`
  *   hitEndFx      the detonation a shell's end (or a pierce pass) is told with
  *   hpWire        part HP as the wire carries it
  *   deriveShellHit  the lot, on a client's view of the target (shield unknown: 0; boss modifiers unknown: defaults)
@@ -42,8 +46,8 @@ import { hitMultiplier, weaponHit, type HitInfo } from './damage.js';
 import { RUIN_HP, stageOf, currentStage, standing, deciding, stageParts } from './stages.js';
 import { partDistance, castParts } from './collide.js';
 import { worldToLocalDir } from './flight.js';
-import { gunDef, stackMods, ammoByCode } from './launch.js';
-import { dhypot } from '../math/detTrig.js';
+import { shipGunDef, stackMods, ammoByCode, gunCodePart, gunCodeAmmo, gunCodeAug, gunCodeFx, gunCodePlace, burstShareOf } from './launch.js';
+import { dhypot, datan2 } from '../math/detTrig.js';
 import { crossShaped, shapedOf, shapedReach, shieldUp, soakShaped, type ShapedCross, type ShapedSoak } from './features/zoneshield/shaped.js';
 
 /** A hit that gets less than this share through the armour it strikes shows as glancing */
@@ -161,10 +165,13 @@ export function shellGone(def: WeaponTuning, passes: number): boolean {
 
 /**
  * A shell's damage after `passes` pierce passes: (def.damage ?? 14) × strength, × pierceKeep each pass. Rounded to
- * f32 at each step, as the server's Projectile.damage stores it.
+ * f32 at each step, as the server's Projectile.damage stores it. (A weapon modifier's shell, tuning.ts pierceFracs:
+ * its share for that hit instead, the last one repeating)
  */
 export function shellAmount(def: WeaponTuning, strength: number, passes = 0): number {
   let a = Math.fround((def.damage ?? 14) * strength);
+  const f = def.pierceFracs;
+  if (f) return Math.fround(a * f[Math.min(passes, f.length - 1)]);
   for (let i = 0; i < passes; i++) a = Math.fround(a * pierceKeepOf(def));
   return a;
 }
@@ -295,11 +302,29 @@ export function igniteRule(ship: ShipState, struck: number, def: WeaponTuning): 
   return def.ignite && ship.kind === 'ship' && struckStands(ship, struck) ? struck : -1;
 }
 
-/** The detonation a shell's hit is told with: its end (`gone`), when it bursts; a pierce pass, when its def keeps damage */
+/**
+ * The share of its hit a shell carries after `passes` passes (a weapon modifier's piercing or wave shell: tuning.ts
+ * pierceFracs, the last entry repeating); 1 for any other. Its blast at each hull and its fire's heat go by it
+ */
+export function passShare(def: WeaponTuning, passes: number): number {
+  const f = def.pierceFracs;
+  return f ? f[Math.min(Math.max(0, passes), f.length - 1)] : 1;
+}
+
+/** A shot's heading where it leaves a hull, as an exit blast's detonation carries it (`out`): whole degrees, 0..359 */
+export function exitHeading(dx: number, dy: number): number {
+  return ((Math.round((datan2(dy, dx) * 180) / Math.PI) % 360) + 360) % 360;
+}
+
+/**
+ * The detonation a shell's hit is told with: its end (`gone`), when it bursts; a pierce pass, when its def keeps
+ * damage, or when it shares its hit between hulls and has a blast (the blast where it enters each one)
+ */
 export interface HitEndFx { kind: string; radius: number }
 
 export function hitEndFx(kind: string, def: WeaponTuning, gone: boolean): HitEndFx | null {
   if (gone) return bursts(def) ? { kind, radius: def.splash?.radius ?? def.emp?.radius ?? 40 } : null;
+  if (def.pierceFracs && def.splash) return { kind, radius: def.splash.radius };
   return def.pierceKeep !== undefined ? { kind, radius: 40 } : null;
 }
 
@@ -367,18 +392,20 @@ export interface GunShell { kind: string; def: WeaponTuning; grade: number; stre
 
 /**
  * What a shell from `ship`'s gun is, worked out from the firing ship alone (its blueprint and rebuild), so the server
- * and a client with the same copy of the ship get the same answer. `gun` packs as a fire event's part does: part +
- * 256 × ammunition code + 65536 for an augmented shot. Null: no such gun. The server's own shell may differ (power,
- * a ward's scale, a dry round): that is what a confirmed hit's extras carry.
+ * and a client with the same copy of the ship get the same answer. `gun` is the shell's gun code (launch.ts gunCode: a
+ * fire event's part field: the part, its ammunition, an augmented shot, its weapon modifier effects' mask, and its
+ * place in a split volley). Null: no such gun. The server's own shell may differ (power, a ward's scale, a dry
+ * round): that is what a confirmed hit's extras carry.
  */
 export function gunShell(tuning: ShipTuning, ship: ShipState, gun: number): GunShell | null {
   if (!(gun >= 0)) return null;
-  const part = gun % 256, ammo = Math.floor(gun / 256) % 256, aug = gun >= 65536;
+  const part = gunCodePart(gun);
   const w = ship.derived.weapons.find((x) => x.part === part);
   if (!w) return null;
-  const mods = stackMods(ammoByCode(ammo)?.mods, aug ? ship.derived.ports?.augMods[part] : undefined);
-  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[part]?.mods, ammo: mods, grade: w.grade, size: w.size, model: w.model });
-  return { kind: w.kind, def, grade: w.grade ?? 1, strength: (w.strength ?? 1) * (ship.dmg ?? 1) };
+  const mods = stackMods(ammoByCode(gunCodeAmmo(gun))?.mods, gunCodeAug(gun) ? ship.derived.ports?.augMods[part] : undefined);
+  const def = shipGunDef(tuning, ship, w, mods, gunCodeFx(gun));
+  const strength = (w.strength ?? 1) * (ship.dmg ?? 1);
+  return { kind: w.kind, def, grade: w.grade ?? 1, strength: def.burstShare ? strength * burstShareOf(def, gunCodePlace(gun)) : strength };
 }
 
 // ---- Who may hurt whom, and where a shell meets a ship (client-detected hits, part D) ----

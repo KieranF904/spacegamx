@@ -8,7 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { isDeepStrictEqual } from 'util';
 import { decodeServerFrame, encodeServerMessage, serverFrame, type EntityState, type ServerMessage } from '../protocol.js';
 import { PackedEncoder, PackedDecoder } from './packedCodec.js';
-import { BlockStore, derivedRow } from './blocks.js';
+import { BlockStore, derivedRow, fireBody } from './blocks.js';
+import { PackedIO } from './packedIO.js';
+import { gunCode, gunCodePart, gunCodeAmmo, gunCodeAug, gunCodeFx } from '../../ships/launch.js';
 import { packGunRow, GUN_FIRE, GUN_ALT } from '../../sim/otherGuns.js';
 
 const base = (msgs: ServerMessage[]): ServerMessage[] => decodeServerFrame(serverFrame(msgs.map(encodeServerMessage)));
@@ -98,6 +100,52 @@ describe('encode-once blocks', () => {
     const odd = client(store, 7004);
     send(odd, [{ type: 'snapshot', tick: 700, lastProcessedInput: 1, entities: [], removed: [], gun: [[4262, 1.5, 3], [-1 - 4263]] } as unknown as ServerMessage]);
     expect(odd.enc.stats.blocks).toBe(0);
+  });
+
+  it('fire rows with weapon modifier masks: the gun code round trips with and without a mask and an augment, and a row without a mask packs to the bits it always did', () => {
+    const bits = (write: (io: PackedIO) => void) => { const io = new PackedIO(); io.startWrite(); write(io); const b = io.takeBits(); return { n: b.n, b: [...b.b.slice(0, Math.ceil(b.n / 8))] }; };
+    /** The fire body as it was before a part field could carry a mask */
+    const before = (io: PackedIO, row: readonly number[]) => {
+      io.num(row[1], 0, 2);
+      const p = row[2], aug = io.bit(p >= 65536 && p < 131072);
+      io.num(aug ? p - 65536 : p, 0, 5);
+      io.num(row[3], 0, 6);
+      io.vu(row.length - 4, 1);
+      let id = 0;
+      for (let i = 4; i < row.length; i++) id = i === 4 ? io.vu(row[i], 7) : id + io.vs(row[i] - id, 3);
+    };
+    const guns: [part: number, ammo: number, aug: boolean][] = [[0, 0, false], [7, 0, true], [153, 1, false], [255, 255, false], [255, 255, true], [12, 3, true]];
+    for (const [part, ammo, aug] of guns) {
+      const plain = [4300, 2, gunCode(part, ammo, aug), -1200, 5000, 5001, 5003];
+      expect(plain[2]).toBe(part + 256 * ammo + (aug ? 65536 : 0));
+      expect(bits((io) => fireBody(io, plain)), `${part} ${ammo} ${aug}`).toEqual(bits((io) => before(io, plain)));
+      for (const fx of [0, 1, 2, 5, 8, 15]) {
+        const row = [4300, 2, gunCode(part, ammo, aug, fx), -1200, 5000, 5001, 5003];
+        // (what the writer says the other side will have, and what a reader of those bits gets)
+        const w = new PackedIO();
+        w.startWrite();
+        const said = fireBody(w, row), packed = w.takeBits();
+        const r = new PackedIO();
+        r.startRead(packed.b, 0);
+        const got = fireBody(r, undefined) as number[];
+        expect(said.slice(1)).toEqual(row.slice(1));
+        expect(got.slice(1)).toEqual(row.slice(1));
+        expect([gunCodePart(got[2]), gunCodeAmmo(got[2]), gunCodeAug(got[2]), gunCodeFx(got[2])]).toEqual([part, ammo, aug, fx]);
+        // (a mask costs its own bits only: never fewer than the plain row, and the plain row no more than before)
+        if (fx) expect(packed.n).toBeGreaterThanOrEqual(bits((io) => fireBody(io, plain)).n);
+      }
+    }
+    // And through a whole snapshot, shared between clients as any fire row is
+    const store = new BlockStore(() => 1);
+    const a = client(store, 7001), b = client(store, 7002);
+    for (let k = 0; k < 4; k++) {
+      const fire = [[4300, 1, gunCode(9, 0, false, 1 + k), 400], [4253, 2, gunCode(153, 1, true, 15), -1200 + k, 5000 + k * 10, 5001 + k * 10, 5002 + k * 10], [4253, 0, gunCode(4, 0, true), 12, 6000 + k]];
+      const msg = { type: 'snapshot', tick: 900 + 3 * k, lastProcessedInput: 1, entities: [], removed: [], fire } as unknown as ServerMessage;
+      send(a, [msg]);
+      send(b, [msg]);
+    }
+    expect(store.stats.f).toBe(12);
+    expect(a.enc.stats.legacy + b.enc.stats.legacy).toBe(0);
   });
 
   it('a continuing holder gets the delta form (smaller), the same bits as every other continuing holder', () => {

@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Mount
+Mk I · Square · 1 cell
+Hull · mass40 hp · 1.0
+Armour · build1 · 1 pts
+Holds10 energy
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+Socketsone socket: a modifier touching a socket changes the shots of the guns down its line
+Treatstreats 24 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws
+Upkeepburns 1 E a second for each filled socket; out of power it still passes power, with no effect
+
+== partStats (stats rows) ==
+GradeMk I
+Carriespasses power between the parts it touches
+Hull · mass40 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 40
+
+== familyLabel ==
+Modifiers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Power line with a socket
+
+== keyStats ==
+holds 10 · power line · 1 socket · treats 24 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws · burns 1 E a second for each filled socket; out of power it still passes power, with no effect
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 2","why":"Unlocks at level 2 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 2","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":39.75,"mass":1,"firepower":0,"toughness":39.75,"armour":1}

@@ -23,6 +23,7 @@ import { activity } from './activity/index.js';
 import { LobbyFriends } from './game/social/LobbyFriends.js';
 import { LobbyRankings } from './game/rankings/RankingsBackend.js';
 import { heartbeatIdentity, installUpdate } from './update/install.js';
+import { startAdminChatLink } from './adminChatLink.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -208,10 +209,15 @@ async function registerWithBrowser() {
     if (response.ok) {
       console.log('✓ Registered with server browser');
       // Accounts deleted at the lobby: their profiles go here
-      const body = await response.json().catch(() => null) as { deletedAccounts?: unknown; update?: { inMs: number } } | null;
+      const body = await response.json().catch(() => null) as { deletedAccounts?: unknown; update?: { inMs: number }; newContributors?: unknown } | null;
       // The lobby's schedule for a server update (none: nothing, or called off): see update/UpdateCountdown.ts
       if (body) updates.onLobby(body.update);
       if (Array.isArray(body?.deletedAccounts)) void gameServer.forgetAccounts(body.deletedAccounts.map(Number));
+      // Accounts whose donations just earned the contributor rank: a pilot who is on gets it now (the rest when they sign in)
+      if (Array.isArray(body?.newContributors) && body.newContributors.length) {
+        const ids = new Set(body.newContributors.map(Number));
+        for (const c of gameServer.clients.values()) if (c.userId !== null && ids.has(c.userId)) gameServer.contrib.grantDonor(c.userId, c.username, c);
+      }
     } else {
       console.log(`⚠ Browser registration failed: ${response.status}`);
     }
@@ -228,3 +234,6 @@ async function registerWithBrowser() {
 // Register immediately and then every 10 seconds
 registerWithBrowser();
 setInterval(registerWithBrowser, 10000);
+
+// Chat with an admin on the website (game/AdminChat.ts): the lobby is asked every couple of seconds while pilots are on
+if (LOBBY_ADMIN_SECRET && process.env.ADMIN_CHAT !== '0') startAdminChatLink(gameServer.adminChat, { url: BROWSER_URL, secret: LOBBY_ADMIN_SECRET, server: SERVER_NAME });

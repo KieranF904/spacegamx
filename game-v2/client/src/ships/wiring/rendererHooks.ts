@@ -53,6 +53,16 @@ export function wireRendererHooks(h: RendererHooksHost, renderer: Renderer, ship
   renderer.onStruck = (id, x, y, type, target, owner) => h.strike.struck(id, x, y, type, target, owner);
   // Your mining progress: a ring round the rock you're working, filling towards your next drop (when it drops is public: common econ/miningChunks.ts)
   h.strike.init(renderer.getEffectLayer());
+  // The cursor in the world: in a bunch of ships, the one under it keeps its name (ships/render/labelCrowd.ts)
+  const pointerPoint = { x: 0, y: 0 };
+  renderer.pointerWorld = () => {
+    const me = h.state.entities.get(h.state.playerId);
+    if (!me) return null;
+    const a = h.localAim();
+    pointerPoint.x = me.renderX + Math.cos(a.angle) * a.dist;
+    pointerPoint.y = me.renderY + Math.sin(a.angle) * a.dist;
+    return pointerPoint;
+  };
   // A guided shell's guide line runs to your cursor while you hold fire
   renderer.guideTo = () => {
     if (!h.ownPresent.fireHeld) return null;

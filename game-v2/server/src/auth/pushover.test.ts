@@ -25,7 +25,7 @@ describe('pushover join notices', () => {
     n.join('Guest_12', true, 2);
     t.now = 31 * 60_000;
     n.join('Ash', false, 2);
-    expect(sent).toEqual(['Ash joined. 1 online.', 'Guest_12 (guest) joined. 2 online.', 'Ash joined. 2 online.']);
+    expect(sent).toEqual(['A pilot joined. 1 online.', 'A guest joined. 2 online.', 'A pilot joined. 2 online.']);
   });
 
   it('caps an hour at 30 and counts the rest into the next', () => {
@@ -34,7 +34,17 @@ describe('pushover join notices', () => {
     expect(sent.length).toBe(30);
     t.now = 61 * 60_000;
     n.join('Late', false, 3);
-    expect(sent.at(-1)).toBe('Late joined. 3 online. (+5 more not sent this hour)');
+    expect(sent.at(-1)).toBe('A pilot joined. 3 online. (+5 more not sent this hour)');
+  });
+
+  it('never says who: no name reaches the notice, in the title or the text', () => {
+    const t = { now: 0 };
+    const out: string[] = [];
+    const n = new Notifier({ token: 't', user: 'u' }, () => t.now, async (_k, title, msg) => { out.push(title, msg); });
+    n.join('Zephyrine', false, 4);
+    n.join('Guest_8841', true, 5);
+    expect(out).toEqual(['Space Game: pilot joined', 'A pilot joined. 4 online.', 'Space Game: pilot joined', 'A guest joined. 5 online.']);
+    expect(out.join(' ')).not.toMatch(/Zephyrine|Guest_8841|8841/i);
   });
 
   it('is off by default outside production, on in production with keys', async () => {

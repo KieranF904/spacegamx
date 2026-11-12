@@ -263,7 +263,7 @@ export class OwnTick implements OwnTimeline {
     OWN_ENV.pulls = env.pulls;
     // (Docking Clamps, common sim/clampPair.ts: steering, it flies the pair; the other pilot, it rides the leader's replica)
     OWN_ENV.clamp = env.clamp;
-    OWN_FIELDS.central = env.central; OWN_FIELDS.lodestones = env.lodestones;
+    OWN_FIELDS.central = env.central; OWN_FIELDS.lodestones = env.lodestones; OWN_FIELDS.landmarks = env.landmarks;
     const events: SimEvent[] = [];
     // (On its raw aim (its inputs': `q`, held between changes, is the applied one) and the one it was applied at last tick:
     // its state's applied aim, as the server works it out, sim/aimHold.ts)

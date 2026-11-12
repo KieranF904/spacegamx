@@ -6,6 +6,7 @@
  * extend:     a new server message is an interface here (or its own *Protocol.ts) plus one line in serverMessage.ts
  */
 import type { AsteroidBeltData, LodestoneData } from '../../data/schemas.js';
+import type { Landmark } from '../../world/landmarks.js';
 // ============================================
 // SERVER -> CLIENT MESSAGES
 // ============================================
@@ -196,6 +197,12 @@ export interface ServerSystemInfoMessage {
   hazardRadius?: number;
   /** Ancient lodestones (their fields charge the jump drive: ships/jumpFields.ts) */
   lodestones?: LodestoneData[];
+  /**
+   * The system's moving landmarks (world/landmarks.ts: orbiting stations, planets, moons, orbiting stillstones, each
+   * with its tracking zone): a pilot's ship in a zone is carried with the landmark, by the same step on both ends.
+   * Absent: none (an older server, the empty scene, a system where nothing moves)
+   */
+  landmarks?: Landmark[];
   /** Background visuals */
   visuals: {
     starHueShift?: number;

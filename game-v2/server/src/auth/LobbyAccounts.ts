@@ -67,7 +67,7 @@ export class LobbyAccounts implements UserStore {
     // (Only a ban's refusal is worth passing on: anything else is "sign in again")
     if (!r?.success) return { user: null, error: r?.banned ? String(r.error) : '' };
     // (An owner is an admin too, whatever an older lobby says)
-    return { user: { id: r.id, username: r.username, email: '', is_admin: !!r.isAdmin || !!r.isOwner, is_owner: !!r.isOwner, created_at: '' } };
+    return { user: { id: r.id, username: r.username, email: '', is_admin: !!r.isAdmin || !!r.isOwner, is_owner: !!r.isOwner, ...(r.donorContributor === true ? { donor_contributor: true } : {}), created_at: '' } };
   }
 
   async logout(token: string): Promise<void> {

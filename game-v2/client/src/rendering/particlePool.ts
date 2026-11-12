@@ -7,7 +7,7 @@
  * as Pixi's sprite batcher chooses one (the index rides in the particle's u coordinate: u + 4 × index).
  */
 
-import { Color, Container, GlProgram, Matrix, Particle, ParticleContainer, Shader, Texture } from 'pixi.js';
+import { Color, Container, GlProgram, Matrix, Particle, ParticleContainer, Shader, Texture, type TextureSource } from 'pixi.js';
 
 const MAX_TEXTURES = 4;
 /** Particles kept in reserve, past which those not needed are let go */
@@ -142,6 +142,8 @@ export class ParticlePool {
   private shader: Shader | null = null;
   /** Each texture taken, by the copy of it whose u coordinates carry its index */
   private textures = new Map<Texture, Texture>();
+  /** The images they are parts of, by sampler (at most MAX_TEXTURES) */
+  private sources: TextureSource[] = [];
   private used = 0;
   /** How many it drew last frame (a change has Pixi upload the particles' attributes afresh) */
   private drawn = 0;
@@ -232,9 +234,14 @@ export class ParticlePool {
 
   /** A texture seen for the first time: its sampler, and its copy with the index in its u coordinates */
   private add(texture: Texture): Texture {
-    const i = this.textures.size;
-    if (i >= MAX_TEXTURES) throw new Error(`ParticlePool: more than ${MAX_TEXTURES} textures`);
-    if (i > 0) this.shader!.resources[`uTexture${i}`] = texture.source;
+    // (a part of an image already taken draws from that image's sampler)
+    let i = this.sources.indexOf(texture.source);
+    if (i < 0) {
+      i = this.sources.length;
+      if (i >= MAX_TEXTURES) throw new Error(`ParticlePool: more than ${MAX_TEXTURES} textures`);
+      this.sources.push(texture.source);
+      if (i > 0) this.shader!.resources[`uTexture${i}`] = texture.source;
+    }
     const copy = new Texture({ source: texture.source, frame: texture.frame.clone(), orig: texture.orig.clone() });
     const shift = (): void => {
       const uv = copy.uvs;

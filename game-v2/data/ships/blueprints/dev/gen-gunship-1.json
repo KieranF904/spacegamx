@@ -1,0 +1,33 @@
+{
+  "name": "Untitled",
+  "catalogVersion": 1,
+  "parts": [
+    {"uid":0,"piece":"sq","fn":"core","material":"alloy","x":0,"y":0,"rot":0,"flip":false},
+    {"uid":1,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":-3,"rot":0,"flip":false},
+    {"uid":2,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":-2,"rot":0,"flip":false},
+    {"uid":3,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":-1,"rot":0,"flip":false},
+    {"uid":4,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":1,"rot":0,"flip":false},
+    {"uid":5,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":2,"rot":0,"flip":false},
+    {"uid":6,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":3,"rot":0,"flip":false},
+    {"uid":7,"piece":"sq","fn":"hull","material":"alloy","x":-3,"y":1,"rot":0,"flip":false},
+    {"uid":8,"piece":"sq","fn":"hull","material":"alloy","x":3,"y":1,"rot":0,"flip":false},
+    {"uid":9,"piece":"sq","fn":"hull","material":"alloy","x":-4,"y":1,"rot":0,"flip":false},
+    {"uid":10,"piece":"sq","fn":"hull","material":"alloy","x":4,"y":1,"rot":0,"flip":false},
+    {"uid":11,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-2,"y":0,"rot":0,"flip":false},
+    {"uid":12,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":2,"y":0,"rot":0,"flip":false},
+    {"uid":13,"piece":"sq","fn":"power_drive_cell","material":"steel","x":-1,"y":0,"rot":0,"flip":false},
+    {"uid":14,"piece":"sq","fn":"power_drive_cell","material":"steel","x":1,"y":0,"rot":0,"flip":false},
+    {"uid":15,"piece":"sq","fn":"power_battery","material":"alloy","x":-1,"y":-1,"rot":0,"flip":false},
+    {"uid":16,"piece":"sq","fn":"power_battery","material":"alloy","x":1,"y":-1,"rot":0,"flip":false},
+    {"uid":17,"piece":"sq","fn":"cannon_pip","material":"alloy","x":-1,"y":-2,"rot":0,"flip":false,"facing":"N"},
+    {"uid":18,"piece":"sq","fn":"cannon_pip","material":"alloy","x":1,"y":-2,"rot":0,"flip":false,"facing":"N"},
+    {"uid":19,"piece":"sq","fn":"autocannon_rattler","material":"alloy","x":-2,"y":-1,"rot":0,"flip":false,"facing":"N"},
+    {"uid":20,"piece":"sq","fn":"autocannon_rattler","material":"alloy","x":2,"y":-1,"rot":0,"flip":false,"facing":"N"},
+    {"uid":21,"piece":"sq","fn":"cannon_pip","material":"alloy","x":-3,"y":0,"rot":0,"flip":false,"facing":"N"},
+    {"uid":22,"piece":"sq","fn":"cannon_pip","material":"alloy","x":3,"y":0,"rot":0,"flip":false,"facing":"N"},
+    {"uid":23,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":-2,"y":1,"rot":0,"flip":false,"facing":"S"},
+    {"uid":24,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":2,"y":1,"rot":0,"flip":false,"facing":"S"},
+    {"uid":25,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":-1,"y":1,"rot":0,"flip":false,"facing":"S"},
+    {"uid":26,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":1,"y":1,"rot":0,"flip":false,"facing":"S"}
+  ]
+}

@@ -1,6 +1,6 @@
 /**
- * Weapon groups (docs/design/groups-mines-docking.md, "Weapon groups"). Each weapon is in any of four groups (a blueprint
- * part's `wg`, a 4-bit mask: bit 0 = group 1). The pilot picks the group the left button fires and the one the right
+ * Weapon groups (docs/design/groups-mines-docking.md, "Weapon groups"). Each weapon is in any of five groups (a blueprint
+ * part's `wg`, a 5-bit mask: bit 0 = group 1). The pilot picks the group the left button fires and the one the right
  * button fires; 0 means "all", which is how every ship fired before groups: the left button fires every weapon, the
  * right button fires every weapon too (or mines, on a ship with mining lasers). So a pilot who never touches groups
  * fires exactly as before.
@@ -13,7 +13,7 @@
 import type { PlacedPart } from './types.js';
 
 /** How many groups there are (1..WEAPON_GROUPS) */
-export const WEAPON_GROUPS = 4;
+export const WEAPON_GROUPS = 5;
 /** A part's mask when it has no `wg`: group 1 only */
 export const DEFAULT_WEAPON_GROUPS = 1;
 /** Every group's bit */
@@ -21,23 +21,23 @@ export const ALL_GROUP_BITS = (1 << WEAPON_GROUPS) - 1;
 /** A selection of "all" (either button) */
 export const GROUP_ALL = 0;
 
-/** A part's group mask (0..15; absent: group 1) */
+/** A part's group mask (0..31; absent: group 1) */
 export function partWeaponGroups(p: Pick<PlacedPart, 'wg'> | undefined): number {
   const v = p?.wg;
   return v === undefined ? DEFAULT_WEAPON_GROUPS : v & ALL_GROUP_BITS;
 }
 
-/** A design's `wg` as kept (canonical): a whole 0..15 other than the default, else absent */
+/** A design's `wg` as kept (canonical): a whole 0..31 other than the default, else absent */
 export function cleanWeaponGroups(v: unknown): number | undefined {
   if (!Number.isInteger(v)) return undefined;
   const m = (v as number) & ALL_GROUP_BITS;
   return (v as number) >= 0 && (v as number) <= ALL_GROUP_BITS && m !== DEFAULT_WEAPON_GROUPS ? m : undefined;
 }
 
-/** In group g (1..4)? */
+/** In group g (1..5)? */
 export const inGroup = (mask: number, g: number): boolean => g >= 1 && g <= WEAPON_GROUPS && (mask & (1 << (g - 1))) !== 0;
 
-/** The selection as one byte: the left button's group (0 all, 1..4) in the low nibble, the right button's in the high */
+/** The selection as one byte: the left button's group (0 all, 1..5) in the low nibble, the right button's in the high */
 export function packGroupSel(left: number, right: number): number {
   return (clampSel(left) | (clampSel(right) << 4)) & 0xff;
 }
@@ -51,7 +51,7 @@ export function cleanGroupSel(v: unknown): number {
   return Number.isInteger(n) && n >= 0 && n <= 0xff ? packGroupSel(n & 0x0f, (n >> 4) & 0x0f) : 0;
 }
 
-/** The next selection when cycling: all, 1, 2, 3, 4, all... (`dir` -1 goes back) */
+/** The next selection when cycling: all, 1, 2, 3, 4, 5, all... (`dir` -1 goes back) */
 export function cycleSel(g: number, dir: 1 | -1 = 1): number {
   const n = WEAPON_GROUPS + 1;
   return (((clampSel(g) + dir) % n) + n) % n;
@@ -105,8 +105,11 @@ export function gunSelected(mask: number, sel: number, hasMiners: boolean): bool
   return rightFiresGuns(sel, hasMiners) && (r === GROUP_ALL || inGroup(mask, r));
 }
 
-/** Every group mask (0..15) as one bit each: the masks a click is for (`ShipState.clickMasks`) */
-export const EVERY_MASK = (1 << (ALL_GROUP_BITS + 1)) - 1;
+/**
+ * Every group mask (0..31) as one bit each: the masks a click is for (`ShipState.clickMasks`). 32 bits, kept as a whole
+ * number from 0 (never negative: `>>> 0` after any bit work), so it is the same number on every end and on the wire
+ */
+export const EVERY_MASK = Number((1n << BigInt(ALL_GROUP_BITS + 1)) - 1n);
 
 /**
  * The group masks whose guns' trigger goes down from `prev` to `word` (bit m: a gun with mask m): who a click is for.
@@ -116,7 +119,7 @@ export const EVERY_MASK = (1 << (ALL_GROUP_BITS + 1)) - 1;
 export function freshMasks(word: number, prev: number, hasMiners: boolean): number {
   let out = 0;
   for (let m = 0; m <= ALL_GROUP_BITS; m++) if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prev, hasMiners)) out |= 1 << m;
-  return out;
+  return out >>> 0;
 }
 
 /** Does a click (its masks, `ShipState.clickMasks`: absent, every gun's) call on a gun with this group mask? */

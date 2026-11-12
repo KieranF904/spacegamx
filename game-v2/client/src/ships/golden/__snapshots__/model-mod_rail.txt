@@ -1,0 +1,44 @@
+== partTip (tooltip) ==
+Rail Driver Module
+Mk III · Square · 1 cell
+Hull · mass40 hp · 1.2
+Armour · build3 · 2.5 pts
+Holds20 energy
+Effectagainst a mount's socket: Very fast shots that hit a little softer
+Usesuses 0.5 E more for each E of a shot, from a power line of its own into its back (up to 30 E a second)
+
+== partStats (stats rows) ==
+GradeMk III
+Hull · mass40 hp · 1.2
+Armour · build3 · 2.5 pts
+Rating scoretoughness 40
+
+== familyLabel ==
+Modifiers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Special: very fast shots
+
+== keyStats ==
+holds 20 · hyper · uses 0.5 E more for each E of a shot, from a power line of its own into its back (up to 30 E a second)
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":39.75,"mass":1.2,"firepower":0,"toughness":39.75,"armour":3}

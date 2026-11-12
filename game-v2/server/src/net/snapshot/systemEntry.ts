@@ -1,16 +1,17 @@
 /**
  * @contract server.snapshot.system-entry
  * owns:       a client entering a system (briefings, the asteroid seed and regrown rocks, your part-worked mining
- *             chunks on them, a clean slate of what it was sent), its HUD numbers (playerState) and the system's visuals (systemInfo)
- * needs:      EntryHost (world, gameData, scene, events, surfaces, crowd, focus, away, asteroid maps, mineState, send, ticks); npm: bitecs
+ *             chunks on them, a clean slate of what it was sent), its HUD numbers (playerState) and the system's visuals and flight world (systemInfo: stillstones, moving landmarks)
+ * needs:      EntryHost (world, gameData, scene, events, surfaces, crowd, focus, away, asteroid maps, mineState, landmarks, send, ticks); npm: bitecs
  * invariants: a new system starts the client from scratch (known, synced, names, map) — server/src/net/cells/focusCells.test.ts
  *             playerState only when it changed (or every 600 ticks) — server/src/net/snapshot/snapshotParts.test.ts
+ *             systemInfo carries the landmark records the server's steps use — server/src/net/own/landmarkCarry.test.ts
  * extend:     a new per-system thing a client is told on entry is one send in enterSystem
  */
 import { hasComponent, entityExists, type IWorld } from 'bitecs';
 import {
   InSystem, Player, Dead, Health, Boost, ASTEROID_SEED, packRanges,
-  type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData,
+  type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, type Landmark, type LandmarkSet,
 } from '@space-game/common';
 import type { GameData } from '../../data/GameData.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -39,6 +40,8 @@ export interface EntryHost {
   /** The pilot's part-worked mining chunks on the system's rocks, packed (server Mining.partWorked) */
   readonly mineState?: (miner: number, systemNum: number) => number[];
   readonly ticks: { readonly currentTick: number };
+  /** A system's moving landmarks, as its ships' steps have them (GameServer.replicaEnv; common world/landmarks.ts) */
+  readonly landmarks?: (systemNum: number) => LandmarkSet | undefined;
 }
 
 /** Convert a hex color (#RRGGBB) to hue 0-360 */
@@ -160,6 +163,11 @@ export function sendPlayerState(h: EntryHost, conn: ClientConnection): void {
  * Send data-driven system visuals (central body + background config)
  * to a client. Derived from systems.json with sensible defaults.
  */
+function landmarksFor(h: EntryHost, system: StarSystemData): { landmarks?: Landmark[] } {
+  const list = h.landmarks?.(h.gameData.getSystemNum(system.id));
+  return list?.length ? { landmarks: [...list] } : {};
+}
+
 export function sendSystemInfo(h: EntryHost, conn: ClientConnection, system: StarSystemData): void {
   const cb = system.centralBody;
   // Default: a sun derived from starColor/starRadius. The empty scene has no central body.
@@ -183,6 +191,8 @@ export function sendSystemInfo(h: EntryHost, conn: ClientConnection, system: Sta
     hazards: h.scene === 'empty' ? [] : system.hazards ?? [],
     // (Prediction charges the jump drive in their fields exactly as the server does)
     ...(h.scene !== 'empty' && system.lodestones?.length ? { lodestones: system.lodestones } : {}),
+    // (...and carries its own ship with a moving landmark exactly as the server does: the same records)
+    ...landmarksFor(h, system),
     ...(h.scene !== 'empty' && system.hazardRatings ? { hazardRatings: system.hazardRatings, hazardRadius: system.starRadius } : {}),
   });
 }

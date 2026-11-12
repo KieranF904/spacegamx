@@ -41,9 +41,10 @@ export type SimEvent =
   /**
    * A gun fired one shell (one per barrel). Shape and spread are re-derived from (owner, slot, tick, aimQ) on every end.
    * `aug`: a ports ship's augmented shot (its augment's mods go on the shell: power/ports.ts augMods). Open: the damage
-   * scale (the server reads it off the gun step's shot spec, not the event) and ammunition (outside the step)
+   * scale (the server reads it off the gun step's shot spec, not the event) and ammunition (outside the step).
+   * `fx`: the weapon modifier effects live on the shot (a mask over the gun's own, ships/modifiers; absent: none)
    */
-  | { k: 'fire'; tick: number; owner: number; slot: number; barrel: number; shot: number; aimQ: number; aug?: 1 }
+  | { k: 'fire'; tick: number; owner: number; slot: number; barrel: number; shot: number; aimQ: number; aug?: 1; fx?: number }
   /** A shell reached the end of its life (deterministic: never sent) */
   | { k: 'shotEnd'; tick: number; shot: number }
   /** A shell struck a ship's part (or a rock: target -1, until rocks are on the tick layer) */
@@ -55,9 +56,10 @@ export type SimEvent =
   /** A visual with no effect on state (a pulse starting, a charge tell, a muzzle flash) */
   /**
    * `aq`: a gun's fx its aim offset in SHOT_AIM_STEPS as a fire record carries it (a pulse, a charge tell, a beam piece), or
-   * a ports mining laser's fulfilment (0..255): what another ship's client builds the record from (sim/otherGuns.ts)
+   * a ports mining laser's fulfilment (0..255): what another ship's client builds the record from (sim/otherGuns.ts).
+   * `mask`: a pulse's, a held beam's or a beam piece's live weapon modifier effects (as a fire event's `fx`; absent: none)
    */
-  | { k: 'fx'; tick: number; owner: number; fx: string; part: number; x: number; y: number; aq?: number }
+  | { k: 'fx'; tick: number; owner: number; fx: string; part: number; x: number; y: number; aq?: number; mask?: number }
   | { k: 'sound'; tick: number; owner: number; sound: string; x: number; y: number }
   /**
    * Reserved plug-in point for damage (clients don't apply damage yet): what a hit or contact would do to a part.

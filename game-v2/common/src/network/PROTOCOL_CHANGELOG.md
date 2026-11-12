@@ -59,3 +59,8 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 67 (2026-11-09): shipSync carries pinned (a new ship's sync): clients take pinned ships in their own contact pass
 - 68 (2026-11-10): gunSync drops the retired pool and banks slots and the mining scalars (minePaid, mineUntil, mineShare); the trainingDrone client message is gone; the wire hash covers the gunSync layout
 - 69 (2026-11-11): plain-message changes old clients cannot use: respawn backups and the backups/wreck messages, guest accounts (convertGuest, guestStatus, guestConverted), loot pickup (lootTake, lootNear, ghost, ghostTemplate, pickupPrefs, oreBlacklist), tutorialState returner; station message: queueSlots replaced by lanes, job views carry taken/wait/short; asteroidSeed and asteroidSpawn carry `mine` on entering a system (your part-worked mining chunks: a chunk's drop is public, from the rock's mining seed, so MiningProgress steps your own hits to it and no longer takes a pod or mined ore as the drop)
+- 70 (2026-11-11): cannon_mauler added
+- 71 (2026-11-11): weapon modifier parts
+- 72 (2026-11-11): detonation out (exit blasts), gun range rooms and ships, five weapon groups
+- 73 (2026-11-12): landmark tracking (ships, loot and debris ride with moving stations and planets), gun range doors, contributor comment and vote ops
+- 74 (2026-11-12): burn fire spreads (ignite gen), Mauler look

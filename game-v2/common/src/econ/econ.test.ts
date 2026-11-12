@@ -141,4 +141,14 @@ describe('profiles', () => {
     expect(migrateProfile(null, kit).credits).toBe(300);
     expect(migrateProfile('garbage', kit).plans).toEqual(['sparrow-t']);
   });
+
+  it('a saved position keeps its landmark offset (world/landmarks.ts); a save without one, or with a broken one, has none', () => {
+    const at = (position: unknown) => migrateProfile(JSON.parse(JSON.stringify({ ...newProfile(kit), position })), kit).position;
+    expect(at({ system: 'sol', x: 5, y: 6, at: { id: 'station:sol_station_central', dx: 1500, dy: -700 } }))
+      .toEqual({ system: 'sol', x: 5, y: 6, at: { id: 'station:sol_station_central', dx: 1500, dy: -700 } });
+    expect(at({ system: 'sol', x: 5, y: 6 })).toEqual({ system: 'sol', x: 5, y: 6 });
+    for (const bad of [null, 'here', { id: 7, dx: 1, dy: 1 }, { id: 'planet:vesta', dx: 'far', dy: 1 }, { id: '', dx: 1, dy: 1 }, { id: 'planet:vesta', dx: 1 }]) {
+      expect(at({ system: 'sol', x: 5, y: 6, at: bad })).toEqual({ system: 'sol', x: 5, y: 6 });
+    }
+  });
 });

@@ -47,7 +47,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
       conn.username = user.username;
       conn.userId = user.id;
       setRanks(ctx, conn, user);
-      conn.isContributor = ctx.contrib.hasRank(user.id, user.username);
+      conn.isContributor = contributorAtSignIn(ctx, user);
       conn.authToken = msg.token;
       ctx.loginPilot(conn, user.id).catch((e) => ctx.fault('login', e));
       console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_owner ? ' (owner)' : user.is_admin ? ' (admin)' : ''}`);
@@ -102,6 +102,15 @@ function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
 }
 
 /** An account's ranks on its connection: owner > admin > pilot (an owner passes every admin check) */
+/**
+ * Does this account have the contributor rank, as it signs in: an account the lobby says has donated enough gets it
+ * here first (ContributorNotes.grantDonor), so a grant missed while they were offline is made now
+ */
+export function contributorAtSignIn(ctx: ServerCtx, user: { id: number; username: string; donor_contributor?: boolean }): boolean {
+  if (user.donor_contributor) ctx.contrib.grantDonor(user.id, user.username, null);
+  return ctx.contrib.hasRank(user.id, user.username);
+}
+
 export function setRanks(ctx: ServerCtx, conn: ClientConnection, user: { is_admin: boolean; is_owner?: boolean }): void {
   conn.isOwner = !!user.is_owner;
   conn.isAdmin = user.is_admin || conn.isOwner || ctx.guestAdmin;

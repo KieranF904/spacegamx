@@ -401,7 +401,7 @@ export const SHAPES: Record<string, Spec> = {
       id: 'string', name: 'string', description: 'string', system: 'string', position: 'xy', radius: 'number', sprite: 'string',
       'design?': oneOf('ring', 'outpost', 'observatory', 'bastion', 'shipyard', 'refinery', 'citadel'),
       'defence?': obj({ weapon: 'string', turrets: 'number' }),
-      dockingRadius: 'number', 'orbit?': obj({ orbitType: 'number', semiMajorAxis: 'number', eccentricity: 'number', argPeriapsis: 'number', meanAnomaly0: 'number', 'epochTick?': 'number' }),
+      dockingRadius: 'number', 'orbit?': obj({ orbitType: 'number', semiMajorAxis: 'number', eccentricity: 'number', argPeriapsis: 'number', meanAnomaly0: 'number', 'epochTick?': 'number' }), 'tracking?': strict({ 'inner?': 'number', 'outer?': 'number' }),
       services: arr(oneOf(...STATION_SERVICES)), 'shop?': 'any',
       'market?': obj({ sells: 'string[]', demand: rec('number'), 'note?': 'string' }),
       repairCostPerHp: 'number', refuelCostPerUnit: 'number', 'dockingFee?': 'number', 'tutorial?': 'boolean',
@@ -425,12 +425,13 @@ export const SHAPES: Record<string, Spec> = {
       }),
       'instance?': obj({ slots: 'number' }), 'private?': 'boolean', 'visuals?': 'any',
       'arena?': strict({ boss: 'string', centre: 'xy', radius: 'number', 'barrier?': arr(arr('number')), outside: 'xy' }),
-      'gunRange?': strict({
+      'gunRange?': strict({ rooms: arr(strict({
+        id: 'string', name: 'string', 'light?': 'number',
         centre: 'xy', width: 'number', height: 'number', wall: 'number',
-        door: strict({ wall: oneOf('N', 'E', 'S', 'W'), 'along?': 'number', width: 'number', reach: 'number' }),
+        doors: arr(strict({ wall: oneOf('N', 'E', 'S', 'W'), 'along?': 'number', width: 'number', reach: 'number', to: 'string' })),
         spawn: strict({ x: 'number', y: 'number', angle: 'number' }),
-        targets: arr(strict({ label: 'string', ship: 'string', faction: 'string', 'grade?': 'number', 'hp?': 'number', ring: 'number', x: 'number', y: 'number', angle: 'number', respawnSeconds: 'number', keepRadius: 'number' })),
-      }),
+        targets: arr(strict({ label: 'string', 'ship?': 'string', 'faction?': 'string', 'mob?': 'string', 'grade?': 'number', 'hp?': 'number', ring: 'number', x: 'number', y: 'number', angle: 'number', respawnSeconds: 'number', keepRadius: 'number' })),
+      })) }),
       'pocket?': strict({
         entrance: strict({ system: 'string', x: 'number', y: 'number', radius: 'number', name: 'string', 'look?': strict({ kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'), faction: 'string', 'scale?': 'number' }) }),
         landing: 'xy', radius: 'number', 'dread?': obj({ x: 'number', y: 'number', from: 'number', full: 'number' }),
@@ -448,8 +449,8 @@ export const SHAPES: Record<string, Spec> = {
       'rifts?': arr(obj({ id: 'string', position: 'xy', destination: obj({ system: 'string', x: 'number', y: 'number' }) })),
       'planets?': arr(obj({
         id: 'string', name: 'string', kind: 'string', radius: 'number', orbit: obj({ radius: 'number', phase: 'number', period: 'number' }),
-        'moons?': arr(obj({ radius: 'number', distance: 'number', period: 'number', phase: 'number', 'name?': 'string', 'surface?': 'string' })),
-        'surface?': 'string', 'look?': lookSpec,
+        'moons?': arr(obj({ radius: 'number', distance: 'number', period: 'number', phase: 'number', 'name?': 'string', 'surface?': 'string', 'tracking?': strict({ 'inner?': 'number', 'outer?': 'number' }) })),
+        'surface?': 'string', 'look?': lookSpec, 'tracking?': strict({ 'inner?': 'number', 'outer?': 'number' }),
       })),
       'derelicts?': arr(obj({ id: 'string', name: 'string', blueprint: 'string', position: 'xy', 'log?': strict({ codex: 'string' }) })),
       'comets?': arr(obj({ id: 'string', name: 'string', nucleus: 'number' })),
@@ -457,7 +458,7 @@ export const SHAPES: Record<string, Spec> = {
       'lodestones?': arr(strict({
         id: 'string', 'name?': 'string', 'orbit?': strict({ radius: 'number', phase: 'number', period: 'number' }), 'position?': 'xy',
         'size?': 'number', 'state?': oneOf('active', 'scarred', 'dead', 'shattered'), 'scar?': strict({ from: 'number', to: 'number' }), 'rough?': 'boolean',
-        'zone?': 'string', 'description?': 'string',
+        'zone?': 'string', 'description?': 'string', 'tracking?': strict({ 'inner?': 'number', 'outer?': 'number' }),
       })),
       'nests?': arr(strict({
         id: 'string', name: 'string', faction: 'string', kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'),
@@ -575,6 +576,18 @@ export const SHIP_SHAPES: Record<string, Spec> = {
     'energy?': obj({ 'coreCapacity?': 'number' }),
     // (The feed layer's materials, common/src/ships/power/ports.ts FeedDef: what each multiplies on a part that takes it)
     'feeds?': rec(strict({ name: 'string', 'short?': 'string', on: oneOf('weapon', 'engine'), mod: rec('number'), 'color?': 'string', 'say?': 'string' })),
+    // (Weapon modifiers: common/src/ships/modifiers/types.ts ModifierTuning, docs/design/weapon-modifiers-2026-11.md)
+    'modifiers?': strict({
+      effects: 'string[]', say: rec(strict({ name: 'string', color: 'string', say: 'string' })),
+      kinds: rec(strict({ effect: 'string', 'needs?': strict({ 'mat?': 'string', 'power?': 'number', per: 'number' }) })),
+      recipes: arr(strict({ parts: 'string[]', effect: 'string' })), lines: arr(strict({ fx: 'number', cap: 'number' })),
+      velocity: strict({ speed: 'number', range: 'number' }), rapid: strict({ rate: 'number', total: 'number' }),
+      explosive: strict({ direct: 'number', blast: 'number', radius: 'number[]' }), split: strict({ shots: 'number', total: 'number', spreadDeg: 'number' }),
+      pierce: strict({ fracs: 'number[]' }), wave: strict({ width: 'number', perTarget: 'number' }), chain: strict({ jumps: 'number', frac: 'number', reach: 'number' }),
+      heavy: strict({ damage: 'number', speed: 'number' }), burn: strict({ total: 'number', secs: 'number', layers: 'number', layerKeep: 'number', blast: strict({ chance: 'number', scale: 'number', max: 'number' }), arc: 'number',
+        fire: strict({ beat: 'number', base: 'number', per: 'number', cap: 'number', survive: 'number', surviveCap: 'number', keep: 'number', time: 'number', fade: 'number', gens: 'number', total: 'number', parts: 'number' }) }),
+      hyper: strict({ speed: 'number', damage: 'number', 'beamRange?': 'number' }),
+    }),
     'miner?': obj({ range: 'number', dps: 'number', shipDps: 'number', gimbalDeg: 'number' }),
     turret: obj({ halfArcDeg: 'number', sampleDeg: 'number', slewRate: 'number', fireToleranceDeg: 'number', barrelMargin: 'number' }),
     debris: obj({ lifetimeTicks: 'number', pushSpeed: 'number', pushSpin: 'number' }),

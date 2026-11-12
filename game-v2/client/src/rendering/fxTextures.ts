@@ -6,7 +6,7 @@
  * little blur, smooth falloff) instead of flat-edged layers.
  */
 
-import { CanvasSource, Texture } from 'pixi.js';
+import { CanvasSource, Rectangle, Texture } from 'pixi.js';
 
 const cache = new Map<string, Texture>();
 
@@ -162,6 +162,19 @@ export function streak(): Texture {
     ctx.closePath();
     ctx.fill();
   });
+}
+
+/**
+ * A length of a streak with square ends (no caps): the middle 32 px of the streak's own image, so a pool that draws
+ * streaks draws these from the same texture. Lengths laid end to end join with no overlap, so a trail built of them is
+ * even along its length (round caps would double up at each join)
+ */
+export function band(): Texture {
+  const hit = cache.get('band');
+  if (hit) return hit;
+  const tex = new Texture({ source: streak().source, frame: new Rectangle(48, 0, 32, 32) });
+  cache.set('band', tex);
+  return tex;
 }
 
 /** Sprite scale for a streak from tail to head `len` long and `width` thick (caps included, as a stroke's round caps) */

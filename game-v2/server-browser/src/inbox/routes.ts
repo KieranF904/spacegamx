@@ -6,6 +6,10 @@
  *   POST /inbox/read   { token, id | ids | all }    -> { success, changed, unread, unreadImportant }
  *   POST /inbox/delete { token, id | ids }          -> { success, changed, unread, unreadImportant }
  *
+ * (The website's /account/inbox uses these three too, with the pilot's own session: site/src/playerLobby.ts.)
+ *
+ * The lobby itself sends one kind of message, systemMessage(): the thank-you for a donation (donations/routes.ts).
+ *
  * Admins (and the owner) only, checked on the token's account:
  *   POST /inbox/send   { token, to | everyone: true, subject, body, important? } -> { success, sent, to }
  *   POST /inbox/sent   { token }                    -> { success, sent: SentInfo[] }
@@ -183,6 +187,18 @@ export class InboxRoutes {
     });
     console.log(`[Inbox] ${from?.username ?? 'system'} sent "${subject}" to ${everyone ? `everyone (${count})` : recipient!.username}`);
     this.sendJson(res, 200, { success: true, sent: count, to: everyone ? '*' : recipient!.username });
+  }
+
+  /**
+   * A message from the game ("system") to one account, made by the lobby itself (the thank-you for a donation):
+   * not a banner, just unread mail. False when the account is gone or the inbox is off.
+   */
+  async systemMessage(userId: number, subject: string, body: string): Promise<boolean> {
+    if (!this.store) return false;
+    const user = await this.users.getUserById(userId);
+    if (!user) return false;
+    const { count } = await this.store.send([user.id], { from_user_id: null, from_name: 'system', subject: cleanText(subject, true).slice(0, SUBJECT_MAX), body: cleanText(body, false).slice(0, BODY_MAX), important: false, sent_to: user.username });
+    return count > 0;
   }
 
   /** Every account, a page at a time */

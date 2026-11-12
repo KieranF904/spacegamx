@@ -76,6 +76,7 @@ export function activityPage(ctx: PageCtx, d: {
   return shell(ctx, 'activity', f.player ? `Activity: ${f.player}` : 'Activity', html`
   <div class="admin-head">
     <h1>${f.player ? html`Activity: ${f.player}` : 'Activity'}</h1>
+    <p><a class="btn" href="/admin/chat">Chat with pilots who are on</a></p>
     <div class="act-controls">
       <span class="act-state small" data-activity-state aria-live="polite">Live</span>
       <button class="btn btn-sm" type="button" data-activity-pause>Pause</button>

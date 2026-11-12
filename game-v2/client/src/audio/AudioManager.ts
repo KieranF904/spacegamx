@@ -34,7 +34,7 @@ const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_sho
   autocannon_shot: 10, pulse_shot: 8, arc_shot: 6, mortar_shot: 5, torpedo_launch: 3, charge_launch: 4, pd_shot: 6,
   rivet_shot: 8, scrap_chunk_shot: 4, seeker_launch: 4, heart_spark: 8, heart_seeker: 4,
   // (Each model's own: the quick ones need the voices)
-  pip_shot: 10, hammer_shot: 6, twinlink_shot: 10, longbarrel_shot: 3, bastion_shot: 3, slurry_shot: 6, chainsaw_shot: 12, stinger_shot: 8,
+  pip_shot: 10, hammer_shot: 6, mauler_shot: 6, twinlink_shot: 10, longbarrel_shot: 3, bastion_shot: 3, slurry_shot: 6, chainsaw_shot: 12, stinger_shot: 8,
   cloudmaker_shot: 6, quake_shot: 3, overpulse_shot: 8, swarm_launch: 6, hammerhead_launch: 3, coilgun_shot: 4, spear_shot: 3, rail_driver_shot: 6,
   blackout_shot: 2, leviathan_launch: 2, lance_fire: 3,
   // (Warnings: soft, and never a stack: BossFx also spaces them)
@@ -64,7 +64,7 @@ export const FILE_GAIN: Record<string, number> = {
   arc_loop: 0.6, frost_loop: 0.6, repair_loop: 0.55,
   rivet_shot: 0.6, scrap_chunk_shot: 0.75, seeker_launch: 0.6, heart_spark: 0.6, heart_seeker: 0.65,
   // (Each weapon model's own shot: the heavy marks louder than the quick ones)
-  pip_shot: 0.7, hammer_shot: 0.9, twinlink_shot: 0.6, longbarrel_shot: 0.95, bastion_shot: 1, slurry_shot: 0.75, chainsaw_shot: 0.8, stinger_shot: 0.75,
+  pip_shot: 0.7, hammer_shot: 0.9, mauler_shot: 0.9, twinlink_shot: 0.6, longbarrel_shot: 0.95, bastion_shot: 1, slurry_shot: 0.75, chainsaw_shot: 0.8, stinger_shot: 0.75,
   cloudmaker_shot: 0.7, quake_shot: 0.85, overpulse_shot: 0.7, swarm_launch: 0.7, hammerhead_launch: 0.85, coilgun_shot: 0.8, spear_shot: 0.95, rail_driver_shot: 0.75,
   blackout_shot: 0.85, leviathan_launch: 0.95, lance_fire: 0.85, searchlight_loop: 0.65,
   // (Warnings sit under the shots)

@@ -6,6 +6,7 @@ import { createShipState } from '../ships/state.js';
 import { stepGuns } from '../ships/guns.js';
 import type { Charge } from '../ships/energy.js';
 import { createPortsState } from '../ships/power/ports.js';
+import { powerTick } from '../ships/energy.js';
 import { buildCheatShip, isRangeWeapon } from './cheatShip.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import { readShipJson, testCatalog } from '../ships/testData.js';
@@ -45,7 +46,7 @@ describe('gun range cheat ship', () => {
     expect(parseBlueprint(JSON.stringify(bp)).range).toBeUndefined();
   });
 
-  it('its guns never want for power: held on a dead-flat store, its beam still burns every tick', () => {
+  it('its guns never want for power: held on a dead-flat store, its beam is fed all it takes, and burns in pieces and rests as flown', () => {
     const bp = buildCheatShip(catalog, 'laser_cutter')!;
     const { range: _flag, ...plain } = bp;
     const burns = (b: typeof bp) => {
@@ -53,15 +54,31 @@ describe('gun range cheat ship', () => {
       // (No power at all: every part of it empty, and nothing refilling it)
       const e = createPortsState(ship.derived.ports);
       e.held.fill(0);
-      const charge: Charge = { e };
+      let charge: Charge = { e };
       let n = 0;
       for (let t = 1; t <= 600; t++) {
+        // (the ship's power stepped each tick, as flown)
+        charge = powerTick(ship.derived, charge, { thrusting: false, boosting: false }, tuning).charge ?? charge;
         const r = stepGuns(ship, { x: 0, y: 0, angle: -Math.PI / 2 } as never, { firing: true, aimWorld: -Math.PI / 2, aimDist: 400, energy: { charge } }, t, tuning);
         n += r.beams.length;
       }
       return n;
     };
-    expect(burns(bp)).toBeGreaterThan(500);
-    expect(burns(plain)).toBeLessThan(burns(bp));
+    // (The Cutter: three pieces, a rest, then its buffer filling: lit well under all the time, and far more than unfed)
+    expect(burns(bp)).toBeGreaterThan(150);
+    expect(burns(bp)).toBeLessThan(450);
+    expect(burns(plain)).toBeLessThan(burns(bp) / 3);
+  });
+
+  it('its shells hit as the tier of the gun does (as its beams do): a Longbarrel by its heavy tier, a Hammer plain', () => {
+    const scale = (model: string) => {
+      const ship = createShipState(catalog, tuning, 1, buildCheatShip(catalog, model)!, 0);
+      for (let t = 1; t <= 600; t++) {
+        const r = stepGuns(ship, { x: 0, y: 0, angle: -Math.PI / 2 } as never, { firing: true, aimWorld: -Math.PI / 2, aimDist: 400 }, t, tuning);
+        if (r.shots.length) return r.shots[0].shot.damageScale;
+      }
+      return NaN;
+    };
+    expect(scale('cannon_longbarrel') / scale('cannon_hammer')).toBeCloseTo(catalog.functions.get('cannon_longbarrel')!.infra!.damage!, 6);
   });
 });

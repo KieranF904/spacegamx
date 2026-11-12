@@ -46,7 +46,7 @@ import { partyTab } from '../ui/hub/tabs/partyTab';
 import { pilotTab } from '../ui/hub/tabs/pilotTab';
 import { componentsTab } from '../ui/hub/tabs/componentsTab';
 import { fabTab } from '../ui/hub/tabs/fabTab';
-import { boundKeyName } from '../input/keybindings';
+import { actionKey, boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
 import type { MenuPilotInfo } from '../ui/GameMenuUI';
 import type { MenuFacade } from '../ui/menuLazy';
@@ -71,6 +71,7 @@ import { backupPicker } from '../ui/BackupPicker';
 import { ShipWindow } from '../ui/ship/ShipWindow';
 import { shipTabs } from '../ui/ship/tabs';
 import { FooterBar } from '../ui/hud/FooterBar';
+import { GroupRow } from '../ui/hud/GroupRow';
 import { PowerMargin } from '../ui/hud/PowerMargin';
 import { StatusTray } from '../ui/hud/StatusTray';
 import { groupSelection } from '../ships/weaponGroups/selection';
@@ -162,6 +163,8 @@ export interface WindowSet {
   /** The power readout, bottom right, and the status effect icons above the jump drive bar (ui/hud) */
   powerMargin: PowerMargin;
   statusTray: StatusTray;
+  /** The weapon group row above the quick bar (ui/hud/GroupRow.ts) */
+  groupRow: GroupRow;
 }
 
 export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSet {
@@ -248,12 +251,12 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       enabled: () => host.loggedIn && !host.localDead && !host.shipClient.hangarOpen && !host.menu.isOpen && !w.systemMapUI.isOpen
         && !host.stationOpen && !w.inventoryWindow.isOpen && !w.tradeWindow.isOpen && !w.quests.log.isOpen
         && !host.adminPanel?.capturesFlight,
-      menuModifier: () => host.input.isKeyDown('KeyZ'),
+      menuModifier: () => host.input.isKeyDown(actionKey('contextMenu')),
       autopilot: w.autopilot,
       flyTo: (d, note) => host.flyTo(d, note),
       dock: () => { host.shipClient.onKey('KeyH'); },
       stationInRange: () => host.shipClient.stationInRange()?.name ?? null,
-      // (As the X key: the gate card asks first for a system that outclasses you)
+      // (As the interact key: the gate card asks first for a system that outclasses you)
       interact: () => { if (host.regionUI.allowInteract()) host.network.send({ type: 'interact' }); },
       planetBelow: () => host.planetBelow(),
       locked: (id) => w.systemMapUI.locked?.(id) ?? null,
@@ -393,7 +396,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
 
 const keyOf = (a: string): string => boundKeyName(a, settings.data.bindings);
 
-/** The Ship window, the footer's shortcut buttons, the power readout and the status icons */
+/** The Ship window, the footer's shortcut buttons, the power readout, the status icons and the weapon group row */
 function buildShipHud(host: WindowHost, w: WindowSet): void {
   w.shipWindow = new ShipWindow({
     pilot: host.pilot,
@@ -416,14 +419,20 @@ function buildShipHud(host: WindowHost, w: WindowSet): void {
   w.powerMargin = new PowerMargin();
   w.powerMargin.onClick = () => w.shipWindow.toggle('power');
   w.statusTray = new StatusTray();
+  w.groupRow = new GroupRow({
+    econ: () => host.pilot.econ,
+    sel: () => groupSelection.packed,
+    press: (button, g) => { if (groupSelection.press(button, g)) host.audio.playUI('ui_open', 0.3); },
+    fnName: (fn) => host.pilot.econ.ships.functions.get(fn)?.name ?? fn,
+  });
   w.footer = new FooterBar([
-    { id: 'ship', label: 'Ship', action: 'inventory', title: 'Your ship: status, power, weapons, pickup, refiner, fabricator, kills', run: () => w.shipWindow.toggle('status'), on: () => w.shipWindow.isOpen },
-    { id: 'build', label: 'Build', action: 'fieldBuild', title: 'Build view: edit your ship in flight', run: () => { host.shipClient.onKey('Digit7'); } },
-    { id: 'jobs', label: 'Jobs', action: 'log', title: 'Pilot log: your jobs', run: () => w.quests.log.toggle('jobs'), on: () => w.quests.log.isOpen },
-    { id: 'map', label: 'Map', action: 'map', title: 'Galaxy and system map', run: () => { w.systemMapUI.toggle(); host.audio.playUI('ui_open', 0.6); } },
-    { id: 'station', label: 'Station', action: 'dock', title: 'Dock at the station', run: () => { host.shipClient.onKey('KeyH'); }, shown: () => !!host.shipClient.dockableStationName() },
-    { id: 'social', label: 'Social', action: 'party', title: 'Friends and party (the side panel)', run: () => w.hub.toggle('social') },
-    { id: 'guide', label: 'Guide', action: '', title: 'The field guide', run: () => host.menu.openGuide('progress') },
-    { id: 'settings', label: 'Settings', action: 'menu', title: 'Settings', run: () => host.menu.open('settings') },
+    { id: 'ship', label: 'Ship', icon: 'ship', action: 'inventory', title: 'Your ship: status, power, weapons, pickup, refiner, fabricator, kills', run: () => w.shipWindow.toggle('status'), on: () => w.shipWindow.isOpen },
+    { id: 'build', label: 'Build', icon: 'build', action: 'fieldBuild', title: 'Build view: edit your ship in flight', run: () => { host.shipClient.onKey('Digit7'); } },
+    { id: 'jobs', label: 'Jobs', icon: 'jobs', action: 'log', title: 'Pilot log: your jobs', run: () => w.quests.log.toggle('jobs'), on: () => w.quests.log.isOpen },
+    { id: 'map', label: 'Map', icon: 'map', action: 'map', title: 'Galaxy and system map', run: () => { w.systemMapUI.toggle(); host.audio.playUI('ui_open', 0.6); } },
+    { id: 'station', label: 'Station', icon: 'station', action: 'dock', title: 'Dock at the station', run: () => { host.shipClient.onKey('KeyH'); }, shown: () => !!host.shipClient.dockableStationName() },
+    { id: 'social', label: 'Social', icon: 'social', action: 'party', title: 'Friends and party (the side panel)', run: () => w.hub.toggle('social') },
+    { id: 'guide', label: 'Guide', icon: 'guide', action: '', title: 'The field guide', run: () => host.menu.openGuide('progress') },
+    { id: 'settings', label: 'Settings', icon: 'settings', action: 'menu', title: 'Settings', run: () => host.menu.open('settings') },
   ], keyOf);
 }

@@ -1,5 +1,5 @@
 /**
- * Pushover notices to Kieran's phone when someone joins the live game server. The lobby sends its own for
+ * Pushover notices to Kieran's phone when someone joins the live game server (that someone did, never who). The lobby sends its own for
  * registrations (server-browser/src/accounts/pushover.ts, the same rules).
  *
  * On in production when PUSHOVER_TOKEN and PUSHOVER_USER are set (deploy/vps/deploy.sh copies them from game-v2/.env
@@ -43,14 +43,18 @@ export class Notifier {
     return this.k !== null;
   }
 
-  /** Someone joined: their name, signed in or a guest, and how many are on now */
+  /**
+   * Someone joined: signed in or a guest, and how many are on now. The notice never says who (no name or other account
+   * detail leaves for Pushover: the website's admin activity page says who is on); `name` only stops a reconnect from
+   * being told twice
+   */
   join(name: string, guest: boolean, online: number): void {
     if (!this.k) return;
     const t = this.now(), key = name.toLowerCase();
     if (t - (this.lastJoin.get(key) ?? -Infinity) < JOIN_QUIET_MS) return;
     this.lastJoin.set(key, t);
     if (this.lastJoin.size > 1000) for (const [n, at] of this.lastJoin) if (t - at >= JOIN_QUIET_MS) this.lastJoin.delete(n);
-    this.notify('Space Game: pilot joined', `${name}${guest ? ' (guest)' : ''} joined. ${online} online.`);
+    this.notify('Space Game: pilot joined', `${guest ? 'A guest' : 'A pilot'} joined. ${online} online.`);
   }
 
   notify(title: string, message: string): void {

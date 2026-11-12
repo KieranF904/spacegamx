@@ -11,6 +11,7 @@ import { ShipGeometry, type ShipHull } from '../rendering/lighting/ShipBatch';
 import { HULL_MAT, bakeHull, gradeOfMaterial, hullKind } from './hullLook';
 import { shipFunction } from './shipFunctionData';
 import { ENGINE_FNS, decorOf } from './partDecor';
+import { modSocketDecor } from './modDecor';
 import { functionColor, mix } from './shipColors';
 import { carve, drawDetail } from './bespokeRelief';
 import { SOLAR_CELL_HEX, SOLAR_FRAME_HEX, SOLAR_HULL_TILE } from '../rendering/solarCells';
@@ -46,6 +47,8 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
   const shown = alive.map((a, i) => a && !art[i]);
   // (what holds a detail up: plating, and a skeleton while it's there; built whole, what each lies on: layered)
   const trim = whole ? (d: PieceDetail) => [d] : plating(geoms, alive);
+  // (a Mount's sockets with a modifier block on them: their contacts lit, modDecor.ts)
+  const plugged = modSocketDecor(ship.blueprint.parts, geoms, shown);
   geoms.forEach((geom, i) => {
     if (!shown[i]) return;
     const part = ship.blueprint.parts[i];
@@ -96,7 +99,7 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
 
     // Engines and weapons: their hardware (nozzles, breeches, lenses, tubes...) on top (damaged with the part, in the shader)
     const wear = (c: number) => (debris ? mix(c, 0x333333, 0.45) : c);
-    for (const d of decor.polys) {
+    for (const d of plugged?.has(i) ? [...decor.polys, ...plugged.get(i)!] : decor.polys) {
       const o = { glow: debris ? 0 : d.glow ?? 0, bevel: (d.bevel ?? 0) * cs };
       const p = toPx(d.pts);
       if (d.sunk) sunken(g, p, wear(d.color), o.bevel, o.glow); else g.panel(p, wear(d.color), o);

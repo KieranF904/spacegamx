@@ -214,9 +214,9 @@ export class BlockTarget {
     return hurt;
   }
 
-  /** A beam along y = 0 from the muzzle for one tick: `amount` to the first standing block (or mended, if negative); the x it ends at, or null if it meets none */
-  beam(amount: number, farX: number): { x: number; id: number } | null {
-    const c = this.cast(0, 0, farX, 0);
+  /** A beam from the muzzle to (farX, farY) for one tick (along y = 0, but for a beam of a fan): `amount` to the first standing block (or mended, if negative); the x it ends at, or null if it meets none */
+  beam(amount: number, farX: number, farY = 0): { x: number; id: number } | null {
+    const c = this.cast(0, 0, farX, farY);
     if (!c) return null;
     const b = this.find(c.id)!;
     if (amount >= 0) this.hurtBlock(b, amount);
@@ -225,8 +225,8 @@ export class BlockTarget {
   }
 
   /** The x a beam from the muzzle ends at without touching anything (the first block's face), or null */
-  beamEnd(farX: number): number | null {
-    const c = this.cast(0, 0, farX, 0);
+  beamEnd(farX: number, farY = 0): number | null {
+    const c = this.cast(0, 0, farX, farY);
     return c ? c.t * farX : null;
   }
 }

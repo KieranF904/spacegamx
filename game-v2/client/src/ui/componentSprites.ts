@@ -18,7 +18,7 @@ import { pictureData } from '../assets/gameData';
 export const CELL_PX = 34;
 const DPR = 2;
 /** What it draws, by version (assetCache.ts): bump it whenever the pictures change */
-export const PART_SPRITES_VERSION = 1;
+export const PART_SPRITES_VERSION = 2;
 /** (Kept between visits: pictureSheet) */
 const cache = pictureSheet<{ url: string; w: number; h: number }>('partSprites', PART_SPRITES_VERSION, pictureData);
 

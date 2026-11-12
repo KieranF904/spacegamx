@@ -68,6 +68,9 @@ export interface ShipTuning {
   /** The feed layer's materials (power/ports.ts FeedDef), by id: what each multiplies on a gun or engine that takes it */
   feeds?: Record<string, { name: string; short?: string; on: 'weapon' | 'engine'; mod: Record<string, number>; color?: string; say?: string }>;
 
+  /** Weapon modifiers (modifiers/types.ts; docs/design/weapon-modifiers-2026-11.md) */
+  modifiers?: import('./modifiers/types.js').ModifierTuning;
+
   /** Mining lasers: beam reach (world units), damage per second to asteroids and to ships, and how far they swivel towards the cursor */
   miner?: { range: number; dps: number; shipDps: number; gimbalDeg: number };
 
@@ -114,6 +117,14 @@ export interface ShipTuning {
   };
 
   debug: { damageFraction: number; replayTicks: number; replayRuns: number };
+}
+
+/** What a Burn modifier adds to a fire (modifiers/fxDef.ts): how it spreads, and what it does with the gun's other effects */
+export interface FireFx {
+  fire?: import('./fire.js').FireSpread;
+  layers?: number; layerKeep?: number;
+  blast?: { chance: number; scale: number; max: number };
+  arc?: number;
 }
 
 export interface WeaponTuning {
@@ -187,12 +198,35 @@ export interface WeaponTuning {
    */
   ramp?: { to: number; ticks: number };
   // --- end shot behaviours ---
-  /** The part hit burns (damage over time), spreading to parts within `radius` cells */
-  ignite?: { dps: number; ticks: number; radius: number };
+  /**
+   * The part hit burns (damage over time), spreading to parts within `radius` cells. A Burn modifier's (fxDef.ts):
+   * `fire`, how it spreads over the hull (ships/fire.ts); `layers`, the parts it lights along the shot's line into a
+   * hull (the struck one counted), each deeper one × `layerKeep`; `blast`, the shell's blast lights parts it reaches;
+   * `arc`, each of its arcs lights what it strikes, × this of the arc's share
+   */
+  ignite?: { dps: number; ticks: number; radius: number } & FireFx;
   /** Shatters on impact into `count` shots of `kind` fanned over `arc` degrees */
   split?: { count: number; arc: number; kind: string };
   /** Piercing shots keep this fraction of their damage per body (default 0.75) */
   pierceKeep?: number;
+  /**
+   * A weapon modifier's (modifiers/fxDef.ts): the share of its damage a passing shot does on its i-th hit (the last
+   * entry repeats), in place of pierceKeep's compounding. A beam with it burns through `pierce` hulls past the first
+   */
+  pierceFracs?: number[];
+  /** A weapon modifier's split: each shell of the volley's share of the shot's damage, by its place in spawn order (the main shell last) */
+  burstShare?: number[];
+  /**
+   * A weapon modifier's split on a beam: it burns as a fan of beams from the one muzzle, each `off` (radians) off its
+   * aim for its `share` of the burn (left to right; the middle one keeps most of it). Each is a beam of its own to
+   * everything else (its reach, its pierce, its end)
+   */
+  beamFan?: { off: number[]; share: number[] };
+  /**
+   * A weapon modifier's on a beam, at where it ends on a hull, each damage step (a pulse, a zap, a held beam's sixth of
+   * a second): a blast of `frac` of the step's damage, arcs on to more ships, a fire of `frac` of it over `ticks`
+   */
+  beamEnd?: { blast?: { radius: number; frac: number }; chain?: { count: number; radius: number; falloff: number; fx?: number }; burn?: { frac: number; ticks: number } & FireFx };
   /** Drags ships within `radius` towards it */
   pull?: { radius: number; strength: number };
   /** Lobbed (a mortar): flies over everything to burst where it was aimed (its flight cut to the aim distance) */
@@ -201,7 +235,7 @@ export interface WeaponTuning {
   vsShield?: number;
   vsHull?: number;
   /** Lightning: from what it hits it leaps to `count` more ships within `radius`, each time × `falloff` */
-  chain?: { count: number; radius: number; falloff: number };
+  chain?: { count: number; radius: number; falloff: number; /** A chain modifier's strength step on it (1..FX_STEPS; none: the gun's own arcs): what its arcs are drawn by (modifiers/fxDef.ts arcRadius) */ fx?: number };
   /** Beam: it burns in a zap every `zap` ticks (dps x zap / 60 each, the chain leaping from it) instead of continuously (the Tesla) */
   zap?: number;
   /** Each hit takes `perHit` of the warmth of the ship it lands on (warmth.ts); frozen through (0), it seizes up for `ticks` */

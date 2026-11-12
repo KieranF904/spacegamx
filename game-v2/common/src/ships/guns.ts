@@ -24,7 +24,10 @@ import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from 
 import { pointTurretAim, stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { chargeGroupsEnd, type Charge } from './energy.js';
-import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
+import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, portsSpace, type PortsLayout, type PortsState } from './power/ports.js';
+import { portsLastFx } from './power/portsMods.js';
+import { fxStep } from './modifiers/fxDef.js';
+import { rapidRate } from './modifiers/types.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import { datan2, dcos, dsin } from '../math/detTrig.js';
 import { EVERY_MASK, TRIG_LEFT, clickCalls, freshMasks, gunSelected, gunTriggeredBy, partWeaponGroups, trigSel } from './weaponGroups.js';
@@ -68,12 +71,16 @@ export interface GunShot {
   shot: ProjectileSpec;
   /** A ports ship's augmented shot (power/ports.ts): its augment's mods go on top of the gun's */
   aug?: WeaponMods;
+  /** The weapon modifier effects live on it when it was spent: a mask over the gun's own (PortsMods.gunFx[part]); absent: none */
+  fx?: number;
 }
 
 /** A pulse laser that starts a pulse this tick (pulse.ts): charged like a gun's reload, paid for as one shot */
 export interface GunPulse {
   w: WeaponInfo;
   aimQ: number;
+  /** As GunShot.fx */
+  fx?: number;
 }
 
 /** A charge gun that starts charging (start) or is let go early (the charge drains away): everyone sees the tell (a shell-less fire event) */
@@ -86,6 +93,8 @@ export interface GunTell {
 export interface GunStep {
   shots: GunShot[];
   beams: WeaponInfo[];
+  /** By `beams`' place: each beam's live weapon modifier effects this tick (a mask, as GunShot.fx); absent when none has any */
+  beamFx?: number[];
   pulses: GunPulse[];
   /** Charge starts and early releases (empty on most ticks: a shared empty list) */
   tells: readonly GunTell[];
@@ -369,19 +378,32 @@ function stepClip(ship: ShipState, w: WeaponInfo, share: number): void {
 export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tick: number, tuning: ShipTuning): GunStep {
   const shots: GunShot[] = [];
   const beams: WeaponInfo[] = [];
+  let beamFx: number[] | undefined;
   const pulses: GunPulse[] = [];
   let tells = NO_TELLS as GunTell[];
   const weapons = tuning.weapons ?? {};
   const { aimWorld } = orders;
   // A ports ship (power/ports.ts): each gun fires from its own buffer, a shot's worth at a time, and a beam lights while its buffer
   // can feed it; nothing is shared. (Unaccounted without the state, as the old one is without a charge)
-  // (A gun range cheat ship's guns are always fully powered, types.ts Blueprint.range: its power goes unaccounted)
+  // (A gun range cheat ship's guns are always fully powered, types.ts Blueprint.range: its power goes unaccounted; a beam still burns from its fed buffer, in pieces and with its rests)
   const energy = ship.blueprint.range ? undefined : orders.energy;
   const pz: PortsLayout | undefined = ship.derived.ports && energy?.charge.e ? ship.derived.ports : undefined, E = energy?.charge.e as PortsState;
+  // (A gun range ship's weapon modifiers are all live on every shot, at full strength (rebuild.ts): the range shows the effect, not its upkeep)
+  const rm = ship.blueprint.range ? ship.derived.ports?.mod : undefined;
+  const rangeFx = (p: number): number => { const g = rm?.gunFx[p]; return g ? (1 << g.length) - 1 : 0; };
   // Each gun's timers run a whole tick a tick (the ports core gates each gun from its own buffer; unaccounted, guns run free)
   const share = (_w: WeaponInfo) => 1;
   // (A beam in pieces burns a piece out whatever the trigger: `want` only decides whether the next follows)
-  const burns = (w: WeaponInfo, want: boolean) => (pz ? portsBeamStep(pz, E, w.part, want) > 0 : true);
+  // (A gun range ship's beam burns from its own buffer too, fed all its intake takes whatever the ship makes: it burns its
+  // pieces out and rests as it does flown, so the range shows the gun's real damage. One that burns a material stays lit)
+  const rz: PortsLayout | undefined = ship.blueprint.range && ship.derived.ports && orders.energy?.charge.e ? ship.derived.ports : undefined, RE = orders.energy?.charge.e as PortsState;
+  const fed = (p: number) => !!rz && rz.feedPort[p] !== 2;
+  if (rz) for (const w of ship.derived.weapons) {
+    if (w.fire.model !== 'beam' || !fed(w.part)) continue;
+    const room = portsSpace(rz, RE, w.part), take = rz.intake[w.part];
+    RE.held[w.part] += room < take ? room : take;
+  }
+  const burns = (w: WeaponInfo, want: boolean) => (pz ? portsBeamStep(pz, E, w.part, want) > 0 : fed(w.part) ? portsBeamStep(rz!, RE, w.part, want) > 0 : true);
   const tell = (w: WeaponInfo, start: boolean) => {
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
@@ -401,7 +423,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   if (!click && word !== prevWord) for (const w of ship.derived.weapons) { const m = partWeaponGroups(ship.blueprint.parts[w.part]); if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prevWord, hasMiners)) { click = true; break; } }
   if (click) {
     const waiting = tick - ship.clickAt <= SEMI_BUFFER ? ship.clickMasks ?? EVERY_MASK : 0;
-    const masks = waiting | freshMasks(word, prevWord, hasMiners);
+    const masks = (waiting | freshMasks(word, prevWord, hasMiners)) >>> 0;
     ship.clickMasks = masks === EVERY_MASK ? undefined : masks;
     ship.clickAt = tick;
   }
@@ -505,8 +527,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (!want) {
       // (A beam let go winds up again from nothing; on a ports ship it goes out, but a piece once spent burns to its end)
       if (f.model === 'beam') {
-        if (pz && portsPieceLit(pz, E, p)) { ready.push(w); letGo.add(p); continue; }
-        ship.charge[p] = 0; if (pz) portsBeamStep(pz, E, p, false);
+        if (pz ? portsPieceLit(pz, E, p) : fed(p) && portsPieceLit(rz!, RE, p)) { ready.push(w); letGo.add(p); continue; }
+        ship.charge[p] = 0; if (pz) portsBeamStep(pz, E, p, false); else if (fed(p)) portsBeamStep(rz!, RE, p, false);
       }
       continue;
     }
@@ -529,6 +551,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       ship.cooldown[p] = 1;
       if (f.windup) ship.charge[p] = Math.min(f.windup, ship.charge[p] + 1);
       beams.push(w);
+      // (its weapon modifier effects live on this tick's burn, power/portsMods.ts)
+      const lit = pz?.mod ? portsLastFx() : rangeFx(p);
+      if (lit) (beamFx ??= [])[beams.length - 1] = lit;
+      else if (beamFx) beamFx[beams.length - 1] = 0;
       continue;
     }
     // (Waiting its turn in its group's ripple: see stagger below)
@@ -546,17 +572,29 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     const aimQ = shotAimQ(ship.aim[p]);
     ship.aim[p] = aimQ / SHOT_AIM_STEPS;
     // (A ports ship pays for the shot now, from the gun's buffer and its feed buffer; its material may make the shot hit harder)
-    const dmg = pz ? portsSpendShot(pz, E, p, f.model === 'clip' ? f.rounds ?? 1 : 1) : 1;
+    // (A gun range ship pays nothing, but its shot hits as its tier does, as its beams do: the range shows the gun as flown)
+    const dmg = pz ? portsSpendShot(pz, E, p, f.model === 'clip' ? f.rounds ?? 1 : 1) : ship.blueprint.range ? ship.derived.ports?.tierDmg[p] ?? 1 : 1;
     const aug = pz && portsShotAugmented() ? pz.augMods[p] : undefined;
-    if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
-    else { const shot = buildShot(w, ship, pose, tick, tuning); if (dmg !== 1) shot.damageScale *= dmg; shots.push(aug ? { w, aimQ, shot, aug } : { w, aimQ, shot }); }
-    if (f.model === 'charge') ship.cooldown[p] = f.cooldown ?? w.interval;
+    // (The weapon modifier effects live on this shot: a mask over the gun's own, power/portsMods.ts. A ship without mounts has none)
+    const fx = pz?.mod ? portsLastFx() : rangeFx(p);
+    if (weapons[w.kind]?.type === 'beam') pulses.push(fx ? { w, aimQ, fx } : { w, aimQ });
+    else {
+      const shot = buildShot(w, ship, pose, tick, tuning);
+      if (dmg !== 1) shot.damageScale *= dmg;
+      const s: GunShot = aug ? { w, aimQ, shot, aug } : { w, aimQ, shot };
+      if (fx) s.fx = fx;
+      shots.push(s);
+    }
+    // (A rapid shot is a smaller one, and the next comes that much sooner: modifiers/fxDef.ts)
+    const rapid = fx ? fxStep(tuning.modifiers, (pz?.mod ?? rm)!.gunFx[p], fx, 'rapid') : 0;
+    const quick = rapid ? rapidRate(tuning.modifiers!, rapid) : 1;
+    if (f.model === 'charge') ship.cooldown[p] = (f.cooldown ?? w.interval) / quick;
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
-    else ship.cooldown[p] = (cd > -1 ? cd : 0) + gunInterval(ship, w);
+    else ship.cooldown[p] = (cd > -1 ? cd : 0) + gunInterval(ship, w) / quick;
     if (f.model === 'clip') ship.rounds[p] -= f.rounds ?? 1;
     if ((f.model === 'cycle' || f.model === 'ammo') && weapons[w.kind]?.stagger) stagger(ship, w);
   }
   // (Held: unless a gun's aim differed on it where it's read: the trigger down, held or let go, a click waiting, a shot)
   const aimHeld = !heldDiff || !(reads || semiWaits || shots.length > 0 || beams.length > 0 || pulses.length > 0 || tells.length > 0);
-  return { shots, beams, pulses, tells, dist: aimDist, aimHeld };
+  return beamFx ? { shots, beams, beamFx, pulses, tells, dist: aimDist, aimHeld } : { shots, beams, pulses, tells, dist: aimDist, aimHeld };
 }

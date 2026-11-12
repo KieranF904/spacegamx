@@ -7,7 +7,7 @@
  * extend:     a new fire-event tell is one more `if (ammo === TELL_X)` branch in fromFire
  */
 
-import { SHOT_AIM_STEPS, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, endsAtAim, rebuildVolley, partWeaponDef, shipPointToWorld, WEAPON_KIND_TYPE, EntityType, type EntityState, type ServerSnapshotMessage, type ShipTuning, type WeaponInfo } from '@space-game/common';
+import { SHOT_AIM_STEPS, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, endsAtAim, rebuildVolley, partWeaponDef, shipGunDef, shipGunFx, fxMarks, gunCodePart, gunCodeAmmo, gunCodeAug, gunCodeFx, shellGunCode, shipPointToWorld, WEAPON_KIND_TYPE, EntityType, type EntityState, type ServerSnapshotMessage, type ShipTuning, type WeaponInfo } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import type { ShipStore } from '../ShipStore';
 import type { GunFeel } from '../gunFeel';
@@ -99,7 +99,8 @@ export class FireShells {
    */
   fromFire(m: ServerSnapshotMessage, out: EntityState[]): void {
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
-      const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
+      // (the part field is the volley's gun code: launch.ts gunCode. `fx`: its weapon modifier effects' mask)
+      const tick = m.tick - ago, part = gunCodePart(partAmmo), ammo = gunCodeAmmo(partAmmo), aug = gunCodeAug(partAmmo) ? (1 as const) : undefined, fx = gunCodeFx(partAmmo);
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
       if (ammo === TELL_CHARGE_START) {
         this.chargeTells.set(owner * 256 + part, tick);
@@ -114,7 +115,7 @@ export class FireShells {
         continue;
       }
       // A beam in pieces spent a piece (no shells): its pulse runs from that tick (power/ports.ts; drawn by MiningBeamFx)
-      if (ammo === TELL_BEAM_PIECE) { this.h.beamFx()?.startPiece(owner, part, tick); continue; }
+      if (ammo === TELL_BEAM_PIECE) { this.h.beamFx()?.startPiece(owner, part, tick, fx); continue; }
       // A ports ship's mining laser started a pulse (its aim field: the fulfilment it started at, 0..255)
       if (ammo === TELL_MINE_PULSE) { this.h.beamFx()?.startMinePulse(owner, part, tick, aimQ / 255); continue; }
       // (Nothing fired there, a point-defence shot: for the gun lanes, OtherGuns.confirm; drawn by nothing, or its intercept)
@@ -146,30 +147,32 @@ export class FireShells {
       // (Another ship's gun points where this shot left: a pilotless ship's aim is known only from its shots; a pilot's
       // follows their cursor between them, stepTurretVisuals)
       if (gun && owner !== this.h.state.playerId && !this.h.tuning.weapons?.[gun.kind]?.pointDefence) ship.aim[part] = aimQ / SHOT_AIM_STEPS;
-      if (gun && this.h.tuning.weapons?.[gun.kind]?.pulse) { this.h.beamFx()?.startPulse(owner, part, tick); continue; }
-      const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship, st.body, this.h.tuning);
+      if (gun && this.h.tuning.weapons?.[gun.kind]?.pulse) { this.h.beamFx()?.startPulse(owner, part, tick, fx); continue; }
+      const v = rebuildVolley(fx ? { owner, tick, part, aimQ, ids, ammo, aug, fx } : { owner, tick, part, aimQ, ids, ammo, aug }, ship, st.body, this.h.tuning);
       if (!v) continue;
       // The ship's pose as it fired: the muzzle flash sits on the barrel in its frame
       for (const id of ids) this.firePoses.set(id, { x: st.body.x, y: st.body.y, angle: st.body.angle });
       while (this.firePoses.size > 512) this.firePoses.delete(this.firePoses.keys().next().value!);
       // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
-      const wdef = partWeaponDef(this.h.tuning, v.kind, ship.blueprint.parts[part], gun);
+      // (with the shot's weapon modifier effects on it, and the effects themselves for its modifier layers: look.fx)
+      const wdef = fx && gun ? shipGunDef(this.h.tuning, ship, gun, undefined, fx) : partWeaponDef(this.h.tuning, v.kind, ship.blueprint.parts[part], gun);
       // (An augmented shot looks charged up: weaponStyles AUG)
-      const fn = ship.blueprint.parts[part]?.fn, look = { model: fn && aug ? fn + AUG : fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce, life: straightLife(wdef, v.shells[0]?.life), arm: wdef.arm };
+      const fn = ship.blueprint.parts[part]?.fn, look = { model: fn && aug ? fn + AUG : fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce, life: straightLife(wdef, v.shells[0]?.life), arm: wdef.arm, fx: fxMarks(shipGunFx(ship, part), fx) };
       for (const id of ids) this.shellLooks.set(id, look);
       while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
       const spawnTick = this.h.state.entities.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       // (Its gun's grade, as the server's shells carry it: each mark's shells look their own way)
       const grade = ship.derived.weapons.find((w) => w.part === part)?.grade ?? 1;
-      for (const s of v.shells) {
+      for (let i = 0; i < v.shells.length; i++) {
+        const s = v.shells[i];
         const age = m.tick - spawnTick;
         // (built from a gun lane: it ends on its own, OtherGuns.expire)
         this.h.otherGuns.built(s.id, tick + s.life - 1);
         out.push({
           id: s.id, type: EntityType.Projectile, x: s.x + s.vx * age, y: s.y + s.vy * age, vx: s.vx, vy: s.vy,
-          // (no end; the gun as the fire event packs it, which a confirmed hit works out from: data[10])
-          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (owner * 137) % 360, spawnTick, s.x, s.y, owner, s.size, v.turret ? 1 : 0, 0, partAmmo],
+          // (no end; the shell's gun code, which a confirmed hit works out from: data[10])
+          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (owner * 137) % 360, spawnTick, s.x, s.y, owner, s.size, v.turret ? 1 : 0, 0, shellGunCode(partAmmo, v.def, i)],
         });
       }
     }

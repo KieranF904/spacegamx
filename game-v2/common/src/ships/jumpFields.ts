@@ -16,6 +16,7 @@
  */
 
 import type { LodestoneData } from '../data/schemas.js';
+import type { LandmarkSet } from '../world/landmarks.js';
 import { planetAngle } from '../world/planets.js';
 import { dcos, dsin } from '../math/detTrig.js';
 import { inSolarRing, jumpBurnAt, jumpBurning, type JumpTuning } from './flight.js';
@@ -25,6 +26,8 @@ export interface FieldEnv {
   /** The central body (its charging ring) */
   central: { type?: string; radius?: number } | null | undefined;
   lodestones?: readonly LodestoneData[];
+  /** The system's moving landmarks: a pilot's ship in one's zone is carried with it (world/landmarks.ts, sim/step.ts). Absent: none */
+  landmarks?: LandmarkSet;
 }
 
 /** The fields at a point */

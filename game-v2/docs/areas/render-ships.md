@@ -13,6 +13,7 @@ How a ship looks on screen: the whole-hull geometry build (in a worker), the lit
 | client/src/ships/hullTextures.ts, hullAtlasWorker.ts | 425/15 | procedural panel atlas (`buildHullAtlas`, `HULL_ATLAS_VERSION`, `HULL_TILE`, `HULL_ROWS`), built in a worker |
 | client/src/ships/partDecor.ts | 670 | `partDecor(geom)` / `decorOf(geom)`: engine nozzles, weapon bases/housings, miner; `DECOR_SHAPES` registry; `drawDecor2d` for icons |
 | client/src/ships/gunDecor.ts | 623 | gun heads by family: `turretHead`, `fixedGun`, `gunId`, `housingOf`, `turretBaseOf`; one `// ---- <family>` block each (202-429), legendaries 429+ |
+| client/src/ships/modDecor.ts | | weapon modifier hardware: mounts and their sockets, one shape per modifier block kind (`MOD_BLOCK_KINDS`), hoppers, tier II / III line parts; `modDecor` (called by partDecor), `modSocketDecor` (lit sockets on a ship, called by hullBuild) |
 | client/src/ships/bespokeRelief.ts, skeletonBuild.ts, frameBuild.ts | 555/193/52 | relief (`carve`, `drawDetail`) and skeleton/frame geometry for bespoke/boss pieces |
 | client/src/ships/{DamageFx,BossFx,ThrusterFx,JumpFx,PulseFx,ScannerFx,MiningFx,MiningBeamFx}.ts | 886/318/325/340/310/87/222/372 | effect layers. `DamageFx` is sectioned (104-404 events, 405-504, 505-584, 585+); `ThrusterFx.draw` flames; `BossFx` telegraphs/beams |
 | client/src/ships/HangarLitView.ts | 102 | the editor's WebGL layer using the same hull build/ShipBatch/Lighting (consumer side in hangar-ui) |

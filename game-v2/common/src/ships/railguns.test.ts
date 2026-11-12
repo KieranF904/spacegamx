@@ -73,7 +73,7 @@ describe('railguns', () => {
     expect(spear.ammo).toBeNull();
     expect(armed('railgun_spear').derived.weapons[0].fire).toMatchObject({ model: 'cycle', interval: 114 });
     const needle = armed('railgun_needle');
-    expect(defOf(needle)).toMatchObject({ damage: 62, pierce: 2, speed: 150, ammo: { item: 'railgun_slugs', rounds: 200 } });
+    expect(defOf(needle)).toMatchObject({ damage: 90, pierce: 2, speed: 150, ammo: { item: 'railgun_slugs', rounds: 200 } });
     expect(needle.derived.weapons[0].fire).toMatchObject({ model: 'ammo', interval: 75 });
   });
 

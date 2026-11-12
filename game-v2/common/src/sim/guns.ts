@@ -24,7 +24,7 @@ import type { WeaponInfo } from '../ships/rebuild.js';
 import type { WeaponMods } from '../ships/types.js';
 import { rightFiresGuns, trigWord } from '../ships/weaponGroups.js';
 import { stepGuns, type GunOrders, type GunStep } from '../ships/guns.js';
-import { gunDef, shotAimQ } from '../ships/launch.js';
+import { shipGunDef, shotAimQ } from '../ships/launch.js';
 import { ensurePortsCharge, payMining, type Charge } from '../ships/energy.js';
 import { portsMinePhase, portsPiecePhase, type PortsState } from '../ships/power/ports.js';
 import { jumpPhase, jumpTuning } from '../ships/flight.js';
@@ -54,10 +54,11 @@ export interface GunPose { x: number; y: number; angle: number }
 
 /**
  * The shells a volley of this gun has (a burst's, by its tuning with its part's mods, grade, size, model and an
- * augment's mods; ammunition isn't the step's: an ammunition's burst count goes with the volley's consumer)
+ * augment's mods and the shot's weapon modifier effects (`fx`, its mask: a split's shells); ammunition isn't the
+ * step's: an ammunition's burst count goes with the volley's consumer)
  */
-export function volleyBarrels(tuning: ShipTuning, ship: Pick<ShipState, 'blueprint'>, w: WeaponInfo, aug?: WeaponMods): number {
-  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[w.part]?.mods, ammo: aug, grade: w.grade, size: w.size, model: w.model });
+export function volleyBarrels(tuning: ShipTuning, ship: Pick<ShipState, 'blueprint' | 'derived'>, w: WeaponInfo, aug?: WeaponMods, fx?: number): number {
+  const def = shipGunDef(tuning, ship, w, aug, fx);
   return Math.max(1, Math.min(SHOT_ID_BARRELS, Math.round(def.burst ?? 1)));
 }
 
@@ -66,19 +67,31 @@ export function gunEvents(ship: ShipState, owner: number, pose: GunPose, step: G
   for (const s of step.shots) {
     // (a gun past the id's slot field, or an owner past its owner field, fires unnamed: no ship has one yet)
     if (s.w.part >= SHOT_ID_SLOTS || owner >= SHOT_ID_OWNERS || owner < 0) continue;
-    const n = volleyBarrels(tuning, ship, s.w, s.aug);
+    const n = volleyBarrels(tuning, ship, s.w, s.aug, s.fx);
     for (let i = 0; i < n; i++) {
       const e: GunFireEvent = { k: 'fire', tick, owner, slot: s.w.part, barrel: i, shot: shotId(owner, tick, s.w.part, i), aimQ: s.aimQ };
       if (s.aug) e.aug = 1;
+      if (s.fx) e.fx = s.fx;
       events.push(e);
     }
   }
-  for (const p of step.pulses) events.push({ k: 'fx', tick, owner, fx: GUN_FX.pulse, part: p.w.part, x: pose.x, y: pose.y, aq: p.aimQ });
+  for (const p of step.pulses) {
+    const e: SimEvent = { k: 'fx', tick, owner, fx: GUN_FX.pulse, part: p.w.part, x: pose.x, y: pose.y, aq: p.aimQ };
+    if (p.fx) e.mask = p.fx;
+    events.push(e);
+  }
   for (const t of step.tells) events.push({ k: 'fx', tick, owner, fx: t.start ? GUN_FX.chargeStart : GUN_FX.chargeCancel, part: t.w.part, x: pose.x, y: pose.y, aq: t.aimQ });
   const pz = ship.derived.ports, pe = pz ? (charge?.e as PortsState | undefined) : undefined;
-  for (const w of step.beams) {
-    events.push({ k: 'fx', tick, owner, fx: GUN_FX.beam, part: w.part, x: pose.x, y: pose.y });
-    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) events.push({ k: 'fx', tick, owner, fx: GUN_FX.beamPiece, part: w.part, x: pose.x, y: pose.y, aq: shotAimQ(ship.aim[w.part]) });
+  for (let i = 0; i < step.beams.length; i++) {
+    const w = step.beams[i], mask = step.beamFx?.[i];
+    const lit: SimEvent = { k: 'fx', tick, owner, fx: GUN_FX.beam, part: w.part, x: pose.x, y: pose.y };
+    if (mask) lit.mask = mask;
+    events.push(lit);
+    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) {
+      const e: SimEvent = { k: 'fx', tick, owner, fx: GUN_FX.beamPiece, part: w.part, x: pose.x, y: pose.y, aq: shotAimQ(ship.aim[w.part]) };
+      if (mask) e.mask = mask;
+      events.push(e);
+    }
   }
 }
 

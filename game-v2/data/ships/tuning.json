@@ -467,7 +467,6 @@
       "color": "#a78bfa",
       "mod": {
         "steady": 0.5,
-        "steady": 0.5,
         "cycle": 1.25
       },
       "say": "Half the floor a heavy gun needs, a quarter slower"
@@ -541,6 +540,53 @@
       },
       "say": "Boost half again as hard for half the extra burn; a tenth less thrust cruising"
     }
+  },
+  "_modifiers": "Weapon modifiers (docs/design/weapon-modifiers-2026-11.md; common/src/ships/modifiers/). effects: what a shot can carry, in wire order (never reorder, append only). kinds: the modifier blocks a mount holds and the effect each gives; needs.mat: a hopper material used up, needs.power: extra E, both per E of gun energy treated. recipes: kinds a Double or Triple mount fuses into an effect of its own. lines: by line tier (I, II, III), how many effects one line part carries and the most treated E a second. The numbers under each effect are its change at full strength; a shot's strength (0..1) scales each from no change to that.",
+  "modifiers": {
+    "effects": ["velocity", "rapid", "explosive", "split", "pierce", "wave", "chain", "heavy", "burn", "hyper"],
+    "say": {
+      "velocity": { "name": "Velocity", "color": "#7fd8ff", "say": "Faster shots that reach further" },
+      "rapid": { "name": "Rapid", "color": "#ffd166", "say": "Fires faster, each shot lighter, more damage overall" },
+      "explosive": { "name": "Explosive", "color": "#ff8a3d", "say": "Trades direct damage for a blast around the hit" },
+      "split": { "name": "Split", "color": "#b58cff", "say": "Each shot becomes three in a narrow fan" },
+      "pierce": { "name": "Pierce", "color": "#8ef0c8", "say": "Shots pass through, spreading their damage down the line" },
+      "wave": { "name": "Wave", "color": "#9db4ff", "say": "A wide front that hits everything it crosses" },
+      "chain": { "name": "Chain", "color": "#5ef2e0", "say": "Arcs from the target to others nearby" },
+      "heavy": { "name": "Heavy", "color": "#d9a066", "say": "Slower shots that hit much harder" },
+      "burn": { "name": "Burn", "color": "#ff5a4a", "say": "Sets the target burning for a few seconds" },
+      "hyper": { "name": "Hyper", "color": "#f2f27a", "say": "Very fast shots that hit a little softer" }
+    },
+    "kinds": {
+      "coil": { "effect": "velocity" },
+      "resonator": { "effect": "rapid" },
+      "chamber": { "effect": "explosive" },
+      "prism": { "effect": "split" },
+      "arc": { "effect": "chain", "needs": { "mat": "arcsalt", "per": 0.05 } },
+      "condenser": { "effect": "heavy", "needs": { "mat": "cryo", "per": 0.05 } },
+      "brand": { "effect": "burn", "needs": { "mat": "pyre", "per": 0.05 } },
+      "rail": { "effect": "hyper", "needs": { "power": 30, "per": 0.5 } }
+    },
+    "recipes": [
+      { "parts": ["coil", "prism"], "effect": "pierce" },
+      { "parts": ["chamber", "resonator"], "effect": "wave" }
+    ],
+    "lines": [{ "fx": 2, "cap": 120 }, { "fx": 3, "cap": 300 }, { "fx": 4, "cap": 900 }],
+    "velocity": { "speed": 1.8, "range": 1.6 },
+    "rapid": { "rate": 1.8, "total": 1.2 },
+    "explosive": { "direct": 0.75, "blast": 0.32, "radius": [12, 34] },
+    "split": { "shots": 3, "total": 1.35, "spreadDeg": 6 },
+    "pierce": { "fracs": [0.36, 0.26, 0.18, 0.12, 0.08] },
+    "wave": { "width": 3.5, "perTarget": 0.78 },
+    "chain": { "jumps": 4, "frac": 0.6, "reach": 320 },
+    "heavy": { "damage": 1.6, "speed": 0.62 },
+    "burn": {
+      "total": 0.78, "secs": 3,
+      "layers": 3, "layerKeep": 0.7,
+      "blast": { "chance": 0.5, "scale": 0.5, "max": 4 },
+      "arc": 1,
+      "fire": { "beat": 30, "base": 0.06, "per": 0.05, "cap": 0.35, "survive": 0.2, "surviveCap": 0.6, "keep": 0.7, "time": 0.7, "fade": 0.8, "gens": 3, "total": 600, "parts": 8 }
+    },
+    "hyper": { "speed": 3.5, "damage": 0.8, "beamRange": 1.3 }
   },
   "miner": {
     "range": 700,

@@ -24,7 +24,7 @@
 import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
-  GravityWell, FlightConstants, type HitInfo, type SegmentHit, type WarmthStage, type JumpField, standing,
+  GravityWell, FlightConstants, type HitInfo, type FireSpread, type SegmentHit, type WarmthStage, type JumpField, standing,
   WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot, newAimHoldStats,
 } from '@space-game/common';
 import {
@@ -61,6 +61,8 @@ export class ShipBridge {
   readonly library: Map<string, Blueprint>;
   readonly enemyDesigns: Record<string, Blueprint>;
   readonly devDesigns: Record<string, Blueprint>;
+  /** The dev test ships marked `retired` in their files: no ship list offers them (the gun range's, gameServer/hosts/gunRange.ts) */
+  readonly retiredDesigns: ReadonlySet<string>;
   /** Gone (the v5 design update was removed with the old save migrations, 2026-11-10): always undefined, kept only
    *  because shipBridgeApi.json pins the name (drop it with a deliberate golden update) */
   readonly designUpdate: undefined = undefined;
@@ -141,16 +143,18 @@ export class ShipBridge {
   private salvos = new Map<number, PendingSalvoShell[]>();
   /** Where each ship's guns aimed on the last tick they stepped, and whether the trigger was held (guided shells steer to it) */
   private guides = new Map<number, { tick: number; held: boolean; x: number; y: number }>();
-  /** A ramping beam's run on one part, per ship and gun (key = ship * 1024 + part): the part it is on, the ticks it has burned there, its last tick (fireBeam) */
+  /** A ramping beam's run on one part, per beam (key: beamFx.ts gunRay): the part it is on, the ticks it has burned there, its last tick (fireBeam) */
   private ramps = new Map<number, { target: number; ticks: number; last: number }>();
+  /** What a held beam with an end effect has burned into its first hull since its last damage step, per beam (beamFx.ts heldBurn) */
+  private beamBurns = new Map<number, { target: number; span: number; sum: number; since?: number; last?: number; layered?: number; deep?: Map<number, { span: number; sum: number; since: number; last: number; layered?: number }> }>();
   /** The ship the last damaging beam tick burned (fireBeam; -1 none): a marking or slowing beam's role reads it */
   private beamStruck = -1;
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */
-  private burns: { eid: number; part: number; until: number; dps: number; radius: number; source: number; hit?: HitInfo }[] = [];
+  private burns: dmg.Burn[] = [];
   /** Weapon beams on this tick, per ship: how far along the nearest one hit (0..1) */
   private weaponBeams = new Map<number, number>();
   /** Pulse lasers mid-pulse, per ship: which part, and the tick its pulse started (common/src/ships/pulse.ts) */
-  private pulsing = new Map<number, { part: number; start: number; hit?: { eid: number; dealt: number } }[]>();
+  private pulsing = new Map<number, { part: number; start: number; fx?: number; hit?: { eid: number; dealt: number } }[]>();
   /** What the last pulse tick burned (fireBeam), so a pulse's damage is told as one number */
   private pulseHit: { eid: number; dealt: number } | null = null;
   /** Autopilot headings, held steady until they drift a little (fewer control changes to send) */
@@ -208,6 +212,7 @@ export class ShipBridge {
     this.library = new Map(Object.entries(cfg.library ?? {}));
     this.enemyDesigns = cfg.enemies ?? {};
     this.devDesigns = cfg.dev ?? {};
+    this.retiredDesigns = new Set(cfg.retired ?? []);
     this.now = cfg.now ?? (() => 0);
   }
 
@@ -384,7 +389,7 @@ export class ShipBridge {
   /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
   private stepPulses(eid: number, ship: ShipState, tick: number): void { return wpn.stepPulses(this.ctx, eid, ship, tick); }
 
-  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number { return wpn.fireBeam(this.ctx, eid, ship, w, def, pulse); }
+  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number; whole?: number }): number { return wpn.fireBeam(this.ctx, eid, ship, w, def, pulse); }
 
   /** A beam's muzzle (world) and angle, along its gun's aim */
   private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } { return wpn.beamFrom(this.ctx, eid, ship, w); }
@@ -507,7 +512,16 @@ export class ShipBridge {
   /** An EMP burst: ships in range lose engines and guns for `ticks` (shields halve it) */
   empAt(systemNum: number, x: number, y: number, radius: number, ticks: number, source: number): number[] { return dmg.empAt(this.ctx, systemNum, x, y, radius, ticks, source); }
 
-  ignite(eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1): number { return dmg.ignite(this.ctx, eid, x, y, dps, ticks, radius, source, hit, struck); }
+  ignite(eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1, held = -1, fire?: FireSpread): number { return dmg.ignite(this.ctx, eid, x, y, dps, ticks, radius, source, hit, struck, held, fire); }
+
+  /** ignite, and everyone near told (a fire no shell's hit record carries: a beam's, an arc's) */
+  igniteTold(eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1, held = -1, fire?: FireSpread): number { return dmg.igniteTold(this.ctx, eid, x, y, dps, ticks, radius, source, hit, struck, held, fire); }
+
+  /** The layers a piercing shot lights behind the part it struck, along its line into the hull (bridge/damage.ts igniteLayers) */
+  igniteLayers(eid: number, x0: number, y0: number, x1: number, y1: number, struck: number, layers: number, keep: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, fire?: FireSpread): number[] { return dmg.igniteLayers(this.ctx, eid, x0, y0, x1, y1, struck, layers, keep, dps, ticks, radius, source, hit, fire); }
+
+  /** A blast's fire: the parts it reaches may catch (bridge/damage.ts blastIgnite) */
+  blastIgnite(systemNum: number, x: number, y: number, radius: number, by: { chance: number; max: number }, dps: number, ticks: number, source: number, hit?: HitInfo, fire?: FireSpread): number { return dmg.blastIgnite(this.ctx, systemNum, x, y, radius, by, dps, ticks, source, hit, fire); }
 
   /** Parts on fire now (for the snapshot effects): [body, part] pairs */
   burning(): { eid: number; part: number }[] { return dmg.burning(this.ctx); }

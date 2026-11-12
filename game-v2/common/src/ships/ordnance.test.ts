@@ -73,7 +73,7 @@ describe('ordnance: the section 4 rows', () => {
     expect(firesStraight(sw.d)).toBe(false);
     const hh = def('missile_hammerhead');
     expect(hh.w.fire.interval).toBe(198);
-    expect(hh.d).toMatchObject({ damage: 105, splash: { radius: 150, damage: 54 }, guided: { turn: 0.05 } });
+    expect(hh.d).toMatchObject({ damage: 105, splash: { radius: 150, damage: 90 }, guided: { turn: 0.05 } });
   });
 
   it('torpedoes: the Eel homes gently; the Leviathan is a round a shot every 3 s, straight, armed after 30 ticks', () => {

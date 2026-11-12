@@ -14,6 +14,9 @@ import { InboxRoutes } from './inbox/routes.js';
 import { ActivityRoutes } from './activity/routes.js';
 import { FriendRoutes } from './friends/routes.js';
 import { RankingRoutes } from './rankings/routes.js';
+import { DonationRoutes, thankYouMessage } from './donations/routes.js';
+import { NewsletterRoutes } from './newsletter/routes.js';
+import { AdminChatRoutes } from './adminchat/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
 import { MAX_SERVERS, parseHeartbeat, type ServerEntry } from './servers.js';
 import { loadDefs } from './regions/defs.js';
@@ -157,7 +160,7 @@ async function handleRegister(req: http.IncomingMessage, res: http.ServerRespons
     }
     
     // (Each heartbeat tells the server which accounts are gone, so it deletes their profiles)
-    sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts(), update: updates.schedule.forHeartbeat() });
+    sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts(), update: updates.schedule.forHeartbeat(), newContributors: donations.newContributors() });
   } catch (err) {
     logEvent('register error', { error: String(err) });
     sendJson(res, bodyStatus(err), { ok: false, error: 'Invalid request' });
@@ -198,7 +201,29 @@ const serverDefs = loadDefs(DATA_DIR);
 const friends = await FriendRoutes.create(accounts.users, sendJson, parseJson, { adminSecret: accounts.secret, dataDir: DATA_DIR });
 // Rankings, one row per account: the game servers report, the clients read (see rankings/routes.ts)
 const rankings = await RankingRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
-accounts.onAccountDeleted = (id) => { inbox.forgetUser(id); void friends.forgetUser(id); void rankings.forgetUser(id); };
+// Donations through PayPal, recorded against the account that made them (see donations/routes.ts); off without PayPal keys
+const donations = await DonationRoutes.create(accounts.users, sendJson, parseJson, getClientIp, {
+  adminSecret: accounts.secret, dataDir: DATA_DIR,
+  // (A donor gets a thank-you in their inbox, once per donation)
+  onCompleted: async (d) => { const m = thankYouMessage(d.amount, d.currency, d.crossed); await inbox.systemMessage(d.userId, m.subject, m.body); },
+});
+// A game server checking a session learns whether the account's donations earn the contributor rank (it grants it)
+// Consent to the email newsletter, per account (see newsletter/routes.ts): asked at sign-up, or later on the website
+const newsletter = await NewsletterRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
+// Admins on the website chatting with pilots in the game (see adminchat/routes.ts): the game servers ask for their
+// messages; an offline pilot's can go to their inbox instead
+const adminChat = await AdminChatRoutes.create(accounts.users, sendJson, parseJson, {
+  adminSecret: accounts.secret, dataDir: DATA_DIR, toInbox: (userId, subject, body) => inbox.systemMessage(userId, subject, body),
+});
+accounts.onRegistered = (user, body) => newsletter.signedUp(user.id, body.newsletter);
+accounts.accountExtra = async (user) => { const n = await newsletter.state(user.id); return { newsletter: n.newsletter, newsletterAsked: n.asked }; };
+// A session check also says whether the account's donations earn the contributor rank (a game server grants it) and
+// whether they've been asked about the newsletter (the website asks those who haven't)
+accounts.validateExtra = async (user) => ({
+  ...((await donations.earnsContributor(user.id)) ? { donorContributor: true } : {}),
+  newsletterAsked: (await newsletter.state(user.id)).asked,
+});
+accounts.onAccountDeleted = (id) => { inbox.forgetUser(id); void friends.forgetUser(id); void rankings.forgetUser(id); donations.forgetUser(id); newsletter.forgetUser(id); };
 // The player activity feed: game servers send it, the website's admin panel reads it (see activity/routes.ts)
 const activity = await ActivityRoutes.create(accounts.users, sendJson, parseJson, getClientIp, {
   adminSecret: accounts.secret, dataDir: DATA_DIR, live: () => [...new Set([...servers.values()].map((s) => s.name))],
@@ -224,6 +249,9 @@ const server = http.createServer(async (req, res) => {
     if (await inbox.handle(req, res, url)) return;
     if (await friends.handle(req, res, url)) return;
     if (await rankings.handle(req, res, url)) return;
+    if (await donations.handle(req, res, url)) return;
+    if (await newsletter.handle(req, res, url)) return;
+    if (await adminChat.handle(req, res, url)) return;
     if (await updates.handle(req, res, url)) return;
     if (await accounts.handle(req, res, url)) return;
 
@@ -269,6 +297,7 @@ server.listen({ port: PORT, host: process.env.BROWSER_HOST || undefined }, () =>
   console.log(`     POST /activity/read - Activity feed (an admin's session); game servers send to /admin/activity/ingest`);
   console.log(`     POST /admin/friends/* - Friends and status per account (game servers, behind LOBBY_ADMIN_SECRET)`);
   console.log(`     POST /admin/rankings/report|import - Ranked stats per account (game servers, behind LOBBY_ADMIN_SECRET); POST /rankings/view - the boards`);
+  console.log(`     POST /donations/config|create|capture|mine - Donations through PayPal (${donations.enabled ? 'on' : 'off'}); the owner's report at /admin/donations`);
 });
 
 // Periodic cleanup
@@ -287,6 +316,12 @@ function stop(code: number): void {
     .catch((err) => console.error('[browser] closing the friends lists failed:', err))
     .then(() => rankings.close())
     .catch((err) => console.error('[browser] closing the rankings failed:', err))
+    .then(() => adminChat.close())
+    .catch((err) => console.error('[browser] closing the admin messages failed:', err))
+    .then(() => newsletter.close())
+    .catch((err) => console.error('[browser] closing the newsletter answers failed:', err))
+    .then(() => donations.close())
+    .catch((err) => console.error('[browser] closing the donations failed:', err))
     .then(() => accounts.close())
     .catch((err) => console.error('[browser] closing the accounts failed:', err))
     .finally(() => process.exit(code));

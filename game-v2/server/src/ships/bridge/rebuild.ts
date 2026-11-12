@@ -35,6 +35,7 @@ import {
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
+import { dropBeams } from './beamFx.js';
 
 /** A blueprint's placed geometry, built once per blueprint (geomCache) */
 export function geometry(b: BridgeCtx, ship: ShipState): PlacedGeom[] {
@@ -168,7 +169,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.slowedUntil.delete(eid);
   b.salvos.delete(eid);
   b.guides.delete(eid);
-  for (let p = 0; p < 64; p++) b.ramps.delete(eid * 1024 + p);
+  dropBeams(b, eid);
   b.weaponBeams.delete(eid);
   b.pulsing.delete(eid);
   b.pdOn.delete(eid);

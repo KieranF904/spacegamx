@@ -1,0 +1,11 @@
+{
+  "prompt": "Continuous freezing ice beam, deep cold resonant with soft crystalline crackle of ice forming",
+  "settings": {
+    "duration_seconds": 3,
+    "prompt_influence": 0.6,
+    "loop": true,
+    "output_format": "mp3_44100_128"
+  },
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "time": "2026-11-06T02:19:24.126Z"
+}

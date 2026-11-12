@@ -21,7 +21,7 @@ import type { IWorld } from 'bitecs';
 import {
   FRICTION, BOOST_FACTOR, WORLD_SIZE, CONTACT_BIG_BODY,
   type Blueprint, type Catalog, type ShipState, type ShipTuning, type PlacedPart, type Vec2, type InventoryStub,
-  type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type ShipDerived, type Terrain,
+  type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type GunFx, type ShipDerived, type Terrain,
 } from '@space-game/common';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { AimHoldStats } from '@space-game/common';
@@ -37,7 +37,7 @@ export interface ShipHost {
   removeBody(eid: number): void;
   /** A projectile weapon's shot (kind = tuning.weapons key), spawned exactly at (x, y). `target` is a homing target (or -1). */
   /** Returns the shells' entity ids, in spawn order */
-  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; gun?: number }): number[] | void;
+  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; gun?: number; gunFx?: readonly GunFx[]; fx?: number }): number[] | void;
   /** A shot's damage against shields and hull (pulse lasers), if it has its own */
   shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } | undefined;
   /** Where a hazard bites: beam heat or shield regeneration × this (1 where nothing does) */
@@ -54,8 +54,12 @@ export interface ShipHost {
   splashMobs?(systemNum: number, x: number, y: number, radius: number, damage: number, source: number): void;
   /** A beam passing through mobs this tick */
   beamMobs?(systemNum: number, x0: number, y0: number, x1: number, y1: number, width: number, damage: number, source: number): void;
-  /** A zap leapt to (x, y) from (fromX, fromY) (a Tesla's chain): everyone in the system sees the arc */
-  arcHop?(systemNum: number, x: number, y: number, fromX: number, fromY: number): void;
+  /** A zap leapt to (x, y) from (fromX, fromY) (a Tesla's chain): everyone in the system sees the arc (`fx`: a chain modifier's strength step on it, if any) */
+  arcHop?(systemNum: number, x: number, y: number, fromX: number, fromY: number, fx?: number): void;
+  /** A part was set alight, or burned on, by something no hit record tells (a fire spreading, a blast's or an arc's fire, a beam's): everyone near sees it (`gen`: a spreading fire's generation + 1) */
+  fireLit?(eid: number, part: number, ticks: number, gen?: number): void;
+  /** A modified beam's blast at a hull behind its first, or where it comes out of a hull (`out`: its heading there, whole degrees): everyone in the system sees it (bridge/beamFx.ts beamEnd) */
+  beamBlast?(systemNum: number, x: number, y: number, radius: number, kind: string, out?: number): void;
   beamAsteroid?(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number;
   /**
    * `glancing`: the hit barely got through the armour it struck (a gun too weak for it). `shown`: a shell hit's number
@@ -193,6 +197,8 @@ export interface PendingSalvoShell {
   damageScale: number;
   dry?: boolean;
   ammoMods?: WeaponMods;
+  /** The salvo's weapon modifier effects (its first shell's mask, GunShot.fx) */
+  fx?: number;
 }
 
 export interface ShipBridgeConfig {
@@ -208,6 +214,8 @@ export interface ShipBridgeConfig {
   enemies?: Record<string, Blueprint>;
   /** Dev test ships by file name (the F9 ship swap only) */
   dev?: Record<string, Blueprint>;
+  /** The dev test ships marked `retired` (offered by no list) */
+  retired?: string[];
   /** Wall-clock source for the admin panel's rebuild timer only (never used by ship logic) */
   now?: () => number;
 }
@@ -262,7 +270,7 @@ export interface BridgeInternals {
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];
   markedUntil: ShipBridge['markedUntil']; slowedUntil: ShipBridge['slowedUntil']; salvos: ShipBridge['salvos'];
-  guides: ShipBridge['guides']; ramps: ShipBridge['ramps']; beamStruck: ShipBridge['beamStruck'];
+  guides: ShipBridge['guides']; ramps: ShipBridge['ramps']; beamBurns: ShipBridge['beamBurns']; beamStruck: ShipBridge['beamStruck'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
   rebuildNow: ShipBridge['rebuildNow']; markRebuild: ShipBridge['markRebuild']; rebuildMarked: ShipBridge['rebuildMarked']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];

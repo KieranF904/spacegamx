@@ -47,6 +47,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // The gun range: going in sets a profile aside and moves the ship; a weapon pick rebuilds the cheat ship (game/gunRange)
   gunRangeEnter: { per: 20, burst: 4 },
   gunRangeWeapon: { per: 90, burst: 12 },
+  // (A room change moves the ship; a library ship pick rebuilds it)
+  gunRangeShip: { per: 60, burst: 10 },
   // A weapon-group change refits the live ship (net/handlers/weaponGroups.ts)
   weaponGroups: { per: 60, burst: 10 },
   // Items moved into the repair bank and the profile saved

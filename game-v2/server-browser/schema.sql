@@ -130,3 +130,50 @@ CREATE TABLE IF NOT EXISTS ranking_rows (
     all_time   JSONB NOT NULL DEFAULT '{}',      -- { stat: total }
     updated_at BIGINT NOT NULL                   -- epoch ms
 );
+
+-- Donations through PayPal (server-browser/src/donations): one row per PayPal order the lobby made. `user_id` is the
+-- account whose session made the order (NULL: a guest, or the account was deleted since: the record of the money stays).
+-- Only COMPLETED rows count towards a total. Nothing about the payer is kept. PostgresDonationStore makes this at start
+-- too when it is missing. The JSON store (JsonDonationStore, data/lobby/donations.json) holds the same rows.
+CREATE TABLE IF NOT EXISTS donations (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    amount          BIGINT NOT NULL,          -- minor units (cents); once COMPLETED, what PayPal captured
+    currency        TEXT NOT NULL,            -- 'USD'
+    paypal_order_id TEXT NOT NULL UNIQUE,
+    capture_id      TEXT UNIQUE,              -- PayPal's capture id, once captured (one capture is one row)
+    status          TEXT NOT NULL,            -- CREATED, COMPLETED, PENDING, FAILED
+    created_at      BIGINT NOT NULL,          -- epoch ms
+    completed_at    BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id, status);
+
+
+-- Consent to the email newsletter (server-browser/src/newsletter): one row per account that has been asked. No row: not
+-- asked and not consenting (every account from before this, and one made by a client that sent no answer), so the
+-- `users` table is untouched. `newsletter_via`: where the answer was given (signup, prompt, settings). Nothing is sent
+-- yet. PostgresConsentStore makes this at start too when it is missing. The JSON store (JsonConsentStore,
+-- data/lobby/newsletter.json) holds the same rows. A deleted account's row goes by cascade.
+CREATE TABLE IF NOT EXISTS newsletter_consent (
+    user_id          BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    newsletter       BOOLEAN NOT NULL DEFAULT FALSE,   -- they want it
+    newsletter_asked BOOLEAN NOT NULL DEFAULT FALSE,   -- they have been asked (a row is made by an answer)
+    newsletter_at    BIGINT,                           -- epoch ms of the last change
+    newsletter_via   TEXT                              -- 'signup', 'prompt' or 'settings'
+);
+
+-- The admin message log (server-browser/src/adminchat): what admins wrote to pilots from the website's admin panel, and
+-- pilots' private replies to them. Admins only; never part of the activity feed. The newest 5000 rows are kept.
+-- PostgresAdminChatStore makes this at start too when it is missing. The JSON store (JsonAdminChatStore,
+-- data/lobby/admin-messages.json) holds the same rows.
+CREATE TABLE IF NOT EXISTS admin_messages (
+    id        BIGSERIAL PRIMARY KEY,
+    at        BIGINT NOT NULL,           -- epoch ms
+    server    TEXT NOT NULL,             -- the game server's name; '' for a message left in an inbox
+    direction TEXT NOT NULL,             -- 'out' (admin to pilot) or 'in' (a pilot's reply)
+    admin     TEXT NOT NULL,             -- the admin's account name
+    pilot     TEXT NOT NULL DEFAULT '',  -- the pilot's name; '' for a message to everyone on the server
+    body      TEXT NOT NULL,             -- plain text (escaped on display)
+    status    TEXT NOT NULL              -- queued, sent, failed, received, inbox
+);
+CREATE INDEX IF NOT EXISTS idx_admin_messages_pilot ON admin_messages(lower(pilot), id DESC);

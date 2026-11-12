@@ -506,6 +506,62 @@
     });
   }
 
+  // ---------------------------------------------------------------- admin chat: who is on and the conversation, refreshed
+  // (Both fragments come from the site already rendered and escaped. The log keeps to its newest line unless you scrolled up)
+  const chat = $('[data-chat]');
+  if (chat) {
+    const online = $('[data-chat-online]', chat), log = $('[data-chat-log]', chat), form = $('[data-chat-form]', chat), err = $('[data-chat-error]', chat);
+    const clock = (root) => $$('time[data-clock]', root).forEach((t) => {
+      t.textContent = new Date(t.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const atEnd = () => log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    const toEnd = () => { log.scrollTop = log.scrollHeight; };
+    const say = (text) => { if (!err) return; err.textContent = text; err.hidden = !text; };
+    let busy = false, seen = { online: null, log: null };
+    clock(chat);
+    toEnd();
+    const poll = async () => {
+      if (busy || document.hidden) return;
+      busy = true;
+      try {
+        const r = await fetch(chat.dataset.feed, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error(String(r.status));
+        const d = await r.json();
+        if (typeof d.online === 'string' && d.online !== seen.online) { seen.online = d.online; online.innerHTML = d.online; clock(online); }
+        if (typeof d.log === 'string' && d.log !== seen.log) {
+          const stay = atEnd();
+          seen.log = d.log;
+          log.innerHTML = d.log;
+          clock(log);
+          if (stay) toEnd();
+        }
+      } catch { /* the next one may do better */ } finally {
+        busy = false;
+      }
+    };
+    setInterval(poll, 3000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = form.elements.text;
+      if (!input.value.trim()) return;
+      const body = new URLSearchParams(new FormData(form));
+      input.disabled = true;
+      try {
+        const r = await fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.ok) { input.value = ''; say(''); } else say(d.error || 'It could not be sent. Try again in a moment.');
+      } catch {
+        say('It could not be sent. Check your connection.');
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+      await poll();
+      toEnd();
+    });
+  }
+
   // ---- Database parts: a link to a row (/database/parts#cannon_pip) opens it
   const openHashRow = () => {
     const id = decodeURIComponent(location.hash.slice(1));

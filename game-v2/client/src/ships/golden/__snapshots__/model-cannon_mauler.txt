@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Mauler
+Mk II · Large · Block · 4 cells
+Hull · mass361 hp · 7.3
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage110/s · reach 4,500
+Hits withKinetic · penetration 2
+Fire rate1.3/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 2 clear cells ahead
+Power draw16/s
+
+== partStats (stats rows) ==
+GradeMk II · Large
+Hits withKinetic · penetration 2
+Power draw16
+Hull · mass361 hp · 7.3
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 361
+
+== familyLabel ==
+Cannons
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+steady slow shells that burst where they hit
+
+== keyStats ==
+110 dmg/s · reach 4,500 · cycle · draws 16
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 2 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 14","why":"Unlocks at level 14 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 14","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Large","area":4,"hp":360.96,"mass":7.279999999999999,"firepower":110.08695652173913,"toughness":360.96,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":110.08695652173913,"range":4500,"damageType":"kinetic","pen":2,"draw":16}

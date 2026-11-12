@@ -397,7 +397,7 @@ export class HangarUI implements HangarHost {
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
     else if (code === 'KeyE' || code === FLOW_KEY) { this.setEnergy(!this.overlays.energy); this.renderStats(); }
-    // (1-4 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
+    // (1-5 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
     else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? partAt(this, this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
     else if (code === 'KeyT') {
       // (A gun's barrel is fixed to its piece: R turns it, there is no facing to cycle)

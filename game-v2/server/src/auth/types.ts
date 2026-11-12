@@ -12,6 +12,8 @@ export interface UserRecord {
   is_admin: boolean;
   /** The owner rank, above admin (an owner is an admin too: is_admin is true for one). Missing: not the owner */
   is_owner?: boolean;
+  /** The lobby says their donations earn the contributor rank (server-browser/src/donations): granted at sign-in */
+  donor_contributor?: boolean;
   created_at: string;
 }
 

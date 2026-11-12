@@ -6,7 +6,7 @@
  */
 
 import type { Graphics } from 'pixi.js';
-import { drawStrands } from '../beamLookFx';
+import { drawEmitter, drawStrands, softGlow } from '../beamLookFx';
 
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number }
 interface Missile { x: number; y: number }
@@ -44,8 +44,8 @@ export class SupportFx {
         const u = (this.t * 0.9 + k / 4) % 1, s = Math.sin(u * Math.PI), r = 2.6 + 1.6 * s, mx = x0 + w * u;
         g.moveTo(mx - r, 0).lineTo(mx + r, 0).moveTo(mx, -r).lineTo(mx, r).stroke({ color: 0xa7f3d0, width: 1.6, alpha: 0.85 * s });
       }
-      g.circle(x0, 0, wid * 1.1).fill({ color: 0x5eead4, alpha: 0.45 });
-      g.circle(x1, 0, wid * 2.8).fill({ color: 0x2dd4bf, alpha: 0.22 });
+      drawEmitter(g, x0, 0, 1, 0, wid * 0.8, 0x5eead4, 0xecfdf5, 0.7, this.t * 0.4, 0);
+      softGlow(g, x1, 0, wid * 3, 0x2dd4bf, 0.7);
       g.circle(x1, 0, wid).fill({ color: 0xecfdf5, alpha: 0.8 });
       if (Math.random() < 0.7 * Math.min(1, frames)) {
         const a = Math.random() * Math.PI * 2, s = 0.4 + Math.random() * 1.2;

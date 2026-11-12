@@ -14,7 +14,7 @@
 import { addEntity, addComponent, hasComponent, entityExists, defineQuery, IWorld } from 'bitecs';
 import {
   Position, Velocity, Radius, DroppedItem, Lifetime, InSystem, NetworkSync, Dead, Player,
-  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift, dcos, dhypot, dsin, mulberry32, type LootNearPod,
+  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift, podHold, podCarry, type PodHold, type LandmarkSet, dcos, dhypot, dsin, mulberry32, type LootNearPod,
 } from '@space-game/common';
 
 export interface PodHost {
@@ -31,6 +31,8 @@ export interface PodHost {
   shipRadius(playerEid: number): number;
   /** The server tick (drift anchors) */
   tick?(): number;
+  /** A system's moving landmarks (common world/landmarks.ts): a pod anchored in one's zone is carried with it */
+  landmarks?(systemNum: number): LandmarkSet | undefined;
   /** Who a player is, for pods kept for one pilot (a wreck): their account, not their entity */
   keyOf?(playerEid: number): string | undefined;
   /** A kept pod was emptied */
@@ -43,8 +45,14 @@ export interface PodHost {
   holdFull?(playerEid: number): void;
 }
 
-/** Where a pod was, how fast, on which tick: from there it just drifts (podDrift) until something moves it */
-export interface PodAnchor { x: number; y: number; vx: number; vy: number; t: number }
+/**
+ * Where a pod was, how fast, on which tick: from there it just drifts (podDrift) until something moves it. `hold`
+ * (server only, never sent: clients work it out from the anchor as sent, common world/landmarks.ts podHold): the moving
+ * landmark whose zone the anchor was laid in; the pod is carried with it by that weight until it is anchored again
+ */
+export interface PodAnchor { x: number; y: number; vx: number; vy: number; t: number; hold?: PodHold | null }
+
+const CARRIED = { x: 0, y: 0 }, CARRIED_BEFORE = { x: 0, y: 0 };
 
 const podQuery = defineQuery([DroppedItem, Position]);
 
@@ -343,9 +351,23 @@ export class LootPods {
       const tick = this.host.tick?.() ?? this.ticks;
       const a = this.anchors.get(eid);
       const at = a && podDrift(a, tick - a.t);
+      const set = this.host.landmarks?.(InSystem.systemId[eid]);
+      // (Held by a moving landmark: this tick's share of its move, then where the anchor and the landmark put it now)
+      if (a?.hold && at && set) {
+        podCarry(set, a.hold, tick, CARRIED);
+        podCarry(set, a.hold, tick - 1, CARRIED_BEFORE);
+        Position.x[eid] += CARRIED.x - CARRIED_BEFORE.x;
+        Position.y[eid] += CARRIED.y - CARRIED_BEFORE.y;
+        at.x += CARRIED.x; at.y += CARRIED.y;
+      }
       if (!at || Math.abs(at.x - Position.x[eid]) > 0.05 || Math.abs(at.y - Position.y[eid]) > 0.05
         || Math.abs(at.vx - Velocity.x[eid]) > 0.001 || Math.abs(at.vy - Velocity.y[eid]) > 0.001) {
-        this.anchors.set(eid, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], t: tick });
+        // (Its hold from the anchor as the snapshot row sends it, to a tenth: net/snapshot/rows/bodies.ts podRows)
+        const x = Position.x[eid], y = Position.y[eid];
+        this.anchors.set(eid, { x, y, vx: Velocity.x[eid], vy: Velocity.y[eid], t: tick, hold: podHold(set, Math.round(x * 10) / 10, Math.round(y * 10) / 10, tick) });
+      } else if (a?.hold) {
+        // (Exactly there: a long carry adds no rounding of its own)
+        Position.x[eid] = at.x; Position.y[eid] = at.y;
       }
     }
     if (this.ticks % NEAR_EVERY === 0) this.sendNear();

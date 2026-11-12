@@ -44,6 +44,8 @@ export interface BodyView {
   barKey?: string;
   /** Named pilotless hulks (derelicts) get a label underneath */
   label?: Text;
+  /** How much of its name shows (0..1: put away in a bunch of ships, render/labelCrowd.ts) */
+  named?: number;
   /** Its label is in the calm style (a passive hostile, unprovoked) */
   calmLabel?: boolean;
   /** Hostiles: a health bar under the label */

@@ -77,7 +77,8 @@ export class DamageFx {
   /** Hulls grinding together: sparks thrown along the surface, a flash, some grit */
   onContact(m: ServerContactMessage): void { contact(this.c, m); }
 
-  onIgnite(bodyId: number, part: number, ticks: number): void { this.amb.onIgnite(bodyId, part, ticks); }
+  /** A part caught fire (`gen`: a spreading fire's, a Burn modifier's: damage/fires.ts draws it) */
+  onIgnite(bodyId: number, part: number, ticks: number, gen?: number): void { this.amb.onIgnite(bodyId, part, ticks, gen); }
 
   onBossCharge(bodyId: number, kind: string, ticks: number): void { this.amb.onBossCharge(bodyId, kind, ticks); }
 
@@ -131,6 +132,7 @@ export class DamageFx {
     this.shields.drawShields(frames);
     this.shields.drawRipples(frames);
     this.amb.drawCharges();
+    this.amb.drawFires();
     p.end();
   }
 }

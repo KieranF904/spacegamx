@@ -1,0 +1,891 @@
+{
+ "name": "Beam Split",
+ "catalogVersion": 1,
+ "paint": "#4a3d63",
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "rect2",
+   "fn": "core",
+   "material": "alloy",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "x": -8,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -8,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -7,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -8,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -7,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "laser_glint",
+   "material": "alloy",
+   "x": -8,
+   "y": -5,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "wg": 1
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "x": -5,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -5,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -4,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -5,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -4,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "pulse_strobe",
+   "material": "steel",
+   "x": -5,
+   "y": -5,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "wg": 2
+  },
+  {
+   "uid": 13,
+   "piece": "rect2",
+   "fn": "power_splitter_bank_3",
+   "material": "steel",
+   "x": -1,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -1,
+   "y": -3,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 15,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -2,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -1,
+   "y": -4,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 17,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -2,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -1,
+   "y": -5,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 19,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -2,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": -1,
+   "y": -6,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 21,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": -2,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "sq",
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "x": -8,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 0,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 1,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 0,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 1,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 0,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 1,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 0,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 1,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "rect2",
+   "fn": "laser_cutter",
+   "material": "steel",
+   "x": -1,
+   "y": -7,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "wg": 4
+  },
+  {
+   "uid": 32,
+   "piece": "sq",
+   "fn": "power_conduit",
+   "material": "alloy",
+   "x": 4,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 4,
+   "y": -3,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 34,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 3,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 4,
+   "y": -4,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 36,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 3,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 4,
+   "y": -5,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 38,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 3,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 4,
+   "y": -6,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 40,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 3,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 4,
+   "y": -7,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 42,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 3,
+   "y": -7,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "sq",
+   "fn": "power_conduit",
+   "material": "alloy",
+   "x": 5,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 5,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 6,
+   "y": -3,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 5,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 47,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 6,
+   "y": -4,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 5,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 49,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 6,
+   "y": -5,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 5,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 6,
+   "y": -6,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "sq",
+   "fn": "mod_mount",
+   "material": "alloy",
+   "x": 5,
+   "y": -7,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "sq",
+   "fn": "mod_prism",
+   "material": "alloy",
+   "x": 6,
+   "y": -7,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "rect2",
+   "fn": "lance_lance",
+   "material": "cobalt",
+   "x": 4,
+   "y": -8,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "wg": 8
+  },
+  {
+   "uid": 55,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -8,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -7,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -6,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -5,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 59,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -4,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 60,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 61,
+   "piece": "sq",
+   "fn": "power_corner",
+   "material": "alloy",
+   "x": -2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 62,
+   "piece": "sq",
+   "fn": "power_corner",
+   "material": "alloy",
+   "x": -1,
+   "y": -1,
+   "rot": 1,
+   "flip": true
+  },
+  {
+   "uid": 63,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 64,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 65,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 66,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 67,
+   "piece": "sq",
+   "fn": "power_conduit",
+   "material": "alloy",
+   "x": 4,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 68,
+   "piece": "sq",
+   "fn": "power_conduit",
+   "material": "alloy",
+   "x": 5,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 69,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 6,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 70,
+   "piece": "rect2",
+   "fn": "power_joiner_bank_3",
+   "material": "steel",
+   "x": -2,
+   "y": 0,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 71,
+   "piece": "rect2",
+   "fn": "power_overclock_reactor",
+   "material": "titanium",
+   "x": 2,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 72,
+   "piece": "sq",
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "x": -1,
+   "y": 1,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 73,
+   "piece": "sq",
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "x": 0,
+   "y": 1,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 74,
+   "piece": "sq",
+   "fn": "engine_ion_drive",
+   "material": "alloy",
+   "x": -1,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 75,
+   "piece": "sq",
+   "fn": "engine_ion_drive",
+   "material": "alloy",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 76,
+   "piece": "block2",
+   "fn": "power_fusion_plant",
+   "material": "steel",
+   "x": -3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 77,
+   "piece": "rect2",
+   "fn": "power_joiner_bank_3",
+   "material": "steel",
+   "x": 4,
+   "y": 0,
+   "rot": 0,
+   "flip": true
+  },
+  {
+   "uid": 78,
+   "piece": "rect2",
+   "fn": "power_joiner_bank_3",
+   "material": "steel",
+   "x": 5,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 79,
+   "piece": "block2",
+   "fn": "power_fusion_plant",
+   "material": "steel",
+   "x": 3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 80,
+   "piece": "block2",
+   "fn": "power_fusion_plant",
+   "material": "steel",
+   "x": 5,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 81,
+   "piece": "rect2",
+   "fn": "engine_plasma_drive",
+   "material": "steel",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 82,
+   "piece": "sq",
+   "fn": "engine_ion_drive",
+   "material": "alloy",
+   "x": -8,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 83,
+   "piece": "rect2",
+   "fn": "power_overclock_reactor",
+   "material": "titanium",
+   "x": -6,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 84,
+   "piece": "rect2",
+   "fn": "engine_plasma_drive",
+   "material": "steel",
+   "x": -7,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 85,
+   "piece": "rect2",
+   "fn": "power_overclock_reactor",
+   "material": "titanium",
+   "x": -4,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 86,
+   "piece": "rect2",
+   "fn": "engine_plasma_drive",
+   "material": "steel",
+   "x": -5,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ]
+}

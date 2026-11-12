@@ -443,6 +443,32 @@
    "seconds": 0
   },
   {
+   "id": "mod_mount",
+   "tab": "power",
+   "kind": "model",
+   "name": "Mount",
+   "level": 2,
+   "order": 133,
+   "fn": "mod_mount",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_mount.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Power line with a socket",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 1 socket · treats 24 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws · burns 1 E a second for each filled socket; out of power it still passes power, with no effect",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 3
+   },
+   "seconds": 0
+  },
+  {
    "id": "structure:composite",
    "tab": "structure",
    "kind": "structure",
@@ -533,7 +559,7 @@
    "tradeOff": "a steady stream of shells",
    "family": "Autocannons",
    "size": "Small · Square",
-   "keyNumbers": "44 dmg/s · reach 5,394 · cycle · draws 12",
+   "keyNumbers": "44 dmg/s · reach 5,390 · cycle · draws 12",
    "mounting": [
     "Turret, 270°",
     "Bolts on any side"
@@ -709,6 +735,114 @@
    "cost": {
     "alloy_plate": 2,
     "servo_motor": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "mod_coil",
+   "tab": "power",
+   "kind": "model",
+   "name": "Coil",
+   "level": 4,
+   "order": 136,
+   "fn": "mod_coil",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_coil.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Modifier: faster shots",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "velocity",
+   "cost": {
+    "alloy_plate": 1,
+    "coil_winding": 1,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "mod_resonator",
+   "tab": "power",
+   "kind": "model",
+   "name": "Resonator",
+   "level": 4,
+   "order": 137,
+   "fn": "mod_resonator",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_resonator.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Modifier: faster fire",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "rapid",
+   "cost": {
+    "alloy_plate": 1,
+    "capacitor_cell": 1,
+    "copper_wire": 3
+   },
+   "seconds": 0
+  },
+  {
+   "id": "mod_chamber",
+   "tab": "power",
+   "kind": "model",
+   "name": "Chamber",
+   "level": 4,
+   "order": 138,
+   "fn": "mod_chamber",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_chamber.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Modifier: blast on hit",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "explosive",
+   "cost": {
+    "steel_plate": 2,
+    "servo_motor": 1,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "mod_prism",
+   "tab": "power",
+   "kind": "model",
+   "name": "Prism",
+   "level": 4,
+   "order": 139,
+   "fn": "mod_prism",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_prism.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Modifier: three-shot fan",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "split",
+   "cost": {
+    "alloy_plate": 1,
+    "crystal_lens": 1,
+    "copper_wire": 3
    },
    "seconds": 0
   },
@@ -1282,6 +1416,59 @@
     "copper_wire": 2
    },
    "seconds": 40
+  },
+  {
+   "id": "power_conduit_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Conduit II",
+   "level": 8,
+   "order": 147,
+   "fn": "power_conduit_2",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_conduit_2.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 3 effects",
+   "cost": {
+    "alloy_plate": 4,
+    "copper_wire": 4
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_corner_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Corner Conduit II",
+   "level": 8,
+   "order": 148,
+   "fn": "power_corner_2",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_corner_2.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 3 effects",
+   "cost": {
+    "alloy_plate": 4,
+    "copper_wire": 8,
+    "insulated_polymer": 4
+   },
+   "seconds": 0
   },
   {
    "id": "power_isotope_pile",
@@ -2134,6 +2321,87 @@
    "seconds": 160
   },
   {
+   "id": "mod_mount_double",
+   "tab": "power",
+   "kind": "model",
+   "name": "Double Mount",
+   "level": 12,
+   "order": 134,
+   "fn": "mod_mount_double",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/mod_mount_double.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Two sockets; fuses recipes",
+   "family": "Modifiers",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 20 · power line · 2 sockets · treats 30 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws · burns 1 E a second for each filled socket; out of power it still passes power, with no effect",
+   "cost": {
+    "steel_plate": 3,
+    "power_coupling": 2,
+    "coil_winding": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "power_joiner_bank_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Joiner Bank II",
+   "level": 12,
+   "order": 149,
+   "fn": "power_joiner_bank_2",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_bank_2.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · 3 effects",
+   "cost": {
+    "steel_plate": 12,
+    "capacitor_cell": 8,
+    "copper_wire": 8
+   },
+   "seconds": 60
+  },
+  {
+   "id": "power_splitter_bank_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Splitter Bank II",
+   "level": 12,
+   "order": 150,
+   "fn": "power_splitter_bank_2",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_bank_2.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · 3 effects",
+   "cost": {
+    "steel_plate": 12,
+    "capacitor_cell": 8,
+    "copper_wire": 8
+   },
+   "seconds": 60
+  },
+  {
    "id": "shield_flash_screen",
    "tab": "shields",
    "kind": "model",
@@ -2180,7 +2448,7 @@
    "tradeOff": "fast slugs through two ships · ammo",
    "family": "Railguns",
    "size": "Medium · Panel",
-   "keyNumbers": "50 dmg/s · reach 9,000 · ammo",
+   "keyNumbers": "72 dmg/s · reach 9,000 · ammo",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",
@@ -2278,6 +2546,144 @@
     "steel_plate": 1,
     "capacitor_cell": 2,
     "coil_winding": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "cannon_mauler",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Mauler",
+   "level": 14,
+   "order": 139,
+   "fn": "cannon_mauler",
+   "material": "steel",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/cannon_mauler.webp",
+    "w": 86,
+    "h": 134
+   },
+   "licence": false,
+   "tradeOff": "steady slow shells that burst where they hit",
+   "family": "Cannons",
+   "size": "Large · Block",
+   "keyNumbers": "110 dmg/s · reach 4,500 · cycle · draws 16",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "steel_plate": 4,
+    "barrel_assembly": 2,
+    "copper_wire": 2,
+    "servo_motor": 1
+   },
+   "seconds": 120
+  },
+  {
+   "id": "hopper_arcsalt",
+   "tab": "power",
+   "kind": "model",
+   "name": "Arc Salt Hopper",
+   "level": 14,
+   "order": 144,
+   "fn": "hopper_arcsalt",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/hopper_arcsalt.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Feeds an Arc Lattice",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "hopper",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 4
+   },
+   "seconds": 0
+  },
+  {
+   "id": "hopper_cryo",
+   "tab": "power",
+   "kind": "model",
+   "name": "Cryo Fluid Hopper",
+   "level": 14,
+   "order": 145,
+   "fn": "hopper_cryo",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/hopper_cryo.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Feeds a Condenser",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "hopper",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 4
+   },
+   "seconds": 0
+  },
+  {
+   "id": "hopper_pyre",
+   "tab": "power",
+   "kind": "model",
+   "name": "Pyre Gel Hopper",
+   "level": 14,
+   "order": 146,
+   "fn": "hopper_pyre",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/hopper_pyre.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Feeds a Brand",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "hopper",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 4
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_passthrough_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Passthrough II",
+   "level": 14,
+   "order": 151,
+   "fn": "power_passthrough_2",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_passthrough_2.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 3 effects",
+   "cost": {
+    "alloy_plate": 4,
+    "copper_wire": 8,
+    "insulated_polymer": 8
    },
    "seconds": 0
   },
@@ -2477,6 +2883,33 @@
    "cost": {
     "steel_plate": 2,
     "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_combiner_2",
+   "tab": "power",
+   "kind": "model",
+   "name": "Combiner II",
+   "level": 16,
+   "order": 152,
+   "fn": "power_combiner_2",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_combiner_2.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries three weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 3 effects",
+   "cost": {
+    "steel_plate": 8,
+    "power_coupling": 4,
+    "insulated_polymer": 4
    },
    "seconds": 0
   },
@@ -2974,6 +3407,225 @@
    "seconds": 50
   },
   {
+   "id": "mod_arc",
+   "tab": "power",
+   "kind": "model",
+   "name": "Arc Lattice",
+   "level": 20,
+   "order": 140,
+   "fn": "mod_arc",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_arc.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Special: arcs between targets",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "chain · uses 0.05 Arc Salt for each E of a shot, from a hopper touching it or piped to it; with none left its effect stops",
+   "cost": {
+    "steel_plate": 2,
+    "coil_winding": 4,
+    "capacitor_cell": 4,
+    "copper_wire": 6
+   },
+   "seconds": 50
+  },
+  {
+   "id": "mod_condenser",
+   "tab": "power",
+   "kind": "model",
+   "name": "Condenser",
+   "level": 20,
+   "order": 141,
+   "fn": "mod_condenser",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_condenser.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Special: slow, heavy shots",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "heavy · uses 0.05 Cryo Fluid for each E of a shot, from a hopper touching it or piped to it; with none left its effect stops",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 6,
+    "power_coupling": 5,
+    "copper_wire": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "mod_brand",
+   "tab": "power",
+   "kind": "model",
+   "name": "Brand",
+   "level": 20,
+   "order": 142,
+   "fn": "mod_brand",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_brand.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Special: sets targets burning",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "burn · uses 0.05 Pyre Gel for each E of a shot, from a hopper touching it or piped to it; with none left its effect stops",
+   "cost": {
+    "steel_plate": 2,
+    "crystal_lens": 5,
+    "coil_winding": 3,
+    "power_coupling": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "mod_rail",
+   "tab": "power",
+   "kind": "model",
+   "name": "Rail Driver Module",
+   "level": 20,
+   "order": 143,
+   "fn": "mod_rail",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mod_rail.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Special: very fast shots",
+   "family": "Modifiers",
+   "size": "Small · Square",
+   "keyNumbers": "holds 20 · hyper · uses 0.5 E more for each E of a shot, from a power line of its own into its back (up to 30 E a second)",
+   "cost": {
+    "titanium_plate": 4,
+    "coil_winding": 4,
+    "capacitor_cell": 2,
+    "power_coupling": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "power_conduit_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Conduit III",
+   "level": 20,
+   "order": 153,
+   "fn": "power_conduit_3",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_conduit_3.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 4 effects",
+   "cost": {
+    "alloy_plate": 14,
+    "copper_wire": 14
+   },
+   "seconds": 50
+  },
+  {
+   "id": "power_corner_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Corner Conduit III",
+   "level": 20,
+   "order": 154,
+   "fn": "power_corner_3",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_corner_3.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 4 effects",
+   "cost": {
+    "alloy_plate": 14,
+    "copper_wire": 28,
+    "insulated_polymer": 14
+   },
+   "seconds": 50
+  },
+  {
+   "id": "power_joiner_bank_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Joiner Bank III",
+   "level": 20,
+   "order": 155,
+   "fn": "power_joiner_bank_3",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_bank_3.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · 4 effects",
+   "cost": {
+    "steel_plate": 42,
+    "capacitor_cell": 28,
+    "copper_wire": 28
+   },
+   "seconds": 100
+  },
+  {
+   "id": "power_splitter_bank_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Splitter Bank III",
+   "level": 20,
+   "order": 156,
+   "fn": "power_splitter_bank_3",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_bank_3.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · 4 effects",
+   "cost": {
+    "steel_plate": 42,
+    "capacitor_cell": 28,
+    "copper_wire": 28
+   },
+   "seconds": 100
+  },
+  {
    "id": "missile_swarm",
    "tab": "weapons",
    "kind": "model",
@@ -3247,6 +3899,33 @@
    "seconds": 80
   },
   {
+   "id": "power_passthrough_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Passthrough III",
+   "level": 22,
+   "order": 157,
+   "fn": "power_passthrough_3",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_passthrough_3.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 4 effects",
+   "cost": {
+    "alloy_plate": 14,
+    "copper_wire": 28,
+    "insulated_polymer": 28
+   },
+   "seconds": 50
+  },
+  {
    "id": "power_overclock_reactor",
    "tab": "power",
    "kind": "model",
@@ -3293,7 +3972,7 @@
    "tradeOff": "fast, accurate needles in short bursts",
    "family": "Autocannons",
    "size": "Small · Square",
-   "keyNumbers": "33 dmg/s · reach 5,368 · clip 6 · 1.0s reload · draws 14",
+   "keyNumbers": "49 dmg/s · reach 5,330 · clip 6 · 1.0s reload · draws 14",
    "mounting": [
     "Turret, 200°",
     "Bolts on any side"
@@ -3419,6 +4098,61 @@
    "seconds": 50
   },
   {
+   "id": "mod_mount_triple",
+   "tab": "power",
+   "kind": "model",
+   "name": "Triple Mount",
+   "level": 24,
+   "order": 135,
+   "fn": "mod_mount_triple",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/mod_mount_triple.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Three sockets; fuses recipes",
+   "family": "Modifiers",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 20 · power line · 3 sockets · treats 40 E a second a filled socket; guns drawing more than it treats get a weaker effect, shared by what each draws · burns 1 E a second for each filled socket; out of power it still passes power, with no effect",
+   "cost": {
+    "titanium_plate": 6,
+    "power_coupling": 6,
+    "coil_winding": 6,
+    "capacitor_cell": 2
+   },
+   "seconds": 100
+  },
+  {
+   "id": "power_combiner_3",
+   "tab": "power",
+   "kind": "model",
+   "name": "Combiner III",
+   "level": 24,
+   "order": 158,
+   "fn": "power_combiner_3",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_combiner_3.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Carries four weapon effects",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · power line · 4 effects",
+   "cost": {
+    "steel_plate": 28,
+    "power_coupling": 14,
+    "insulated_polymer": 14
+   },
+   "seconds": 50
+  },
+  {
    "id": "pulse_overpulse",
    "tab": "weapons",
    "kind": "model",
@@ -3469,7 +4203,7 @@
    "tradeOff": "reaches furthest, marks what it lights for 20% more damage",
    "family": "Lasers",
    "size": "Small · Round",
-   "keyNumbers": "25 dmg/s · reach 7,650 · held beam · draws 15",
+   "keyNumbers": "50 dmg/s · reach 7,650 · held beam · draws 15",
    "mounting": [
     "Turret, 360°",
     "Side mount (flippable)",
@@ -3960,7 +4694,7 @@
    "tradeOff": "a huge slow warhead · ammo",
    "family": "Missiles",
    "size": "Large · Block",
-   "keyNumbers": "44 dmg/s · reach 8,008 · ammo",
+   "keyNumbers": "52 dmg/s · reach 8,008 · ammo",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",

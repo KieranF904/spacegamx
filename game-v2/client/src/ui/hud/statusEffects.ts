@@ -1,16 +1,17 @@
 /**
  * @contract client.ui.status-effects
- * owns:       the status effects the client knows about the pilot's own ship (EMP, slowed, marked, the cold's stages): what
+ * owns:       the status effects the client knows about the pilot's own ship (EMP, slowed, marked, the cold's stages, holding with a landmark): what
  *             each is, what it does, what clears it, and which are on now with the time left
- * needs:      common warmthStage (the cold's stage from the warmth %), the own entity's empUntil / slowUntil / markUntil / warmth
+ * needs:      common warmthStage (the cold's stage from the warmth %), the own entity's empUntil / slowUntil / markUntil / warmth,
+ *             the landmark it is carried with (JumpControl.heldBy)
  * invariants: a timed status shows only while its end tick is ahead, with whole seconds left rounded up; the cold shows
- *             from chilled down, with no timer — client/src/ui/hud/statusEffects.test.ts
+ *             from chilled down, with no timer; holding shows while a landmark carries the ship, with how much — client/src/ui/hud/statusEffects.test.ts
  * extend:     a new status is one STATUS_DEFS entry and one branch in activeStatuses()
  */
 
 import { warmthStage } from '@space-game/common';
 
-export type StatusId = 'emp' | 'slowed' | 'marked' | 'chilled' | 'numb' | 'frozen';
+export type StatusId = 'emp' | 'slowed' | 'marked' | 'chilled' | 'numb' | 'frozen' | 'holding';
 
 export interface StatusDef {
   id: StatusId;
@@ -30,6 +31,7 @@ export const STATUS_DEFS: Readonly<Record<StatusId, StatusDef>> = {
   chilled: { id: 'chilled', label: 'Chilled', glyph: '❆', color: '#9fd8ff', does: 'Cold is building up. No cost yet.', clears: 'Warm up near a star, a station or a fire.' },
   numb: { id: 'numb', label: 'Numb', glyph: '❆', color: '#7cc4ff', does: 'Drive at 80%: the cold has numbed it.', clears: 'Warm up near a star, a station or a fire.' },
   frozen: { id: 'frozen', label: 'Frozen', glyph: '❆', color: '#ff9b9b', does: 'Frozen through: the ship seizes up.', clears: 'It thaws a little by itself; warm up to stop it.' },
+  holding: { id: 'holding', label: 'Holding', glyph: '⚓', color: '#86efac', does: 'Carried along with it: stop here and you stay beside it.', clears: 'Fly out of its range; the hold fades with distance.' },
 };
 
 /** What the tray reads of the own ship */
@@ -41,14 +43,18 @@ export interface StatusSource {
   markUntil?: number;
   /** Warmth % (100: warm) */
   warmth?: number;
+  /** The moving landmark carrying the ship (common world/landmarks.ts), and how much of its move (1: all of it) */
+  held?: { name: string; weight: number } | null;
 }
 
 export interface ActiveStatus {
   def: StatusDef;
   /** Whole seconds left, rounded up; null: no timer (the cold) */
   secs: number | null;
-  /** The cold: warmth % */
+  /** The cold: warmth %. Holding: how much of the landmark's move carries the ship, % */
   pct?: number;
+  /** Holding: the landmark's name */
+  name?: string;
 }
 
 const TPS = 60;
@@ -68,11 +74,13 @@ export function activeStatuses(s: StatusSource, out: ActiveStatus[] = []): Activ
     const st = warmthStage(s.warmth).name;
     if (st !== 'warm') out.push({ def: STATUS_DEFS[st], secs: null, pct: Math.round(s.warmth) });
   }
+  if (s.held && s.held.weight > 0) out.push({ def: STATUS_DEFS.holding, secs: null, pct: Math.max(1, Math.round(s.held.weight * 100)), name: s.held.name });
   return out;
 }
 
 /** The tooltip, plain text lines */
 export function statusTip(a: ActiveStatus): string {
-  const head = a.secs !== null ? `${a.def.label}: ${a.secs} s left` : `${a.def.label}: warmth ${a.pct}%`;
+  const head = a.def.id === 'holding' ? `Holding with ${a.name}${(a.pct ?? 100) < 100 ? ` (${a.pct}%, fading)` : ''}`
+    : a.secs !== null ? `${a.def.label}: ${a.secs} s left` : `${a.def.label}: warmth ${a.pct}%`;
   return `${head}\n${a.def.does}\nClears: ${a.def.clears}`;
 }

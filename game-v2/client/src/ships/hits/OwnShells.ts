@@ -13,12 +13,12 @@
  * shell its snapshot removes to its records.
  */
 import {
-  EntityType, WEAPON_KIND_TYPE, fireVolley, firesStraight, gunShell, ownShotWire, SHOT_ID_BARRELS,
+  EntityType, WEAPON_KIND_TYPE, fireVolley, firesStraight, gunShell, gunCode, shellGunCode, ownShotWire, SHOT_ID_BARRELS,
   type EntityState, type FlightBody, type ShipState, type ShipTuning,
 } from '@space-game/common';
 
 /** A volley your guns fired (recorded by the prediction, built once a snapshot covers its tick) */
-export interface OwnFire { tick: number; part: number; aimQ: number; ammo: number; aug?: 1 }
+export interface OwnFire { tick: number; part: number; aimQ: number; ammo: number; aug?: 1; /** Its weapon modifier effects' mask (a fire event's fx) */ fx?: number }
 
 export interface OwnShellsHost {
   self(): number;
@@ -73,10 +73,10 @@ export class OwnShells {
       if (f.tick > tick) { this.fires[keep++] = f; continue; }
       if (tick - f.tick > KEEP_TICKS || !ship) continue;
       const pose = this.host.firePose(f.tick);
-      const v = pose ? fireVolley({ owner: me, tick: f.tick, part: f.part, aimQ: f.aimQ, ammo: f.ammo, aug: f.aug }, ship, pose, this.host.tuning) : null;
+      const v = pose ? fireVolley({ owner: me, tick: f.tick, part: f.part, aimQ: f.aimQ, ammo: f.ammo, aug: f.aug, fx: f.fx }, ship, pose, this.host.tuning) : null;
       if (!v || v.shells.length > SHOT_ID_BARRELS) { this.stats.unbuilt++; continue; }
       // (a pilot's shells move on the tick they're fired: ShipClient.preSnapshot's rule)
-      const spawnTick = f.tick - 1, gun = f.part + 256 * f.ammo + (f.aug ? 65536 : 0);
+      const spawnTick = f.tick - 1, gun = gunCode(f.part, f.ammo, !!f.aug, f.fx);
       const grade = v.w.grade ?? 1;
       v.shells.forEach((s, i) => {
         const id = ownShotWire(f.tick, f.part, i), age = tick - spawnTick;
@@ -85,7 +85,7 @@ export class OwnShells {
         this.stats.shells++;
         out.push({
           id, type: EntityType.Projectile, x: s.x + s.vx * age, y: s.y + s.vy * age, vx: s.vx, vy: s.vy,
-          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (me * 137) % 360, spawnTick, s.x, s.y, me, s.size, v.turret ? 1 : 0, 0, gun],
+          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (me * 137) % 360, spawnTick, s.x, s.y, me, s.size, v.turret ? 1 : 0, 0, shellGunCode(gun, v.def, i)],
         });
       });
     }

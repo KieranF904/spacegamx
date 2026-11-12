@@ -31,12 +31,24 @@ export interface WeaponStyle {
   headColor?: number;
   /** Soft halo around the head (0 = none) */
   haloRadius: number;
-  /** tongue: the forward flame's length × this; girth: the flash's width × this (a heavy shell's flash is fat) */
-  muzzle: { life: number; size: number; sparks: number; color: number; smoke: number; tongue?: number; girth?: number; ring?: { color: number; count?: number; size?: number } };
+  /**
+   * smokeSpeed: how hard a powder gun throws its smoke, × this;
+   * tongue: the forward flame's length × this; girth: the flash's width × this (a heavy shell's flash is fat); jet: a long
+   * gun's bore jet, this many sparks streaking straight down the line of fire with gun smoke laid along the first of the path
+   */
+  muzzle: { life: number; size: number; sparks: number; color: number; smoke: number; smokeSpeed?: number; tongue?: number; girth?: number; jet?: number; ring?: { color: number; count?: number; size?: number } };
+  /** What kind of gun it is at the muzzle: the shape of its flash (flashDraw) and what it throws out (muzzleBlasts). Default powder */
+  blast?: MuzzleBlast;
   /** ring: a second, wider shock ring of this colour (the heavier marks) */
   impact: { sparks: number; speed: number; life: number; color: number; flash: number; ring?: number };
   /** Leaves a smoke trail (missiles) */
   trail?: { color: number; size: number; life: number };
+  /**
+   * Smoke swept along its path: `count` puffs a frame laid along the stretch it just flew, each carried on after the
+   * shell and dragging to a stop, with now and then a hot fleck among them (a flak canister's, an explosive shell's); carry: × how
+   * fast they are carried on
+   */
+  sweep?: { color: number; size: number; life: number; count: number; carry?: number };
   /** Drawn as a body (a finned dart, a banded canister with a fuse ring) in place of the tracer: shellBodies.ts. Visual only */
   shell?: ShellBody;
   /** Drawn as a crackling orb rather than a tracer (EMP) */
@@ -48,10 +60,19 @@ export interface WeaponStyle {
   casings?: number;
   /** A glowing wake behind the head: a segment laid each frame, fading over `life` frames */
   contrail?: { color: number; size: number; life: number };
+  /** The tracer is a trail: faint and thin at its tail, fattening and brightening to the head (a long tracerTicks reads as a streak of light, not a bar) */
+  taper?: boolean;
+  /** Burning embers shed behind the shell as it flies, about `rate` a frame, each cooling from `hot` to `cool` over `life` frames (an incendiary's) */
+  drip?: { rate: number; life: number; hot: number; cool: number };
   /** Ghost copies of the head trailing behind it, this many */
   afterimages?: number;
   /** A ring round the head that swells and fades every `period` ticks */
   ringPulse?: { color: number; size: number; period: number; closing?: number };
+  /**
+   * Ripples left along its path: every `every` ticks a thin ring thrown off where the shell is, widening to `size` and
+   * fading over `life` frames where it was left (a heavy shell's; not with ringPulse, they share the shot's beat)
+   */
+  ripple?: { color: number; size: number; every: number; life: number };
   /** A cloud of smoke or gas left where it lands (and a thin one as it flies, when `fly`) */
   smokeCloud?: { color: number; size: number; life: number; fly?: boolean };
   /** Arcs of lightning round the head, `forks` of them, `length` long (world units); `orb` styles use the same crackle */
@@ -211,6 +232,11 @@ export interface BeamLook {
   pool?: number;
   /** The beam is a lightning polyline of this amplitude (world units), re-jittered every frame (the Tesla's) */
   zap?: number;
+  /**
+   * A shaft of light round the beam (the Searchlight's): it widens `spread` degrees either side as it goes, dust
+   * glitters in it (x `dust`), and it throws a spot of light on what it lights
+   */
+  shaft?: { color: number; spread: number; dust: number };
   /** Frost motes drifting off the beam and white crystals on what it lights: × the amount (0 or absent: none) */
   frost?: number;
   /**
@@ -244,6 +270,9 @@ export function shotScale(damage: number | undefined): number {
   if (!damage || damage <= 0) return 1;
   return Math.max(0.75, Math.min(1.7, Math.pow(damage / REF_DAMAGE, 0.3)));
 }
+
+/** A gun's kind at its muzzle: powder guns, heavy powder guns with a brake, autocannons, rails, missile and torpedo launchers, energy guns */
+export type MuzzleBlast = 'powder' | 'heavy' | 'auto' | 'rail' | 'rocket' | 'energy' | 'fire';
 
 /** A shot's scale (shell size × shotScale) where the muzzle flash stops growing in step with it */
 const FLASH_KNEE = 3;
@@ -356,7 +385,7 @@ const KINETIC: WeaponStyle = {
   ownerTint: 0.2,
   headRadius: 3,
   haloRadius: 10,
-  muzzle: { life: 7, size: 18, sparks: 6, color: 0xffd28a, smoke: 3 },
+  blast: 'powder', muzzle: { life: 7, size: 18, sparks: 6, color: 0xffd28a, smoke: 3 },
   impact: { sparks: 12, speed: 3.6, life: 18, color: 0xffc070, flash: 20 },
 };
 
@@ -372,43 +401,53 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Railgun: a hypersonic slug, a long thin blue-white streak and a hard flash
   [WeaponType.Railgun]: {
     ...KINETIC, tracerTicks: 1.4, coreWidth: 2, glowWidth: 9, coreColor: 0xf2fbff, glowColor: 0x6ab8ff, glowAlpha: 0.45, ownerTint: 0.05,
-    headRadius: 3.5, haloRadius: 14, muzzle: { life: 9, size: 30, sparks: 10, color: 0xbfe3ff, smoke: 4 },
+    headRadius: 3.5, haloRadius: 14, blast: 'rail', muzzle: { life: 9, size: 30, sparks: 10, color: 0xbfe3ff, smoke: 4 },
     impact: { sparks: 22, speed: 6, life: 20, color: 0xbfe3ff, flash: 34 }, hitThrow: 'reflect', hit: DIRECTED_HIT(0xd8f6ff, 1.6, 18),
   },
   // Flak: a stubby glowing shell (the burst is the show)
   [WeaponType.Flak]: {
     ...KINETIC, tracerTicks: 1.2, coreWidth: 3, glowWidth: 8, coreColor: 0xffe0b0, glowColor: 0xff8a3c, glowAlpha: 0.38,
-    headRadius: 3.5, haloRadius: 10, muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 }, shell: CANISTER_SHELL, hit: BURST_MARK(0xffb070, 0.8),
+    headRadius: 3.5, haloRadius: 10, blast: 'powder', muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 }, shell: CANISTER_SHELL, hit: BURST_MARK(0xffb070, 0.8),
   },
   // Missile: a body with an engine flare and a smoke trail, steered by the server
   [WeaponType.Missile]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.8, coreWidth: 4, glowWidth: 10, coreColor: 0xdfe6ee, glowColor: 0xff9a3c, glowAlpha: 0.5,
-    headRadius: 3, haloRadius: 12, muzzle: { life: 8, size: 22, sparks: 4, color: 0xffc080, smoke: 6 },
+    headRadius: 3, haloRadius: 12, blast: 'rocket', muzzle: { life: 8, size: 22, sparks: 4, color: 0xffc080, smoke: 6 },
     trail: { color: 0x8c8780, size: 7, life: 50 }, shell: DART_SHELL, hit: BURST_MARK(0xffc070),
   },
   // EMP: a crackling blue orb
   [WeaponType.Emp]: {
     ...KINETIC, tracerTicks: 1.5, coreWidth: 0, glowWidth: 14, coreColor: 0xe8f7ff, glowColor: 0x4fc3f7, glowAlpha: 0.3, ownerTint: 0,
-    headRadius: 6, haloRadius: 22, muzzle: { life: 8, size: 24, sparks: 6, color: 0x9fe0ff, smoke: 0 },
+    headRadius: 6, haloRadius: 22, blast: 'energy', muzzle: { life: 8, size: 24, sparks: 6, color: 0x9fe0ff, smoke: 0 },
     impact: { sparks: 14, speed: 4, life: 16, color: 0x9fe0ff, flash: 30 }, orb: true, hit: BURST_MARK(0xd8f4ff),
   },
   // ---- Legendary ----
   // Rustjaw's Hive: little seekers with short smoky trails
   [WeaponType.Hive]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.6, coreWidth: 3, glowWidth: 8, coreColor: 0xfff1d6, glowColor: 0xff9a3c, glowAlpha: 0.5,
-    headRadius: 2.5, haloRadius: 9, muzzle: { life: 6, size: 16, sparks: 3, color: 0xffc080, smoke: 3 },
+    headRadius: 2.5, haloRadius: 9, blast: 'rocket', muzzle: { life: 6, size: 16, sparks: 3, color: 0xffc080, smoke: 3 },
     trail: { color: 0x7d7770, size: 4, life: 28 }, hit: BURST_MARK(0xffc080, 0.8),
   },
   // Cinder Bloom: a burning slug dripping embers
   [WeaponType.CinderBloom]: {
-    ...KINETIC, tracerTicks: 2, coreWidth: 3.5, glowWidth: 12, coreColor: 0xfff0c0, glowColor: 0xff5a1a, glowAlpha: 0.55, ownerTint: 0,
-    headRadius: 4.5, haloRadius: 16, muzzle: { life: 9, size: 26, sparks: 10, color: 0xff9a4a, smoke: 5 },
-    impact: { sparks: 20, speed: 3.5, life: 26, color: 0xff7a2a, flash: 30 }, trail: { color: 0x4a2a1a, size: 5, life: 26 }, hit: BURST_MARK(0xffa040, 1.2),
+    ...KINETIC, tracerTicks: 3.2, taper: true, coreWidth: 4.5, glowWidth: 15, coreColor: 0xfff0c0, glowColor: 0xff5a1a, glowAlpha: 0.6, ownerTint: 0,
+    headRadius: 5.5, haloRadius: 21, blast: 'fire', muzzle: { life: 12, size: 30, sparks: 9, color: 0xff8a3a, smoke: 5, tongue: 1.2, girth: 1.2 },
+    impact: { sparks: 20, speed: 3.5, life: 26, color: 0xff7a2a, flash: 30 }, trail: { color: 0x4a2a1a, size: 6, life: 30 },
+    drip: { rate: 0.9, life: 34, hot: 0xffd070, cool: 0x6a1808 },
+    // (where it lands: fire splashing off the hull, burning lumps thrown wide, cinders drifting, the plate left glowing)
+    hit: {
+      core: { size: 9, life: 4 }, bloom: { size: 30, life: 16 },
+      fireball: { size: 15, life: 26, count: 5, color: 0xffb040, cool: 0x8a1c08 },
+      embers: { count: 14, speed: 2.6, life: 46, hot: 0xffc050, cool: 0x5a1408 },
+      debris: { count: 5, speed: 4.5, size: 2.2, life: 34, hot: 0xfff0c0, cool: 0xff5a1a, trail: 0xff7a2a, cone: 70 },
+      scorch: { size: 16, life: 90, color: 0xff5a14 },
+      light: { radius: 150, power: 1.1 },
+    },
   },
   // Magma (a boss's turrets): a great slow ball of molten rock, white-hot at its heart, trailing smoke and embers
   [WeaponType.Magma]: {
     ...KINETIC, tracerTicks: 0.9, coreWidth: 6, glowWidth: 18, coreColor: 0xffe6b0, glowColor: 0xff5a14, glowAlpha: 0.6, ownerTint: 0,
-    headRadius: 8, haloRadius: 24, muzzle: { life: 14, size: 40, sparks: 14, color: 0xff8a3a, smoke: 10, tongue: 1.4, girth: 1.8 },
+    headRadius: 8, haloRadius: 24, blast: 'heavy', muzzle: { life: 14, size: 34, sparks: 14, color: 0xff8a3a, smoke: 9, tongue: 1.4, girth: 1.6 },
     impact: { sparks: 30, speed: 4, life: 34, color: 0xff7a2a, flash: 46, ring: 0xff5a1a }, trail: { color: 0x3a1c12, size: 11, life: 44 },
   },
   // A boss's heart (the Pyreclast's): magma, hotter than its turrets' (white-hot through, a yellow glow: brighter than the
@@ -417,35 +456,35 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // bigger than the boss's own glowing core, a molten rim round it)
   [WeaponType.HeartSpark]: {
     ...KINETIC, tracerTicks: 0.5, coreWidth: 4, glowWidth: 7, coreColor: 0xfffbe8, glowColor: 0xffa02a, glowAlpha: 0.8, ownerTint: 0,
-    headRadius: 5, haloRadius: 7.5, muzzle: { life: 8, size: 3, sparks: 1, color: 0xffd080, smoke: 0 },
+    headRadius: 5, haloRadius: 7.5, blast: 'energy', muzzle: { life: 8, size: 3, sparks: 1, color: 0xffd080, smoke: 0 },
     impact: { sparks: 3, speed: 3.5, life: 22, color: 0xff9a3a, flash: 4, ring: 0xff5a1a }, trail: { color: 0x3a1c12, size: 0.6, life: 20 },
   },
   [WeaponType.HeartSeeker]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.7, coreWidth: 4, glowWidth: 13, coreColor: 0xfff4d0, glowColor: 0xff7a1a, glowAlpha: 0.7, ownerTint: 0,
-    headRadius: 5, haloRadius: 15, muzzle: { life: 8, size: 22, sparks: 5, color: 0xffb060, smoke: 2 },
+    headRadius: 5, haloRadius: 15, blast: 'energy', muzzle: { life: 8, size: 22, sparks: 5, color: 0xffb060, smoke: 2 },
     impact: { sparks: 18, speed: 4, life: 20, color: 0xff8a2a, flash: 30, ring: 0xff5a1a }, trail: { color: 0x3a1c12, size: 8, life: 34 },
   },
   // The Scrap Mother's: a rivet (a hot steel slug, hazard yellow), a great scrap chunk (dark metal, greyseam glowing at its
   // edges: at 11× a shell's size, its parts sized for that) and a greyseam seeker trailing green
   [WeaponType.Rivet]: {
     ...KINETIC, tracerTicks: 1.6, coreWidth: 3, glowWidth: 9, coreColor: 0xfff6d0, glowColor: 0xffc030, glowAlpha: 0.55, ownerTint: 0,
-    headRadius: 3.5, haloRadius: 10, muzzle: { life: 7, size: 22, sparks: 6, color: 0xffd080, smoke: 3 },
+    headRadius: 3.5, haloRadius: 10, blast: 'powder', muzzle: { life: 7, size: 22, sparks: 6, color: 0xffd080, smoke: 3 },
     impact: { sparks: 14, speed: 4, life: 16, color: 0xffc060, flash: 18 }, hitThrow: 'reflect', hit: DIRECTED_HIT(0xffd080, 1.2),
   },
   [WeaponType.ScrapChunk]: {
     ...KINETIC, tracerTicks: 0.5, coreWidth: 4, glowWidth: 7, coreColor: 0x2a2d31, glowColor: 0x3aff9a, glowAlpha: 0.85, ownerTint: 0,
-    headRadius: 3.2, haloRadius: 8.5, muzzle: { life: 8, size: 3, sparks: 1, color: 0xa8ffe4, smoke: 1 },
+    headRadius: 3.2, haloRadius: 8.5, blast: 'powder', muzzle: { life: 8, size: 3, sparks: 1, color: 0xa8ffe4, smoke: 1 },
     impact: { sparks: 3, speed: 3.5, life: 22, color: 0x9affe0, flash: 4, ring: 0x3affb0 }, trail: { color: 0x2a2d31, size: 0.7, life: 20 },
   },
   [WeaponType.SeamSeeker]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.7, coreWidth: 4, glowWidth: 13, coreColor: 0xf0fffa, glowColor: 0x3affc0, glowAlpha: 0.7, ownerTint: 0,
-    headRadius: 5, haloRadius: 15, muzzle: { life: 8, size: 22, sparks: 5, color: 0xa8ffe4, smoke: 0 },
+    headRadius: 5, haloRadius: 15, blast: 'energy', muzzle: { life: 8, size: 22, sparks: 5, color: 0xa8ffe4, smoke: 0 },
     impact: { sparks: 18, speed: 4, life: 20, color: 0x7affd2, flash: 30, ring: 0x2ad8a0 }, trail: { color: 0x1a3a30, size: 8, life: 34 },
   },
   // Prism Splitter: a faceted crystal bolt
   [WeaponType.Prism]: {
     ...KINETIC, tracerTicks: 1.8, coreWidth: 3, glowWidth: 13, coreColor: 0xffffff, glowColor: 0xe879f9, glowAlpha: 0.5, ownerTint: 0,
-    headRadius: 5, haloRadius: 18, muzzle: { life: 8, size: 24, sparks: 8, color: 0xf5d0fe, smoke: 0 },
+    headRadius: 5, haloRadius: 18, blast: 'energy', muzzle: { life: 8, size: 24, sparks: 8, color: 0xf5d0fe, smoke: 0 },
     impact: { sparks: 18, speed: 5, life: 16, color: 0x67e8f9, flash: 26 }, hitThrow: 'normal', hit: { ...DIRECTED_HIT(0xf5d0fe, 1.4, 34), flare: { size: 40, width: 3, life: 10, count: 3, fan: 36 } },
   },
   [WeaponType.PrismShard]: {
@@ -456,13 +495,13 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Phase Cannon: a shimmering violet slug
   [WeaponType.Phase]: {
     ...KINETIC, tracerTicks: 2.6, coreWidth: 4, glowWidth: 16, coreColor: 0xf5f3ff, glowColor: 0x8b5cf6, glowAlpha: 0.5, ownerTint: 0,
-    headRadius: 6, haloRadius: 24, muzzle: { life: 10, size: 34, sparks: 6, color: 0xc4b5fd, smoke: 0 },
+    headRadius: 6, haloRadius: 24, blast: 'energy', muzzle: { life: 10, size: 30, sparks: 6, color: 0xc4b5fd, smoke: 0 },
     impact: { sparks: 14, speed: 4, life: 18, color: 0xc4b5fd, flash: 30 }, hitThrow: 'normal', hit: { ...DIRECTED_HIT(0xddd6fe, 1.6, 26), flare: { size: 50, width: 3.6, life: 11, count: 2, fan: 14 } },
   },
   // Singularity: a dark orb ringed with light
   [WeaponType.Singularity]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 0, glowWidth: 26, coreColor: 0x1a0b2e, glowColor: 0x9b5de5, glowAlpha: 0.35, ownerTint: 0,
-    headRadius: 12, headColor: 0x0b0414, haloRadius: 46, muzzle: { life: 12, size: 40, sparks: 10, color: 0xc084fc, smoke: 0 },
+    headRadius: 12, headColor: 0x0b0414, haloRadius: 46, blast: 'energy', muzzle: { life: 12, size: 34, sparks: 10, color: 0xc084fc, smoke: 0 },
     impact: { sparks: 20, speed: 5, life: 20, color: 0xd8b4fe, flash: 40 }, orb: true, hit: BURST_MARK(0xf0e0ff),
     // (the pull radius is the model's: data/ships/tuning.json singularity.pull.radius, pinned by weaponStyles.test.ts)
     pull: { radius: 900, color: 0xb98cf0 },

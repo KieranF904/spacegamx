@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.hosts.gun-range
- * owns:       the host adapter for the gun range (game/gunRange): its system, berths, travel, the target's ship, and the
- *             module's construction
+ * owns:       the host adapter for the gun range (game/gunRange): its system, berths, travel, the targets' ships and mobs,
+ *             who counts as an admin there, the library ships an admin may fly, and the module's construction
  * needs:      GameServer (type), game/gunRange/GunRange, game/Docking (berths: conn.docked, dockedShips); npm: @space-game/common, bitecs
  * invariants: a server whose data has no gun range builds the module but every entry is refused — server/src/game/gunRange/gunRange.test.ts
  * extend:     a new thing the range needs from the server is a member of GunRangeHost and a line here
@@ -9,7 +9,7 @@
 
 import { hasComponent, entityExists } from 'bitecs';
 import { InSystem, Player, Position, Rotation, Station, type Charge, type GunRangeDef } from '@space-game/common';
-import { GunRange, type GunRangeHost, type RangeBerth } from '../../game/gunRange/GunRange.js';
+import { GunRange, type GunRangeHost, type RangeBerth, type RangeShip } from '../../game/gunRange/GunRange.js';
 import type { ClientConnection } from '../../net/ClientConnection.js';
 import type { PilotConn } from '../../game/Pilots.js';
 import type { GameServer } from '../../GameServer.js';
@@ -24,9 +24,17 @@ export function createGunRangeHost(gs: GameServer): GunRangeHost {
     return found;
   };
   const c = (conn: PilotConn) => conn as ClientConnection;
+  // (The F9 ship swap's list, client app/devTools.ts: the plan library, then the dev test ships and remakes, none retired)
+  let ships: RangeShip[] | undefined;
+  const shipList = () => ships ??= [
+    ...[...gs.ships.library].map(([id, blueprint]) => ({ id, name: blueprint.name, group: 'Library', blueprint })),
+    ...Object.entries(gs.ships.devDesigns).filter(([id]) => !gs.ships.retiredDesigns.has(id) && !gs.ships.library.has(id))
+      .map(([id, blueprint]) => ({ id, name: blueprint.name, group: 'Dev test ships', blueprint })),
+  ];
   return {
     tick: () => gs.currentTick,
     catalog: gs.ships.catalog,
+    modifiers: gs.ships.tuning.modifiers,
     range,
     send: (conn, msg) => gs.send(c(conn).ws, msg),
     toast: (conn, text, kind) => gs.pilots.toast(conn, text, kind),
@@ -74,13 +82,20 @@ export function createGunRangeHost(gs: GameServer): GunRangeHost {
     target: {
       spawn: (t) => {
         const r = range();
-        return r ? gs.enemies.spawnTarget(r.num, { ship: t.ship, faction: t.faction, grade: t.grade, hp: t.hp }, t.x, t.y, t.angle) : -1;
+        if (!r) return -1;
+        // (A mob target: laid still at its spot, nobody's: it hunts nothing and no shot passes through it)
+        if (t.mob) return gs.mobs.kinds().includes(t.mob) ? gs.mobs.spawn(t.mob, r.num, t.x, t.y, t.angle, 0, -1) : -1;
+        return t.ship && t.faction ? gs.enemies.spawnTarget(r.num, { ship: t.ship, faction: t.faction, grade: t.grade, hp: t.hp }, t.x, t.y, t.angle) : -1;
       },
-      alive: (eid) => gs.ships.has(eid) && gs.enemies.isTarget(eid),
-      remove: (eid) => { if (gs.ships.has(eid)) gs.ships.removeShip(eid); },
+      alive: (eid) => gs.mobs.has(eid) || (gs.ships.has(eid) && gs.enemies.isTarget(eid)),
+      // (A mob has no quiet way out: it is burst where it sits, in a room with nobody in it)
+      remove: (eid) => { if (gs.mobs.has(eid)) gs.mobs.hurt(eid, Infinity); else if (gs.ships.has(eid)) gs.ships.removeShip(eid); },
       steer: (eid, to) => gs.enemies.steerTarget(eid, to),
       where: (eid) => ({ x: Position.x[eid], y: Position.y[eid] }),
     },
+    // (The server's own admin rule, net/auth.ts: real admins, and on the dev server its guests. Never a new gate)
+    admin: (conn) => !!c(conn).isAdmin,
+    ships: shipList,
   };
 }
 

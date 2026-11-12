@@ -20,6 +20,7 @@ import { gunRate } from './launch.js';
 import { type CellMap, cellMap, engineExhaust } from './mounting.js';
 import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
 import { type PortsLayout, buildPortsLayout, portsFed } from './power/ports.js';
+import { portsModsFull } from './power/portsMods.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
 import { dhypot, dpow } from '../math/detTrig.js';
@@ -389,6 +390,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // ---- The ports layout (power/ports.ts): power crosses only through the parts' ports; energy.ts runs it every tick
   const health = hp.map((h, i) => partHealth(h, maxHp[i], tuning));
   const ports = buildPortsLayout({ parts, fns, area: D.area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) });
+  // (A gun range ship's beams are fed by the guns' step, whatever the ship makes (guns.ts): they have no steady floor to fall under)
+  // (and its weapon modifiers work at full strength, however little of the gun's load one mount treats)
+  if (blueprint.range) { for (const w of weapons) ports.steady[w.part] = 0; portsModsFull(ports); }
   const coilCool = portsFedSystems(S, ports, sys, fxOut);
   const jump = jumpDriveStats(sys.jumpCap, sys.hullCells, sys.jumpCap > 0 ? sys.jumpGradeSum / sys.jumpCap : 1, sys.jt);
   if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };

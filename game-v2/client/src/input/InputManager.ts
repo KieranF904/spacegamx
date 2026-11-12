@@ -17,6 +17,8 @@ export class InputManager {
   private held = new Map<string, string>();
   private remap = new Map<string, string>();
   private swallow = new Set<string>();
+  /** Every key an action is bound to (physical codes): the page never gets them */
+  private bound = new Set<string>();
   /** Hangar / menu open: no translation */
   public raw = false;
   /** Rebinding UI: the next key press goes here instead of the game */
@@ -24,6 +26,10 @@ export class InputManager {
   public invertZoom = false;
   public zoomSpeedScale = 1;
   private mouseButtons: Set<number> = new Set();
+  /** A physical Shift key is held (whatever it is bound to): the weapon group keys' "with Shift: the right button" */
+  public shiftDown = false;
+  /** Ctrl or Cmd held at the last key event (a browser shortcut in the making: Ctrl+C must not use a quick bar item) */
+  public ctrlDown = false;
   
   /** Where the pointer last was over the canvas */
   public rawX = 0;
@@ -63,6 +69,8 @@ export class InputManager {
     
     // Keyboard events
     window.addEventListener('keydown', (e) => {
+      this.shiftDown = e.shiftKey;
+      this.ctrlDown = e.ctrlKey || e.metaKey;
       // Don't capture keys when typing in input fields
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -88,8 +96,9 @@ export class InputManager {
       
       // Prevent default for game keys
       // Tab: stops browser focus-cycling through input boxes (Tab toggles stats panel)
-      // KeyM: system map toggle
-      if (this.remap.has(e.code) || ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyI', 'KeyE', 'KeyQ', 'KeyX', 'Escape', 'Tab', 'KeyM'].includes(e.code)) {
+      // Every key an action is bound to (Space must never scroll the page, ' and / never open Firefox's quick find),
+      // but not with Ctrl or Cmd held: those are the browser's (copy, paste, reload)
+      if (((this.bound.has(e.code) || this.remap.has(e.code)) && !this.ctrlDown) || ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyI', 'KeyE', 'KeyQ', 'Escape', 'Tab'].includes(e.code)) {
         e.preventDefault();
       }
     });
@@ -97,6 +106,8 @@ export class InputManager {
     // ALWAYS process keyup, even in input fields, to prevent stuck inputs
     // (holding W, clicking into chat, then releasing W used to leave W stuck)
     window.addEventListener('keyup', (e) => {
+      this.shiftDown = e.shiftKey;
+      this.ctrlDown = e.ctrlKey || e.metaKey;
       const code = this.held.get(e.code);
       if (code === undefined) return;
       this.held.delete(e.code);
@@ -157,6 +168,7 @@ export class InputManager {
       this.keys.clear();
       this.held.clear();
       this.mouseButtons.clear();
+      this.shiftDown = false;
       this.onFocusLost?.();
     };
     window.addEventListener('blur', lost);
@@ -190,7 +202,9 @@ export class InputManager {
   setBindings(bindings: { defaultCode: string; code: string }[]): void {
     this.remap.clear();
     this.swallow.clear();
+    this.bound.clear();
     for (const b of bindings) {
+      if (b.code) this.bound.add(b.code);
       if (b.code === b.defaultCode) continue;
       this.remap.set(b.code, b.defaultCode);
       this.swallow.add(b.defaultCode);

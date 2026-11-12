@@ -30,5 +30,8 @@ describe('shell bodies', () => {
     expect(weaponStyle(WeaponType.Flak).shell?.kind).toBe('canister');
     expect(weaponStyle(WeaponType.Flak, 1, 'flak_cloudmaker').shell?.kind).toBe('canister');
     expect(weaponStyle(WeaponType.Cannon).shell).toBeUndefined();
+    // (the Mauler alone among the cannons flies as a body: a slug)
+    expect(weaponStyle(WeaponType.Cannon, 1, 'cannon_mauler').shell?.kind).toBe('slug');
+    expect(weaponStyle(WeaponType.Cannon, 1, 'cannon_hammer').shell).toBeUndefined();
   });
 });

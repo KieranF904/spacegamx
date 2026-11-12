@@ -23,7 +23,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
   pointInConvex, shipPointToWorld,
-  WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, ammoCode, outputOf, MINE_CYCLE,
+  WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, shipGunDef, shipGunFx, gunCode, ammoCode, outputOf, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
   endsAtAim, aimReach, buildShot, gunsTick, gunControls, miningTick, shotId, SHOT_ID_BARRELS, SHOT_ID_SLOTS, SHOT_ID_OWNERS, type SimEvent,
   ReplicaMode, simAim,
@@ -31,6 +31,7 @@ import {
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
 import { lastHurtSoak, lastHurtShown } from './damage.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
+import { beamHasFx, beamFirstShare, beamThrough, beamEnd, heldBurn, heldDeep, gunRay, BEAM_STEP, type BeamLine } from './beamFx.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 export function lastFiredTick(b: BridgeCtx, eid: number): number {
@@ -208,7 +209,8 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
 export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: boolean, aimWorld?: number, cursorDist = 0, target = -1, energy?: { charge: Charge }, hold = false, word?: number): void {
   const tick = b.host.getTick();
   const pose = b.pose(eid);
-  const def = (w: WeaponInfo) => partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
+  // (`fx`: a shot's or a beam's live weapon modifier effects, a mask: common ships/modifiers/fxDef.ts. None: the gun's own tuning)
+  const def = (w: WeaponInfo, fx?: number) => shipGunDef(b.tuning, ship, w, undefined, fx);
   let beamHit = -1;
   // The guns' tick (the step's gun phase, shared with the pilot's client, which fires its own shells on the same tick
   // with the same shot ids: common sim/guns.ts gunsTick). Its fire events name each shell by its shot id
@@ -217,7 +219,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   // where they'd have aimed otherwise on it, the tick's applied aim is the raw one: common sim/aimHold.ts)
   const rec = hold ? b.replicaCtl.get(eid) : undefined;
   const heldQ = rec && rec.mode === ReplicaMode.Player && rec.rawQ !== undefined && rec.q !== rec.rawQ ? rec.q : undefined;
-  const { shots, beams, pulses, tells, dist: aimDist, aimHeld } = gunsTick(ship, eid, pose, { firing, word, aimWorld, aimDist: cursorDist, energy, hold, heldAim: heldQ === undefined ? undefined : simAim(heldQ) }, tick, b.tuning, GUN_EVENTS);
+  const { shots, beams, beamFx, pulses, tells, dist: aimDist, aimHeld } = gunsTick(ship, eid, pose, { firing, word, aimWorld, aimDist: cursorDist, energy, hold, heldAim: heldQ === undefined ? undefined : simAim(heldQ) }, tick, b.tuning, GUN_EVENTS);
   if (rec && heldQ !== undefined && !aimHeld) { rec.q = rec.rawQ!; ship.aimQ = rec.q; }
   // (the shells fly the distance the guns stepped on, `aimDist`: a pilot's held one, as every end has it; a guided
   // shell steers to the cursor's, which only the server reads)
@@ -229,26 +231,28 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   // A charge gun starting to charge, or let go early: a fire event with no shells, so everyone sees its tell (ammo code: guns.ts TELL_CHARGE_*)
   for (const t of tells) b.fired.push({ owner: eid, tick, part: t.w.part, aimQ: t.aimQ, ids: [], ammo: t.start ? TELL_CHARGE_START : TELL_CHARGE_CANCEL });
   const pz = ship.derived.ports, pe = pz ? (energy?.charge.e as PortsState | undefined) : undefined;
-  for (const w of beams) {
+  for (let i = 0; i < beams.length; i++) {
+    const w = beams[i], fx = beamFx?.[i] || 0;
     // (A beam in pieces that spent a piece this tick: a fire event with no shells, so every client draws its pulse from this tick)
-    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) b.fired.push({ owner: eid, tick, part: w.part, aimQ: shotAimQ(ship.aim[w.part]), ids: [], ammo: TELL_BEAM_PIECE });
+    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) b.fired.push({ owner: eid, tick, part: w.part, aimQ: shotAimQ(ship.aim[w.part]), ids: [], ammo: TELL_BEAM_PIECE, ...(fx ? { fx } : {}) });
     // (A beam of a weapon role fires its own way: a Repair Beam mends a friendly hull instead, features/support)
     const hook = fireBeamHook(def(w));
-    const t = hook ? hook(b, eid, ship, w, def(w)) : b.fireBeam(eid, ship, w, def(w));
+    const t = hook ? hook(b, eid, ship, w, def(w, fx)) : b.fireBeam(eid, ship, w, def(w, fx));
     beamHit = beamHit < 0 ? t : Math.min(beamHit, t);
   }
   // A pulse laser starts a pulse: it runs its course along its aim from now (a fire event with no shells tells clients when)
-  for (const { w, aimQ } of pulses) {
+  for (const { w, aimQ, fx } of pulses) {
     let list = b.pulsing.get(eid);
     if (!list) b.pulsing.set(eid, (list = []));
-    list.push({ part: w.part, start: tick });
-    b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids: [] });
+    list.push(fx ? { part: w.part, start: tick, fx } : { part: w.part, start: tick });
+    b.fired.push(fx ? { owner: eid, tick, part: w.part, aimQ, ids: [], fx } : { owner: eid, tick, part: w.part, aimQ, ids: [] });
   }
   b.stepPulses(eid, ship, tick);
   // Weapon roles' own ticks: point defence fires on its own, whatever the trigger (features/support)
   tickWeaponHooks(b, eid, ship, pose, def);
-  for (const { w, aimQ, shot, aug } of shots) {
-    const d = def(w);
+  for (const { w, aimQ, shot, aug, fx } of shots) {
+    const d = def(w, fx);
+    const gunFx = fx ? shipGunFx(ship, w.part) : undefined;
     const gunMods = ship.blueprint.parts[w.part].mods;
     // Missiles lock on to the ship nearest the aim point (the cursor), else the target given (a guided one is steered instead)
     let lock = -1;
@@ -275,15 +279,15 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     // (A shell that ends at the aim flies the aim distance: a lobbed mortar's, an aim burst's, a walking salvo's first)
     const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, damageScale,
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: mods,
-        reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model, gun: straight ? w.part + 256 * ammo + (aug ? 65536 : 0) : undefined });
+        reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model, gun: straight ? gunCode(w.part, ammo, !!aug, fx) : undefined, gunFx, fx });
     // (each shell's shot id: the step's fire events name the volley's barrels so; an ammunition's extra shells by their place too)
-    if (ids?.length && straight) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, shots: volleyShotIds(eid, tick, w.part, ids.length), ...(round?.item ? { ammo } : {}), ...(aug ? { aug: 1 as const } : {}) });
+    if (ids?.length && straight) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, shots: volleyShotIds(eid, tick, w.part, ids.length), ...(round?.item ? { ammo } : {}), ...(aug ? { aug: 1 as const } : {}), ...(fx ? { fx } : {}) });
     // A rippling salvo: the rest of its shells, `gap` ticks apart, on the same lock
     if (d.salvo && d.salvo.count > 1) {
       let list = b.salvos.get(eid);
       if (!list) b.salvos.set(eid, (list = []));
       const uid = ship.blueprint.parts[w.part].uid;
-      for (let i = 1; i < d.salvo.count; i++) list.push({ uid, due: tick + d.salvo.gap * i, index: i, reach: 0, target: locks && locks.length ? locks[i % locks.length] : lock, damageScale, dry: round?.dry, ammoMods: round?.mods });
+      for (let i = 1; i < d.salvo.count; i++) list.push({ uid, due: tick + d.salvo.gap * i, index: i, reach: 0, target: locks && locks.length ? locks[i % locks.length] : lock, damageScale, dry: round?.dry, ammoMods: round?.mods, fx });
     }
     // A walking salvo: the rest of its shells, `gap` ticks apart, each landing at its fraction of this aim distance
     if (d.walk && d.walk.at.length > 1) {
@@ -291,7 +295,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
       if (!list) b.salvos.set(eid, (list = []));
       const uid = ship.blueprint.parts[w.part].uid;
       for (let i = 1; i < d.walk.at.length; i++) {
-        list.push({ uid, due: tick + d.walk.gap * i, index: i, reach: aimReach(aimDist, d, i), damageScale, dry: round?.dry, ammoMods: round?.mods });
+        list.push({ uid, due: tick + d.walk.gap * i, index: i, reach: aimReach(aimDist, d, i), damageScale, dry: round?.dry, ammoMods: round?.mods, fx });
       }
     }
   }
@@ -345,7 +349,7 @@ function stepSalvos(b: BridgeCtx, eid: number, ship: ShipState, pose: { x: numbe
     const shot = buildShot(w, ship, pose, tick, b.tuning);
     b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, p.damageScale,
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: p.target, seed: `${eid}:${p.uid}:w${p.index}`, mods: ship.blueprint.parts[w.part]?.mods,
-        dry: p.dry, ammoMods: p.ammoMods, reach: p.reach, grade: w.grade, size: w.size, model: w.model });
+        dry: p.dry, ammoMods: p.ammoMods, reach: p.reach, grade: w.grade, size: w.size, model: w.model, gunFx: p.fx ? shipGunFx(ship, w.part) : undefined, fx: p.fx });
     b.lastFired.set(eid, tick);
   }
   list.length = keep;
@@ -359,14 +363,15 @@ export function stepPulses(b: BridgeCtx, eid: number, ship: ShipState, tick: num
   for (let i = list.length - 1; i >= 0; i--) {
     const p = list[i];
     const w = ship.derived.weapons.find((x) => x.part === p.part);
-    const def = w && partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
+    // (with the weapon modifier effects it was fired with)
+    const def = w && shipGunDef(b.tuning, ship, w, undefined, p.fx);
     const prof = def?.pulse && pulseProfile(def.pulse);
     const age = tick - p.start;
     const tell = () => { if (p.hit && p.hit.dealt > 0) b.host.notifyDamage(p.hit.eid, p.hit.dealt, eid); p.hit = undefined; };
     // (Its gun shot away, or its pulse over)
     if (!w || !def || !prof || age >= prof.ticks) { tell(); list.splice(i, 1); continue; }
     b.pulseHit = null;
-    b.fireBeam(eid, ship, w, def, { damage: (def.damage ?? 0) * prof.share[age], width: (def.width ?? 0) * prof.width[age] });
+    b.fireBeam(eid, ship, w, def, { damage: (def.damage ?? 0) * prof.share[age], width: (def.width ?? 0) * prof.width[age], whole: age === prof.peak ? def.damage ?? 0 : undefined });
     // The damage it does is told once a pulse (or when it swings on to another ship)
     const h = b.pulseHit as { eid: number; dealt: number } | null;
     if (h) {
@@ -382,9 +387,26 @@ export function stepPulses(b: BridgeCtx, eid: number, ship: ShipState, tick: num
  * One tick of a beam weapon: out of its muzzle along its aim, it burns the
  * first hull (more against armour for the lance) or asteroid it meets, for as
  * long as the power lasts (no heat). Returns how far along it hit.
- * A pulse laser's tick (`pulse`) burns its share of the pulse, that wide.
+ * A pulse laser's tick (`pulse`) burns its share of the pulse, that wide (`whole`, on its peak tick: the pulse's whole
+ * damage, what a weapon modifier's end effects go by: bridge/beamFx.ts).
+ * A split beam (tuning.ts beamFan) burns as its fan: each beam of it a beam of its own, for its share.
  */
-export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number {
+export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number; whole?: number }): number {
+  const fan = def.beamFan;
+  if (!fan) return beamRay(b, eid, ship, w, def, pulse, 0, 0, 1);
+  // (What a role reads as struck: the middle beam's ship, else another's)
+  const mid = (fan.off.length - 1) >> 1;
+  let near = 1, struck = -1;
+  for (let i = 0; i < fan.off.length; i++) {
+    near = Math.min(near, beamRay(b, eid, ship, w, def, pulse, i, fan.off[i], fan.share[i]));
+    if (b.beamStruck >= 0 && (struck < 0 || i === mid)) struck = b.beamStruck;
+  }
+  b.beamStruck = struck;
+  return near;
+}
+
+/** One beam of a gun's this tick (fireBeam): beam `ray` of its fan, `off` radians off its aim, for `share` of its burn */
+function beamRay(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse: { damage: number; width: number; whole?: number } | undefined, ray: number, off: number, share: number): number {
   const pose = b.pose(eid);
   const cs = b.tuning.cellSize;
   let muzzle = w.muzzle, dir = w.dir;
@@ -398,7 +420,7 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   }
   const [x, y] = shipPointToWorld(ship, pose, muzzle, cs);
   const [dx, dy] = localToWorldDir(dir, pose.angle);
-  const angle = datan2(dy, dx);
+  const angle = datan2(dy, dx) + off;
   const range = def.range ?? 800;
   const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
   // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
@@ -409,7 +431,7 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   const zapK = zapping ? (b.host.getTick() % def.zap! === 0 ? def.zap! : 0) : 1;
   // (A ports ship's gun: its infrastructure tier's damage and its material's, power/ports.ts)
   const pz = ship.derived.ports, pc = pz ? b.chargeOf(eid).e : undefined;
-  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1);
+  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1) * share;
   let shipHit: { eid: number; ship: ShipState; part: number; t: number; shield?: number; spill?: boolean } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;
@@ -442,22 +464,50 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
     b.beamStruck = shipHit.eid;
     const armor = shipHit.ship.blueprint.parts[shipHit.part].fn === 'armor' ? def.armorBonus ?? 1 : 1;
     // A ramping beam (the Cutter's) burns deeper the longer it stays on this one part
-    const deeper = def.ramp && !pulse ? rampScale(b, eid, w.part, shipHit.eid * 1024 + shipHit.part, def) : 1;
+    const key = gunRay(eid, w.part, ray);
+    const deeper = def.ramp && !pulse ? rampScale(b, key, shipHit.eid * 1024 + shipHit.part, def) : 1;
     // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)
     const fade = beamFalloff(def, shipHit.t * range);
     const at = b.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
+    // (A weapon modifier's beam: its first hull's share of the burn, the hulls it burns on through, what its end sets off. bridge/beamFx.ts)
+    const fx = beamHasFx(def), first = fx ? beamFirstShare(def) : 1;
+    const line: BeamLine | undefined = fx ? { x, y, x1, y1, half, range, wall } : undefined;
+    const tick = b.host.getTick(), step = tick % BEAM_STEP === 0;
     if (zapping) {
       // (Between zaps it only lights the line; on a zap it hurts the first hull, then leaps on from where it struck)
-      if (dmg > 0) zap(b, eid, w, def, shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, at, ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t, shipHit.shield !== undefined ? { i: shipHit.shield, spill: !!shipHit.spill } : undefined);
+      // (the hulls a sharing zap burns on through come first: its own leaps go to none of them)
+      const more = line && dmg > 0 ? beamThrough(b, eid, ship, w, def, shipHit, dmg * fade, line, 1) : undefined;
+      if (dmg > 0) zap(b, eid, w, def, shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * first, at, ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t, shipHit.shield !== undefined ? { i: shipHit.shield, spill: !!shipHit.spill } : undefined, more);
+      if (line && dmg > 0) beamEnd(b, eid, ship, w, def, shipHit, dmg * fade * first, 0, line, -1, more);
       return shipHit.t;
     }
-    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * deeper, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at, ...(shipHit.shield !== undefined ? { shaped: { i: shipHit.shield, spill: !!shipHit.spill } } : {}) });
-    if (pulse) b.pulseHit = { eid: shipHit.eid, dealt };
-    else if (dealt > 0 && b.host.getTick() % 10 === 0) b.host.notifyDamage(shipHit.eid, dealt * 10, eid);
+    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * deeper * first, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at, ...(shipHit.shield !== undefined ? { shaped: { i: shipHit.shield, spill: !!shipHit.spill } } : {}) });
+    if (pulse) {
+      // (A fan's later beams add to what its first burned of the same ship; another ship's is told now)
+      const p = ray > 0 ? b.pulseHit : null;
+      if (p && p.eid === shipHit.eid) p.dealt += dealt;
+      else { if (p && p.dealt > 0) b.host.notifyDamage(p.eid, p.dealt, eid); b.pulseHit = { eid: shipHit.eid, dealt }; }
+    } else if (dealt > 0 && step) b.host.notifyDamage(shipHit.eid, dealt * BEAM_STEP, eid);
+    if (line) {
+      const more = beamThrough(b, eid, ship, w, def, shipHit, dmg * fade * deeper, line, pulse ? 1 : step ? BEAM_STEP : 0);
+      // (its end, on a damage step, by what its first hull took of it: a pulse's once, at its peak, by the whole pulse; a held beam's every tenth tick, by what it burned into that hull since the last)
+      if (pulse) {
+        if (pulse.whole && pulse.damage > 0) {
+          // (each hull behind by the whole pulse too)
+          const k = pulse.whole / pulse.damage;
+          for (const m of more) m.full *= k;
+          beamEnd(b, eid, ship, w, def, shipHit, dmg * fade * first * k, 0, line, -1, more);
+        }
+      } else if (def.beamEnd) {
+        const sum = heldBurn(b, key, shipHit.eid, dmg * fade * deeper * first, tick, step);
+        heldDeep(b, key, more, tick, step);
+        if (step) beamEnd(b, eid, ship, w, def, shipHit, sum, (sum * 60) / BEAM_STEP, line, key, more);
+      }
+    }
     return shipHit.t;
   }
   // (Off every part: a ramping beam starts over)
-  if (def.ramp) b.ramps.delete(eid * 1024 + w.part);
+  if (def.ramp) b.ramps.delete(gunRay(eid, w.part, ray));
   return rockT * (shipHit ? shipHit.t : 1);
 }
 
@@ -466,11 +516,11 @@ const RAMP_GRACE = 4;
 
 /**
  * How much more a ramping beam burns this tick than at its base dps (`dps` rising to `ramp.to` over `ramp.ticks` burned
- * ticks on one part): the beam of `eid`'s gun `part` is on `target` (ship * 1024 + part). A new part, or a gap of more
+ * ticks on one part): the beam `key` (beamFx.ts gunRay) is on `target` (ship * 1024 + part). A new part, or a gap of more
  * than RAMP_GRACE ticks, starts it over. Allocation-free once the gun has a run.
  */
-function rampScale(b: BridgeCtx, eid: number, part: number, target: number, def: WeaponTuning): number {
-  const ramp = def.ramp!, key = eid * 1024 + part, tick = b.host.getTick();
+function rampScale(b: BridgeCtx, key: number, target: number, def: WeaponTuning): number {
+  const ramp = def.ramp!, tick = b.host.getTick();
   let r = b.ramps.get(key);
   if (!r) b.ramps.set(key, (r = { target, ticks: 0, last: tick }));
   else if (r.target !== target || tick - r.last > RAMP_GRACE) { r.target = target; r.ticks = 0; }
@@ -486,7 +536,7 @@ function rampScale(b: BridgeCtx, eid: number, part: number, target: number, def:
  * `chain.radius` of where it last struck (the nearest not yet struck, by hull), each time `chain.falloff` of the
  * last, on the part nearest where it leapt from. Each hop is shown to everyone (host.arcHop).
  */
-function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target: number, tship: ShipState, part: number, dmg: number, at: Vec2, ship: ShipState, hx: number, hy: number, shaped?: { i: number; spill: boolean }): void {
+function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target: number, tship: ShipState, part: number, dmg: number, at: Vec2, ship: ShipState, hx: number, hy: number, shaped?: { i: number; spill: boolean }, burned?: readonly { eid: number }[]): void {
   const hit = weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part]));
   const dealt = b.hurt(target, tship, part, dmg, eid, shaped ? { hit, at, shaped } : { hit, at });
   if (dealt > 0) b.host.notifyDamage(target, dealt, eid);
@@ -495,6 +545,8 @@ function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target
   const sys = InSystem.systemId[eid];
   // (A zap strikes a handful of ships, a few times a second: the small list costs nothing)
   const struck = [eid, target];
+  // (`burned`: the hulls a sharing zap burned on through, bridge/beamFx.ts: hit already, no leap goes to them)
+  if (burned) for (const m of burned) struck.push(m.eid);
   let fx = hx, fy = hy, d = dmg;
   for (let i = 0; i < c.count; i++) {
     const next = nearestTarget(b, eid, fx, fy, c.radius, (o) => !struck.includes(o), true);
@@ -504,7 +556,10 @@ function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target
     const p = b.nearestPartPoint(next, fx, fy);
     const tx = p ? p[0] : Position.x[next], ty = p ? p[1] : Position.y[next];
     b.splashAt(sys, tx, ty, 30, d, eid, hit);
-    b.host.arcHop?.(sys, tx, ty, fx, fy);
+    // (a Burn modifier's zap: each leap lights what it strikes, by the leap's share of the zap. bridge/beamFx.ts)
+    const burn = def.beamEnd?.burn;
+    if (burn?.arc) b.igniteTold(next, tx, ty, ((d * burn.frac) / (burn.ticks / 60)) * burn.arc, burn.ticks, 0, eid, hit, -1, -1, burn.fire);
+    b.host.arcHop?.(sys, tx, ty, fx, fy, c.fx);
     fx = tx; fy = ty;
   }
 }

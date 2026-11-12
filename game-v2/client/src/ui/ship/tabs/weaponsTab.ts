@@ -6,7 +6,6 @@
 import { WEAPON_GROUPS } from '@space-game/common';
 import { setHtml } from '../../domWrite';
 import { readStatus, newMemory, emptyStatus } from '../../shipStatus/source';
-import { settings } from '../../../settings/Settings';
 import { tabRoot, sec, row, note, num, esc } from './view';
 import type { ShipTab } from '../shipTabs';
 
@@ -31,12 +30,12 @@ export function weaponsTab(): ShipTab {
       let html = sec('Fire buttons');
       html += row(`Left button: group <b>${groupName(sel.left)}</b>`, `${k('groupPrev')} ${k('groupNext')}`);
       html += row(`Right button: group <b>${groupName(sel.right)}</b>`, k('groupRight'));
-      if (settings.data.gameplay.digitGroups) html += note('Number keys 1-4 pick the left button\'s group (Settings, Gameplay).');
+      html += note(`${[1, 2, 3, 4, 5].map((n) => esc(ctx.keyName(`group${n}`))).filter((s) => s).join(' ')} pick the left button's group, with Shift the right button's. Again: back to all.`);
 
       html += sec('Guns', `${gs.reduce((n, g) => n + g.parts.length, 0)}`);
       gs.forEach((g, i) => {
         const w = rec.weapons[i];
-        const chips = [1, 2, 3, 4].filter((n) => g.wg & (1 << (n - 1))).map((n) => `<span class="k">${n}</span>`).join(' ');
+        const chips = [1, 2, 3, 4, 5].filter((n) => g.wg & (1 << (n - 1))).map((n) => `<span class="k">${n}</span>`).join(' ');
         let state = w ? `<span class="${TONE[w.tone] ?? ''}">${w.state.toLowerCase()}</span>` : '';
         if (g.state === 2) state = '<span class="sgsw-bad">no power</span>';
         let ammo = '';

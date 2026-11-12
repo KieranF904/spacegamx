@@ -51,8 +51,10 @@ export const COMPACT: [string, string[]][] = [
   ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd', 'x', 'w', 'h', 'g']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full', 'pts']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
-  ['ignite', ['bodyId', 'part', 'ticks']],
-  ['detonation', ['kind', 'x', 'y', 'radius', 'from', 'mob']],
+  // (`gen`: only a spreading fire's; any other ignite is the three fields it always was)
+  ['ignite', ['bodyId', 'part', 'ticks', 'gen']],
+  // (`out` appended 2026-11-12: an exit blast's heading; a row without it is the row it always was)
+  ['detonation', ['kind', 'x', 'y', 'radius', 'from', 'mob', 'out']],
   ['intercept', ['bodyId', 'part', 'proj', 'x', 'y', 'fx', 'fy', 'down']],
   ['bossTelegraph', ['shape', 'kind', 'x', 'y', 'ticks', 'angle', 'length', 'width', 'radius', 'bodyId']],
   ['pong', ['clientTime', 'serverTime', 'tick', 'serverProcessing']],

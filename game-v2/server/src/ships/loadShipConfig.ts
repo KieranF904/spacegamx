@@ -21,15 +21,22 @@ export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
   }
   // Dev test ships (the F9 ship swap only: apart from the plan library, so never sold, learned or spawned)
   const dev: Record<string, Blueprint> = {};
+  // (One marked `retired` in its file is still loaded, but no ship list offers it: parseBlueprint drops the mark, so it is kept here)
+  const retired: string[] = [];
+  const devShip = (folder: string, f: string) => {
+    const text = readFileSync(join(folder, f), 'utf-8');
+    dev[f.slice(0, -5)] = parseBlueprint(text);
+    if ((JSON.parse(text) as { retired?: unknown }).retired) retired.push(f.slice(0, -5));
+  };
   const devDir = join(dir, 'blueprints', 'dev');
   if (existsSync(devDir)) for (const f of readdirSync(devDir)) {
-    if (f.endsWith('.json')) dev[f.slice(0, -5)] = parseBlueprint(readFileSync(join(devDir, f), 'utf-8'));
+    if (f.endsWith('.json')) devShip(devDir, f);
   }
   // The players' remakes (blueprints/remakes: made for the v5 design update, long run): never sold, learned or spawned.
   // The deploy ships them (unlike dev/); like the dev test ships they're on the F9 ship swap
   const remakeDir = join(dir, 'blueprints', 'remakes');
   if (existsSync(remakeDir)) for (const f of readdirSync(remakeDir)) {
-    if (f.endsWith('.json')) dev[f.slice(0, -5)] = parseBlueprint(readFileSync(join(remakeDir, f), 'utf-8'));
+    if (f.endsWith('.json')) devShip(remakeDir, f);
   }
   // Designs' own pieces (bosses' bespoke hulls)
   const bespokeDir = join(dir, 'bespoke');
@@ -42,6 +49,7 @@ export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
     library,
     enemies,
     dev,
+    retired,
   };
 }
 

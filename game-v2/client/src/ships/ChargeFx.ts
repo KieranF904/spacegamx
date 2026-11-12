@@ -5,7 +5,7 @@
  *
  *   Longbarrel  a thin red sight line along its aim that brightens as it fills, and a glow on the barrel's end
  *   Blackout    its emitter darkening: a dark disc swelling over the dish, a blue rim of crackle at the edge
- *   any other   a soft dot at the muzzle in a neutral light
+ *   any other   light gathering at the muzzle in a neutral colour: a ring closing on it, motes falling in, the dot they feed
  * and two marks on the ships themselves: a ship a Searchlight has lit wears a gold rim and corner brackets, seen by all
  * (the weaponry status bit; your own from the pilot row's ticks), and an Overpulse's clip shows as a 12-segment ring
  * round its ship that empties as it fires and refills as it reloads.
@@ -126,20 +126,28 @@ export class ChargeFx {
     const [x, y] = shipPointToWorld(ship, pose, muzzle, cs);
     const ang = pose.angle + Math.PI / 2 + Math.atan2(dir[1], dir[0]);
     const look = LOOKS[ship.blueprint.parts[w.part]?.fn ?? ''] ?? 'dot';
-    const pulse = 0.75 + 0.25 * Math.sin(this.t * (10 + 24 * k));
+    let reach = 0;
     if (look === 'sight') {
       const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
-      const reach = Math.min(1800, def.range ?? (def.speed && def.life ? def.speed * def.life : 900));
+      reach = Math.min(1800, def.range ?? (def.speed && def.life ? def.speed * def.life : 900));
+    }
+    this.tell(look, x, y, ang, k, Math.max(1, w.fire.charge ?? 60), reach, w.window ? cs * 0.9 : cs);
+  }
+
+  /** One tell at the muzzle (x, y) pointing along `ang`, `k` of the way through a charge of `need` ticks (`reach`: the sight line's; `dish`: the Blackout's emitter size) */
+  private tell(look: Look, x: number, y: number, ang: number, k: number, need: number, reach: number, dish: number): void {
+    const pulse = 0.75 + 0.25 * Math.sin(this.t * (10 + 24 * k));
+    // Last 0.3 s of the charge: a fast bright flicker
+    const left = (1 - k) * need / TICK_RATE;
+    const hot = left < 0.3 ? 1 - left / 0.3 : 0;
+    const flick = hot > 0 ? 1 + hot * (0.5 + 0.5 * Math.sin(this.t * 70)) : 1;
+    if (look === 'sight') {
       const x1 = x + Math.cos(ang) * reach, y1 = y + Math.sin(ang) * reach;
-      // Last 0.3 s of the charge: a fast bright flicker on the line and the tip
-      const left = (1 - k) * Math.max(1, w.fire.charge ?? 60) / TICK_RATE;
-      const hot = left < 0.3 ? 1 - left / 0.3 : 0;
-      const flick = hot > 0 ? 1 + hot * (0.5 + 0.5 * Math.sin(this.t * 70)) : 1;
       this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xef4444, width: 1 + 2.5 * k, alpha: Math.min(1, (0.15 + 0.45 * k) * pulse * flick) });
       this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xfecaca, width: 0.8, alpha: Math.min(1, (0.15 + 0.5 * k) * flick) });
       this.softDot(x, y, (5 + 10 * k) * (1 + 0.3 * hot), 0xffe6a0, Math.min(1, (0.3 + 0.6 * k) * (hot > 0 ? 0.8 + 0.4 * flick / 1.5 : 1)));
     } else if (look === 'blackout') {
-      const r = (w.window ? cs * 0.9 : cs) * (0.4 + 1.1 * k);
+      const r = dish * (0.4 + 1.1 * k);
       // The emitter goes dark: a black disc swelling over it, its rim crackling blue
       this.dark.circle(x, y, r).fill({ color: 0x02040a, alpha: 0.25 + 0.6 * k });
       this.glow.circle(x, y, r * 1.1).stroke({ color: 0x3b5bdb, width: 1 + 1.5 * k, alpha: (0.25 + 0.5 * k) * pulse });
@@ -153,7 +161,17 @@ export class ChargeFx {
           .stroke({ color: 0x93c5fd, width: 1, alpha: 0.6 * k });
       }
     } else {
-      this.softDot(x, y, 4 + 8 * k, 0xbfdbfe, 0.25 + 0.6 * k);
+      // Light gathering: a ring closing on the muzzle, motes falling in to it, and the dot they feed
+      const col = 0xbfdbfe, r = 20 - 12 * k;
+      this.glow.circle(x, y, r).stroke({ color: col, width: 1 + 0.5 * k, alpha: (0.12 + 0.26 * k) * pulse });
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const f = (this.t * (1.1 + 1.4 * k) + i / n) % 1, a = i * 2.399 + this.t * 1.7;
+        const r1 = 3 + (r + 8) * (1 - f * f), r0 = r1 + 4 + 5 * f, ca = Math.cos(a), sa = Math.sin(a);
+        this.glow.moveTo(x + ca * r0, y + sa * r0).lineTo(x + ca * r1, y + sa * r1).stroke({ color: col, width: 1.2, alpha: (0.25 + 0.6 * k) * Math.sin(f * Math.PI) });
+      }
+      this.softDot(x, y, (4 + 7 * k) * (1 + 0.25 * hot), col, Math.min(1, (0.25 + 0.6 * k) * flick));
+      this.glow.circle(x, y, 0.8 + 2.2 * k).fill({ color: 0xffffff, alpha: Math.min(1, k * flick) });
     }
   }
 

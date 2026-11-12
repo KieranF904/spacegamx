@@ -17,6 +17,8 @@ export interface ShipConfig {
   enemies?: Record<string, Blueprint>;
   /** Dev test ships by file name (the F9 ship swap only: never sold, learned or spawned) */
   dev?: Record<string, Blueprint>;
+  /** The dev test ships marked `retired` in their files (still flyable by name, offered by no list) */
+  retired?: string[];
   /** Keep the ship-wide bubble shields working on player ships (catalog.ts PLAYER_BUBBLE_MODELS; tests of the bubble rules) */
   playerBubbles?: boolean;
 }
@@ -30,6 +32,7 @@ export function createShipBridge(cfg: ShipConfig): ShipBridge {
     library: cfg.library,
     enemies: cfg.enemies,
     dev: cfg.dev,
+    retired: cfg.retired,
     now: () => performance.now(),
   });
 }

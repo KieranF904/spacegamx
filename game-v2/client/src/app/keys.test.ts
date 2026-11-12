@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { handleKey, MODAL_CHAIN, PRE_KEYS, POST_KEYS, type KeyHost } from './keys';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { handleKey, FLIGHT_KEYS, MODAL_CHAIN, PRE_KEYS, POST_KEYS, type KeyHost } from './keys';
+import { ACTIONS } from '../input/keybindings';
 import { PickupWindows } from '../ui/pickup';
+import { groupSelection } from '../ships/weaponGroups/selection';
 
 /** A host whose windows are all shut, logged in, recording what it was asked to do */
 function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: string[] } {
@@ -52,7 +54,7 @@ describe('keys: the modal chain and tables', () => {
     let open = true;
     const o = fakeHost({ shipWindow: { get isOpen() { return open; }, toggle: () => {}, onKey: (c: string) => { if (c === 'Escape' && open) { open = false; o.calls.push('ship.close'); return true; } return false; } } });
     handleKey(o.h, 'KeyW');
-    handleKey(o.h, 'KeyM');
+    handleKey(o.h, 'Semicolon');
     expect(o.calls).toEqual(['map.toggle', 'audio']);
     handleKey(o.h, 'Escape');
     expect(o.calls.slice(-1)).toEqual(['ship.close']);
@@ -67,13 +69,48 @@ describe('keys: the modal chain and tables', () => {
     expect(b.calls).toEqual(['invite']);
   });
 
-  it('C opens the side panel on the component guide, but not on the map', () => {
+  it('[ (the components action) opens the side panel on the component guide, but not on the map', () => {
     const { h, calls } = fakeHost();
-    handleKey(h, 'KeyC');
+    handleKey(h, 'BracketLeft');
     expect(calls).toEqual(['hub:components']);
     const m = fakeHost({ systemMapUI: { isOpen: true, toggle: () => {} } });
-    handleKey(m.h, 'KeyC');
+    handleKey(m.h, 'BracketLeft');
     expect(m.calls).toEqual([]);
+  });
+
+  it('the five actions that were on C V B N M answer to their new default codes, and no longer to the letters', () => {
+    const def = (id: string) => ACTIONS.find((a) => a.id === id)!.key;
+    expect(['components', 'helm', 'ping', 'nav', 'map'].map(def)).toEqual(['BracketLeft', 'Quote', 'BracketRight', 'Backslash', 'Semicolon']);
+    expect(['contextMenu', 'interact'].map(def)).toEqual(['KeyZ', 'KeyX']);
+    const { h, calls } = fakeHost({ pingUI: { pingAtCursor: (danger: boolean) => calls.push('ping:' + danger) } });
+    handleKey(h, 'KeyX');
+    expect(calls).toEqual(['send:interact']);
+    handleKey(h, 'BracketRight');
+    expect(calls).toEqual(['send:interact', 'ping:false']);
+    handleKey(h, 'Semicolon');
+    expect(calls).toEqual(['send:interact', 'ping:false', 'map.toggle', 'audio']);
+    // (The letters are the quick bar's now: nothing of the old actions)
+    (h as unknown as { quickBar: { use(i: number): void } }).quickBar.use = () => {};
+    for (const k of ['KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM']) handleKey(h, k);
+    expect(calls).toEqual(['send:interact', 'ping:false', 'map.toggle', 'audio']);
+    // (Interact and the helm switch are flight keys: they hand control back from the autopilot)
+    expect(FLIGHT_KEYS.has(def('interact')) && FLIGHT_KEYS.has(def('helm'))).toBe(true);
+    expect(FLIGHT_KEYS.has('KeyV')).toBe(false);
+  });
+
+  it('the key that opens the map shuts it; M with the map open neither shuts it nor uses a quick item', () => {
+    let open = false;
+    const used: number[] = [];
+    const { h } = fakeHost({ systemMapUI: { get isOpen() { return open; }, loaded: true, toggle: () => { open = !open; } } });
+    (h as unknown as { quickBar: { use(i: number): void } }).quickBar.use = (i) => { used.push(i); };
+    handleKey(h, 'Semicolon');
+    expect(open).toBe(true);
+    handleKey(h, 'KeyM');
+    expect([open, used]).toEqual([true, []]);
+    handleKey(h, 'Semicolon');
+    expect(open).toBe(false);
+    handleKey(h, 'KeyM');
+    expect([open, used]).toEqual([false, [4]]);
   });
 
   it('Esc puts away a side panel called up over the station before anything else below the menu', () => {
@@ -90,7 +127,7 @@ describe('keys: the modal chain and tables', () => {
 
   it('an open window swallows keys that would be global', () => {
     const { h, calls } = fakeHost({ tradeWindow: { isOpen: true, close: () => calls.push('trade.close') } });
-    handleKey(h, 'KeyM');
+    handleKey(h, 'Semicolon');
     expect(calls).toEqual([]);
     handleKey(h, 'Escape');
     expect(calls).toEqual(['trade.close']);
@@ -130,7 +167,7 @@ describe('keys: the modal chain and tables', () => {
 
   it('keys do nothing before login', () => {
     const { h, calls } = fakeHost({ loggedIn: false });
-    for (const k of ['KeyM', 'KeyR', 'KeyI', 'Escape', 'KeyG']) handleKey(h, k);
+    for (const k of ['Semicolon', 'KeyM', 'KeyR', 'KeyI', 'Escape', 'KeyG']) handleKey(h, k);
     expect(calls).toEqual([]);
   });
 
@@ -140,7 +177,83 @@ describe('keys: the modal chain and tables', () => {
     expect(calls).toEqual([]);
   });
 
+  it('the quick bar is on C V B N M (its actions\' default codes), never on 1-5', () => {
+    const { h } = fakeHost();
+    const used: number[] = [];
+    (h as unknown as { quickBar: { use(i: number): void } }).quickBar.use = (i) => { used.push(i); };
+    for (const k of ['KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM']) handleKey(h, k);
+    expect(used).toEqual([0, 1, 2, 3, 4]);
+    for (const k of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']) handleKey(h, k);
+    expect(used.length).toBe(5);
+    groupSelection.reset();
+  });
+
+  it('a quick bar key does nothing on the map (C centres it), with Ctrl held (Ctrl+C copies), in the hangar or before login', () => {
+    const used: number[] = [];
+    const host = (over: Record<string, unknown>) => {
+      const { h } = fakeHost(over);
+      (h as unknown as { quickBar: { use(i: number): void } }).quickBar.use = (i) => { used.push(i); };
+      return h;
+    };
+    handleKey(host({ systemMapUI: { isOpen: true, toggle: () => {} } }), 'KeyC');
+    handleKey(host({ input: { isKeyDown: () => false, resetZoom: () => {}, ctrlDown: true } }), 'KeyC');
+    handleKey(host({ loggedIn: false }), 'KeyC');
+    expect(used).toEqual([]);
+    handleKey(host({}), 'KeyC');
+    expect(used).toEqual([0]);
+  });
+
   it('each table key is an own property (no prototype lookups)', () => {
     for (const k of [...Object.keys(PRE_KEYS), ...Object.keys(POST_KEYS)]) expect(k).toMatch(/^[A-Za-z0-9]+$/);
+  });
+});
+
+describe('keys: the weapon group keys', () => {
+  beforeEach(() => groupSelection.reset());
+  const sel = () => [groupSelection.leftGroup, groupSelection.rightGroup];
+  const shifted = (down: boolean) => fakeHost({ input: { isKeyDown: () => false, resetZoom: () => {}, shiftDown: down } }).h;
+
+  it('1-5 set the group the left button fires; the right button stays', () => {
+    const h = shifted(false);
+    for (let g = 1; g <= 5; g++) {
+      handleKey(h, `Digit${g}`);
+      expect(sel()).toEqual([g, 0]);
+    }
+  });
+
+  it('Shift+1-5 set the group the right button fires; the left button stays', () => {
+    const h = shifted(true);
+    for (let g = 1; g <= 5; g++) {
+      handleKey(h, `Digit${g}`);
+      expect(sel()).toEqual([0, g]);
+    }
+  });
+
+  it('the number of the group a button is already on puts that button back on all', () => {
+    const plain = shifted(false), shift = shifted(true);
+    handleKey(plain, 'Digit3');
+    handleKey(shift, 'Digit4');
+    expect(sel()).toEqual([3, 4]);
+    handleKey(plain, 'Digit3');
+    expect(sel()).toEqual([0, 4]);
+    handleKey(shift, 'Digit4');
+    expect(sel()).toEqual([0, 0]);
+    // (The other button's group is not this button's: 4 on the left while the right is on 4 picks it)
+    handleKey(shift, 'Digit4');
+    handleKey(plain, 'Digit4');
+    expect(sel()).toEqual([4, 4]);
+  });
+
+  it('untouched, both buttons are on all; the keys do nothing before login or in the hangar', () => {
+    expect(sel()).toEqual([0, 0]);
+    handleKey(fakeHost({ loggedIn: false }).h, 'Digit2');
+    handleKey(fakeHost({ shipClient: { hangarOpen: true, onKey: () => false } }).h, 'Digit2');
+    expect(sel()).toEqual([0, 0]);
+  });
+
+  it('6 and up are not group keys', () => {
+    const h = shifted(false);
+    for (const k of ['Digit6', 'Digit0', 'Digit9']) handleKey(h, k);
+    expect(sel()).toEqual([0, 0]);
   });
 });

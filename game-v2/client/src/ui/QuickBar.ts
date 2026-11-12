@@ -1,12 +1,14 @@
 /**
  * The quick bar: five item slots along the bottom of the screen. Drag an item
- * onto a slot (or pick "Put on quick bar" from its menu), then press 1-5 or
- * click it to use it. Right-click empties a slot. Counts are what you can use
+ * onto a slot (or pick "Put on quick bar" from its menu), then press its key
+ * (input/keybindings.ts quick1..quick5: C V B N M unless rebound) or click it
+ * to use it. Right-click empties a slot. Counts are what you can use
  * right now: your hold, plus storage while you're at a station.
  */
 
 import type { ClientMessage } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
+import { esc } from './escape';
 import { itemIcon } from './itemIcons';
 import { itemTipHtml, showTip, hideTip, injectWindowStyles } from './windowKit';
 import { boundKeyName } from '../input/keybindings';
@@ -30,7 +32,7 @@ export class QuickBar {
 .qb-slot img { width: 34px; height: 34px; pointer-events: none; }
 .qb-slot.none img { opacity: 0.3; filter: grayscale(1); }
 .qb-slot.none .n { color: #f0a0a0; opacity: 0.8; }
-.qb-slot .k { position: absolute; left: 4px; top: 2px; font: 700 10px 'Segoe UI', sans-serif; color: #8394ad; }
+.qb-slot .k { position: absolute; left: 4px; top: 1px; font: 700 11px 'Segoe UI', sans-serif; color: #cfe0f5; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
 .qb-slot .n { position: absolute; right: 4px; bottom: 1px; font: 700 11px 'Segoe UI', sans-serif; color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px #000; }`;
     document.head.appendChild(css);
     this.root = document.createElement('div');
@@ -61,6 +63,8 @@ export class QuickBar {
     }
     document.body.append(this.root);
     pilot.onChange(() => this.render());
+    // (A rebound key shows on its slot at once)
+    settings.subscribe(() => this.render());
   }
 
   private keyName(i: number): string {
@@ -94,7 +98,8 @@ export class QuickBar {
       const id = bar[i];
       const n = id ? this.count(id) : 0;
       el.classList.toggle('none', !!id && n <= 0);
-      el.innerHTML = `<span class="k">${this.keyName(i)}</span>${id ? `<img src="${itemIcon(this.pilot.econ, id)}"><span class="n">${n}</span>` : ''}`;
+      el.dataset.slot = String(i + 1);
+      el.innerHTML = `<span class="k">${esc(this.keyName(i))}</span>${id ? `<img src="${itemIcon(this.pilot.econ, id)}"><span class="n">${n}</span>` : ''}`;
     });
   }
 }

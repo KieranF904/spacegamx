@@ -35,7 +35,7 @@ import { jumpPhase, jumpTuning } from '../ships/flight.js';
 import type { ShipState } from '../ships/state.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import { powerTick, ensurePortsCharge, remapCharge, type Charge } from '../ships/energy.js';
-import { firesStraight } from '../ships/launch.js';
+import { firesStraight, gunCode } from '../ships/launch.js';
 import { gunShell } from '../ships/hitRules.js';
 import { TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '../ships/guns.js';
 import { TRIG_LEFT, TRIG_RIGHT, trigSel } from '../ships/weaponGroups.js';
@@ -81,7 +81,7 @@ export interface GunCtl { bits: number; dist: number }
 const NO_GUN_CTL: Readonly<GunCtl> = Object.freeze({ bits: 0, dist: 0 });
 
 /** What a ship's guns did on a tick, as a fire row carries it: a volley (n shells), a pulse (n 0) or a tell (code) */
-export interface LaneRec { tick: number; part: number; code: number; aimQ: number; aug: 0 | 1; n: number }
+export interface LaneRec { tick: number; part: number; code: number; aimQ: number; aug: 0 | 1; n: number; /** Its weapon modifier effects' mask (FireRecord.fx; 0 none) */ fx: number }
 
 /** Can another end build this gun's shells from a record (straight from the muzzle: as OwnShells.derivable) */
 export function shellsDerivable(tuning: ShipTuning, ship: ShipState, gun: number): boolean {
@@ -103,13 +103,13 @@ export function laneRecords(events: readonly SimEvent[], ship: ShipState, tuning
   for (const e of events) {
     if (e.k === 'fire') {
       if (e.barrel !== 0) { const r = out.find((x) => x.tick === e.tick && x.part === e.slot && x.code === 0 && x.n > 0); if (r) r.n++; continue; }
-      const aug = e.aug ? 1 : 0;
-      if (!shellsDerivable(tuning, ship, e.slot + (aug ? 65536 : 0))) continue;
-      out.push({ tick: e.tick, part: e.slot, code: 0, aimQ: e.aimQ, aug, n: 1 });
+      const aug = e.aug ? 1 : 0, fx = e.fx ?? 0;
+      if (!shellsDerivable(tuning, ship, gunCode(e.slot, 0, !!aug, fx))) continue;
+      out.push({ tick: e.tick, part: e.slot, code: 0, aimQ: e.aimQ, aug, n: 1, fx });
     } else if (e.k === 'fx') {
       const code = FX_CODE[e.fx];
       if (code === undefined) continue;
-      out.push({ tick: e.tick, part: e.part, code, aimQ: e.aq ?? 0, aug: 0, n: 0 });
+      out.push({ tick: e.tick, part: e.part, code, aimQ: e.aq ?? 0, aug: 0, n: 0, fx: e.mask ?? 0 });
     }
   }
   out.sort(recOrder);
@@ -119,9 +119,9 @@ export function laneRecords(events: readonly SimEvent[], ship: ShipState, tuning
 const recOrder = (a: LaneRec, b: LaneRec) => a.part - b.part || a.code - b.code || a.n - b.n;
 
 /** A server fire record as a LaneRec (a volley it can't name by shot ids: n -1, never one a lane matches) */
-export function firedRec(f: { tick: number; part: number; ammo?: number; aug?: 1; aimQ: number; ids: readonly number[]; shots?: readonly number[] }): LaneRec {
+export function firedRec(f: { tick: number; part: number; ammo?: number; aug?: 1; fx?: number; aimQ: number; ids: readonly number[]; shots?: readonly number[] }): LaneRec {
   const n = f.ids.length && (!f.shots || f.shots.length !== f.ids.length) ? -1 : f.ids.length;
-  return { tick: f.tick, part: f.part, code: f.ammo ?? 0, aimQ: f.aimQ, aug: f.aug ? 1 : 0, n };
+  return { tick: f.tick, part: f.part, code: f.ammo ?? 0, aimQ: f.aimQ, aug: f.aug ? 1 : 0, n, fx: f.fx ?? 0 };
 }
 
 /** Two ticks' records the same (each list in laneRecords' order) */
@@ -130,14 +130,14 @@ export function sameRecs(a: readonly LaneRec[], b: readonly LaneRec[]): boolean 
   const bs = b.length > 1 ? [...b].sort(recOrder) : b;
   for (let i = 0; i < a.length; i++) {
     const x = a[i], y = bs[i];
-    if (x.part !== y.part || x.code !== y.code || x.aimQ !== y.aimQ || x.aug !== y.aug || x.n !== y.n) return false;
+    if (x.part !== y.part || x.code !== y.code || x.aimQ !== y.aimQ || x.aug !== y.aug || x.n !== y.n || x.fx !== y.fx) return false;
   }
   return true;
 }
 
-/** A record as a fire row ([owner, ticksAgo, part + 256 × code + 65536 × aug, aimQ, ...shell names]), named by shot id */
+/** A record as a fire row ([owner, ticksAgo, its gun code (launch.ts gunCode: part, code, aug, effect mask), aimQ, ...shell names]), named by shot id */
 export function laneFireRow(owner: number, snapTick: number, r: LaneRec): number[] {
-  const row = [owner, snapTick - r.tick, r.part + 256 * r.code + (r.aug ? 65536 : 0), r.aimQ];
+  const row = [owner, snapTick - r.tick, gunCode(r.part, r.code, !!r.aug, r.fx), r.aimQ];
   for (let i = 0; i < r.n; i++) row.push(otherShotWireOf(owner, r.tick, r.part, i));
   return row;
 }

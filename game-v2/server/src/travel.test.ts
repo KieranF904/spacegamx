@@ -232,7 +232,10 @@ describe('jump drive and stars', () => {
       while (ship.jump !== 0 && ticks < 5000) { Position.x[pid] = x; Position.y[pid] = 0; Velocity.x[pid] = 0; Velocity.y[pid] = 0; server.step(); ticks++; }
       return ticks;
     };
-    const far = cool(30000), near = cool(6000);
+    // (Far: well clear of the ring's edge (30000 from Sol's centre) and of every landmark's tracking zone. It was 30000,
+    // exactly on the edge and in Sol Central's fade band: the carry, common world/landmarks.ts, moved it 0.01 inside
+    // the ring within the tick, after the pin, on many ticks, so "far" charged in the ring too)
+    const far = cool(-33000), near = cool(6000);
     expect(near).toBeLessThan(far / 1.8);
   });
 });

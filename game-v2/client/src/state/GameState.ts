@@ -11,7 +11,7 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charge, type TimelineClock, type FlightBody } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charge, type TimelineClock, type FlightBody, type Landmark } from '@space-game/common';
 
 /** The own ship on its tick layer at a tick (GameState.ownStep): its body, its stores and priming (no stores: docked, unchanged) */
 export interface OwnStepped { body: Readonly<FlightBody>; charge?: Charge; jumpPrime: number }
@@ -135,6 +135,8 @@ export class GameState {
   public level: number = 1;
   public credits: number = 0;
   public systemId: string = 'sol';
+  /** This system's moving landmarks (systemInfo; common world/landmarks.ts): loot pods anchored in a zone are drawn carried */
+  public landmarks: Landmark[] = [];
   /** This system's ships past the snapshot's view, for the system map (mapDots) */
   public readonly farShips = new FarShips();
   /** This system's hostile populations: the ghosts of packs nobody's near (pops; common world/populations.ts) */

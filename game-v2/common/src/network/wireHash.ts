@@ -16,6 +16,7 @@ import { PORTS_SLOT_LAYOUT } from '../ships/power/ports.js';
 import { GUN_STATE_LAYOUT, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_CHARGE_CANCEL, TELL_CHARGE_START } from '../ships/guns.js';
 import { packGunSync } from '../sim/otherGuns.js';
 import { newGunState, NO_HAZARD } from '../sim/state.js';
+import { LANDMARK_CARRY_RULE } from '../world/landmarks.js';
 
 /** FNV-1a, 32 bits, as hex */
 export function fnv1a(s: string): string {
@@ -41,6 +42,8 @@ export function computeWireHash(): string {
     // (and one charging a jump: its lock, last, flight.ts FlightBody.jumpAim/jumpTo)
     // (a gunSync's state list, positions too: sim/otherGuns.ts packGunSync)
     gunSync: packGunSync(3, 100, { charge: {}, guns: { ...newGunState(2), clickAt: 7, tow: 5, heldDist: 480, trig: 1 }, hazard: { ...NO_HAZARD }, jumpPrime: 0 }, { bits: 1, dist: 400 }).z,
+    // (not a layout but a rule both ends step alike: landmark tracking's carry, world/landmarks.ts)
+    landmarkCarry: LANDMARK_CARRY_RULE,
     keyframeLock: packKeyframe({ id: 2, mode: ReplicaMode.Player, body: { x: 1, y: 2, vx: 3, vy: 4, angle: 0.5, angVel: 0, jump: 40, jumpAim: Math.fround(dequantizeCursorAngle(1234)), jumpTo: 4800 }, ctl: { bits: 272, targetAngle: 0 }, q: 4000 }),
   };
   const msgs = [

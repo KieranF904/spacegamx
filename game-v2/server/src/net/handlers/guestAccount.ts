@@ -18,7 +18,7 @@ import type { ServerCtx } from '../ServerCtx.js';
 import type { ClientConnection } from '../ClientConnection.js';
 import { entityExists, removeEntity } from 'bitecs';
 import { Player, PROTOCOL_VERSION, TICK_RATE } from '@space-game/common';
-import { setRanks } from '../auth.js';
+import { contributorAtSignIn, setRanks } from '../auth.js';
 import { neutralInput } from './flight.js';
 
 /** Longest session token taken (the lobby's are 64 hex digits) */
@@ -63,7 +63,7 @@ async function convert(ctx: ServerCtx, conn: ClientConnection, raw: unknown): Pr
   // (The connection is the account's now: as a sign-in at join would have made it)
   conn.authToken = token;
   setRanks(ctx, conn, user);
-  conn.isContributor = ctx.contrib.hasRank(user.id, user.username);
+  conn.isContributor = contributorAtSignIn(ctx, user);
   ctx.social.join(conn);
   console.log(`Player ${conn.playerId} registered as ${user.username}`);
   ctx.send(conn.ws, { type: 'guestConverted', success: true });

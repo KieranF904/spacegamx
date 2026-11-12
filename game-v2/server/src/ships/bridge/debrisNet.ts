@@ -119,7 +119,9 @@ export class DebrisNet {
       list.sort((p, q) => p.eid - q.eid);
       const gravity = b.host.gravityAt(list[0].eid);
       const k = gravity ? b.withGravity(gravity) : K;
-      for (const pair of stepWorld(list.map((e) => e.d), k, b.tuning.cellSize, restitution, tick)) this.pairs.push(pair);
+      // (In a moving landmark's zone a piece is carried with it, in the shared step: common world/landmarks.ts)
+      const landmarks = b.host.jumpFields?.(list[0].eid)?.landmarks;
+      for (const pair of stepWorld(list.map((e) => e.d), k, b.tuning.cellSize, restitution, tick, landmarks)) this.pairs.push(pair);
       for (const e of list) {
         b.writeBody(e.eid, e.ship, e.d.body);
         this.expect.set(e.eid, copy(e.d.body));

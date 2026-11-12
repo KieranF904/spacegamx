@@ -38,7 +38,7 @@ export function showServerUpdate(inMs: number): void {
   if (!el) {
     el = document.createElement('div');
     el.setAttribute('role', 'status');
-    el.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9000;max-width:92vw;padding:6px 16px;'
+    el.style.cssText = 'position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:9000;max-width:92vw;padding:6px 16px;'
       + 'background:#7a4a00;color:#ffe9b0;font:600 13px system-ui,sans-serif;border:1px solid #fbbf24;border-top:0;'
       + 'border-radius:0 0 8px 8px;pointer-events:none;text-align:center';
     document.body.appendChild(el);

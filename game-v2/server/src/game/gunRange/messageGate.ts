@@ -20,7 +20,7 @@ export const RANGE_GATE = {
   // X: at the door it takes you out (game/gunRange); nothing else in the range answers it
   interact: 'pass',
   // The range's own
-  gunRangeEnter: 'pass', gunRangeWeapon: 'pass',
+  gunRangeEnter: 'pass', gunRangeWeapon: 'pass', gunRangeShip: 'pass',
   // Talking and company (none of it touches a profile's items)
   chat: 'pass', whisper: 'pass', setStatus: 'pass', friendRequest: 'pass', friendRespond: 'pass', friendRemove: 'pass',
   partyInvite: 'pass', partyRespond: 'pass', partyLeave: 'pass', partyKick: 'pass', partyPromote: 'pass', mapPing: 'pass',

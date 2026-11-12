@@ -73,7 +73,7 @@ export class DebrisSteps {
         list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [], born: shape?.born });
         reps.push(r);
       }
-      stepDebrisWorld(list, k, cs, restitution, t);
+      stepDebrisWorld(list, k, cs, restitution, t, env.landmarks);
       for (let i = 0; i < list.length; i++) {
         // (A piece it runs: its rebuild point; nothing left of it, it has no state at t's end, and isn't stepped again)
         if (this.debris?.after && !this.debris.after(list[i].id, t, list[i].body)) continue;

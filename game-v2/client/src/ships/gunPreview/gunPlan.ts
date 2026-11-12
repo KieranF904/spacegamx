@@ -41,6 +41,8 @@ export interface GunPlan {
   /** Beams: the tuning colour name and width */
   color?: string;
   width: number;
+  /** A split beam's fan (tuning.ts beamFan): radians off its aim and its share of the burn, beam by beam */
+  beamFan?: { off: number[]; share: number[] };
   fire: FireSpec;
   /** World units a ship cell (the preview's target blocks are built from it) */
   cell: number;

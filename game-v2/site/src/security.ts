@@ -124,8 +124,9 @@ export function securityHeaders(res: http.ServerResponse, secure: boolean): void
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    // (The fonts are this site's own files: public/fonts)
+    "style-src 'self'",
+    "font-src 'self'",
     "img-src 'self' data: https:",
     "connect-src 'self'",
     "frame-ancestors 'none'",

@@ -4,7 +4,7 @@ Mk III · Small · Round · 0.8 cells
 Hull · mass62 hp · 0.8
 Armour · build3 · 2 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage25/s · reach 7,650
+Damage50/s · reach 7,650
 Hits withThermal · penetration 3
 Beamheld while you fire · draws its power while it's on
 Modelbeam: Uses power every second you hold it.
@@ -34,7 +34,7 @@ Small · Round
 reaches furthest, marks what it lights for 20% more damage
 
 == keyStats ==
-25 dmg/s · reach 7,650 · held beam · draws 15
+50 dmg/s · reach 7,650 · held beam · draws 15
 
 == mountBadge ==
 TURRET 360°SIDE
@@ -51,4 +51,4 @@ Bolts on at its side only
 {"open":true,"badge":"Lv 26","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":25,"toughness":61.57521601035994,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":25,"range":7650,"damageType":"thermal","pen":3,"draw":15.001104920891263}
+{"grade":3,"mark":"Mk III","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":50,"toughness":61.57521601035994,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":50,"range":7650,"damageType":"thermal","pen":3,"draw":15.001104920891263}

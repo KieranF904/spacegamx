@@ -29,6 +29,7 @@
 import type { FunctionDef } from '../types.js';
 import { PF_LATCH, PF_LIT, PF_SEL, PF_AUG, MAT_UNIT, MAT_RATE, TPS, TOW_BIT, P_RELAY, P_WEAPON, P_TANK, type PortsLayout, type PortsState } from './portsTypes.js';
 import { portsGauge, matOf, effShot, effDischarge, effRest, effSteady, effCap, effThrust } from './portsState.js';
+import { portsModsTick, portsShotFx, portsNoFx } from './portsMods.js';
 
 // (The core's pieces, re-exported so importers of this file are unchanged)
 export {
@@ -43,6 +44,7 @@ export {
   portsMachinePart, setPortsMachine, portsMachineEu, setPortsTow, portsCapStores, matOf, effShot, effCap, effThrust,
 } from './portsState.js';
 export * from './portsWire.js';
+export { portsModsTick, portsFxLive, portsShotFx, portsLastFx, portsRapidShot, portsRapidStep } from './portsMods.js';
 
 // ================================================================ the tick
 export interface PortsControls {
@@ -248,6 +250,7 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
     if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; }
   }
   for (const p of L.thrusters) if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; }
+  if (L.mod) portsModsTick(L, e);
   e.gauge = portsGauge(L, e);
 }
 
@@ -281,6 +284,8 @@ export function portsSpendShot(L: PortsLayout, e: PortsState, p: number, n = L.r
   lastAug = L.augCap[p] > 0 && e.aug[p] >= L.augCost[p] * n;
   if (lastAug) e.aug[p] -= L.augCost[p] * n;
   e.held[p] = h - paid;
+  // (Its modifiers' mask for this shot: portsLastFx)
+  portsShotFx(L, e, p, paid);
   const d = effDischarge(L, e, p); if (d > 0) e.closed[p] = d > 32000 ? 32000 : d;
   if (f) { e.amt[p] -= L.matUse[p] * n; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
   if (L.gun[p] === 2 && e.held[p] < s) e.flags[p] |= PF_LATCH;
@@ -294,6 +299,7 @@ export function portsDamageMul(L: PortsLayout, e: PortsState, p: number): number
 /** A beam's tick while the trigger's held: lights when it may (a burst beam only when full), burns a tick's worth, goes out and rests when it can't. Returns eu burnt
  * (a beam in pieces: piecesStep, called whatever the trigger while a piece burns) */
 export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger: boolean): number {
+  portsNoFx();
   if (L.pieces[p]) return piecesStep(L, e, p, trigger);
   let fl = e.flags[p];
   if (!trigger) { e.flags[p] = fl & ~(PF_LIT | PF_AUG); return 0; }
@@ -308,6 +314,7 @@ export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger:
       if (L.augCap[p] > 0 && e.aug[p] >= L.augCost[p]) { e.aug[p] -= L.augCost[p]; fl |= PF_AUG; } else fl &= ~PF_AUG;
       e.flags[p] = fl;
       if (f) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
+      if (L.mod) portsShotFx(L, e, p, b);
       return b;
     }
     fl = (fl & ~(PF_LIT | PF_AUG)) | PF_LATCH;
@@ -371,6 +378,8 @@ function pieceBurn(L: PortsLayout, e: PortsState, p: number, fl: number): number
   if (L.augCap[p] > 0 && e.aug[p] >= L.augCost[p]) { e.aug[p] -= L.augCost[p]; fl |= PF_AUG; } else fl &= ~PF_AUG;
   e.flags[p] = fl;
   if (matOf(L, e, p)) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
+  // (A piece's energy spread over its ticks: what its specials pay by)
+  if (L.mod) portsShotFx(L, e, p, Math.round(L.pieceE[p] / L.pieceT[p]));
   return 1;
 }
 // ---- Mining lasers (Kieran, 2026-11-04): "constant feed usage, their effectiveness augmented by their energy fulfilment,

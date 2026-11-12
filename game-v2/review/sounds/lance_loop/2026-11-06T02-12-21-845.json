@@ -1,0 +1,11 @@
+{
+  "prompt": "powerful bassy energy streaming with quiet hiss",
+  "settings": {
+    "duration_seconds": 3,
+    "prompt_influence": 0.7,
+    "loop": true,
+    "output_format": "mp3_44100_128"
+  },
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "time": "2026-11-06T02:12:21.845Z"
+}

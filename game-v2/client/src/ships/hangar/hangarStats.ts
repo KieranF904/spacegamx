@@ -23,6 +23,7 @@ import { isSimple } from '../build/detailMode';
 import { simpleSummaryHtml } from './hangarStatsSimple';
 import { stationCost } from '../build/planCost';
 import { stationReadoutHtml, bindResourceLinks } from '../build/planCostView';
+import { modsPanelHtml } from '../modTip';
 
 /** The build panel: what host slot still needs, and buttons to make it */
 export function buildHtml(host: HangarHost): string {
@@ -189,6 +190,8 @@ export function portsHtml(host: HangarHost, L: NonNullable<ShipDerived['ports']>
   if (warn.length) html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${warn.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w)}</div>`).join('')}${warn.length > 6 ? `<div style="color:#6b7a93">and ${warn.length - 6} more</div>` : ''}</div>`;
   else html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Every gun, engine and tool is fed.</div>';
   if (host.derived) html += portsPanelHtml(host.derived, host.ports.scenario, host.overlays.energy, name);
+  // (Weapon modifiers: what the mounts do, what is wrong, how it works: modTip.ts)
+  html += modsPanelHtml({ catalog: host.deps.catalog, tuning: host.deps.tuning, derived: host.derived, parts: host.bp.parts }, name);
   return html + '<div style="margin-bottom:12px"></div>';
 }
 

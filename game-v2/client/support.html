@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Support the game · Space Game</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: radial-gradient(ellipse at 50% 20%, #0a1222 0%, #04060c 70%) fixed;
+      color: #b4c2d4; font: 16px/1.6 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+      display: flex; justify-content: center; padding: 40px 16px;
+    }
+    main { width: 460px; max-width: 100%; }
+    h1 { color: #fff; font-size: 26px; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 14px; }
+    p { margin: 0 0 14px; }
+    a { color: #6cc8ff; }
+    .card { background: rgba(14, 20, 32, 0.9); border: 1px solid #1c2738; border-radius: 8px; padding: 22px; margin-top: 20px; }
+    .label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #8b9cb3; margin: 0 0 8px; }
+    .amounts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .amounts button {
+      flex: 1 1 70px; padding: 10px 0; font: inherit; font-weight: 600; color: #e4ebf5; cursor: pointer;
+      background: #101928; border: 1px solid #2a3850; border-radius: 6px;
+    }
+    .amounts button:hover { border-color: #6cc8ff; }
+    .amounts button[aria-pressed="true"] { background: #16324a; border-color: #6cc8ff; color: #fff; }
+    .custom { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .custom input {
+      width: 120px; padding: 9px 10px; font: inherit; color: #e4ebf5; background: #0b111c; border: 1px solid #2a3850; border-radius: 6px;
+    }
+    .custom input:focus { outline: none; border-color: #6cc8ff; }
+    .who { font-size: 14px; padding: 10px 12px; border-radius: 6px; background: #0b111c; border: 1px solid #1c2738; margin-bottom: 16px; }
+    .who b { color: #e4ebf5; }
+    .note { font-size: 13px; color: #8b9cb3; }
+    .error { color: #ffb4a8; background: rgba(120, 30, 20, 0.25); border: 1px solid rgba(255, 120, 100, 0.35); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 14px; }
+    .thanks h2 { color: #fff; margin: 0 0 10px; font-size: 22px; }
+    .sandbox { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #ffcf7a; margin-bottom: 12px; }
+    #paypal-buttons { min-height: 50px; background: #fff; border-radius: 6px; padding: 12px 12px 4px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Support the game</h1>
+    <p>Hey! Thank you for playing my game! I spend countless hours on this project, and pay to maintain the servers, website, etc.</p>
+    <p>Currently we have no monetization: no ads, no pay to win, nothing. All donations to the project are tracked and associated with your account.</p>
+    <p>Anybody who donates $10 USD or more in total will receive the contributor rank; this allows a set of tools for marking the world in game: making notes and suggestions, viewing other people's ideas and giving feedback.</p>
+    <p>We may remove the rank for abuse, or at our discretion, and may give it for free to players as we see fit.</p>
+    <div id="support-root" class="card"><p class="note">Loading…</p></div>
+    <p class="note" style="margin-top: 18px"><a id="back-link" href="/">Back to the game</a></p>
+  </main>
+  <script type="module" src="/src/support/main.ts"></script>
+</body>
+</html>

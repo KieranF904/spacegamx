@@ -20,6 +20,8 @@ import type { PlacedPart, WeaponMods } from './types.js';
 import { buildShot, type ProjectileSpec } from './shot.js';
 import type { WeaponInfo } from './rebuild.js';
 import { dcos, dpow, dsin } from '../math/detTrig.js';
+import { fxDef } from './modifiers/fxDef.js';
+import type { GunFx } from './modifiers/types.js';
 
 export interface LaunchShape {
   speedScale: number;
@@ -160,11 +162,57 @@ export function gunRate(tuning: ShipTuning, kind: string, grade: number | undefi
  * (`model`: its function's weaponMods, WeaponInfo.model) is its own instead:
  * its kind's with its model's changes, then its gems and ammunition. Each step
  * is cached, so the same gun gets the same object every time.
+ *
+ * Last, a shot's live weapon modifier effects (`gunFx`: the gun's, PortsMods.gunFx[part]; `fx`: the shot's mask of
+ * them): modifiers/fxDef.ts. This is the one place a shot's tuning meets its effects: every end that works out a
+ * shell or a beam (the server's spawn, a client's volley, a hit's derivation) comes through here with the same two.
  */
-export function gunDef(tuning: ShipTuning, kind: string, gun: { grade?: number; size?: number; mods?: WeaponMods; ammo?: WeaponMods; model?: WeaponMods }): WeaponTuning {
+export function gunDef(tuning: ShipTuning, kind: string, gun: { grade?: number; size?: number; mods?: WeaponMods; ammo?: WeaponMods; model?: WeaponMods; gunFx?: readonly GunFx[]; fx?: number; child?: boolean }): WeaponTuning {
   const base = weaponDef(tuning, kind);
-  if (gun.model) return moddedDef(moddedDef(moddedDef(base, gun.model), gun.mods), gun.ammo);
-  return moddedDef(moddedDef(moddedDef(moddedDef(base, gun.mods), gun.ammo), gradeMods(tuning, kind, gun.grade)), sizeMods(base, gun.size));
+  const def = gun.model ? moddedDef(moddedDef(moddedDef(base, gun.model), gun.mods), gun.ammo)
+    : moddedDef(moddedDef(moddedDef(moddedDef(base, gun.mods), gun.ammo), gradeMods(tuning, kind, gun.grade)), sizeMods(base, gun.size));
+  // (`child`: a shot the gun's shot broke into, a Prism's shard: the gun's effects but for the volley's own)
+  return gun.fx ? fxDef(def, tuning.modifiers, gun.gunFx, gun.fx, gun.child) : def;
+}
+
+/** A ship's gun's weapon modifier effects (its ports layout's: power/portsMods.ts), or undefined */
+export function shipGunFx(ship: Pick<ShipState, 'derived'>, part: number): readonly GunFx[] | undefined {
+  return ship.derived.ports?.mod?.gunFx[part];
+}
+
+/**
+ * The tuning one of a ship's guns fires a shot with: gunDef from the ship (its part's mods, the gun's grade, size and
+ * model), the shot's ammunition and augment mods (`ammo`) and its effect mask (`fx`). A beam's too (`fx` its live mask)
+ */
+export function shipGunDef(tuning: ShipTuning, ship: Pick<ShipState, 'derived' | 'blueprint'>, w: WeaponInfo, ammo?: WeaponMods, fx?: number): WeaponTuning {
+  return gunDef(tuning, w.kind, { mods: ship.blueprint.parts[w.part]?.mods, ammo, grade: w.grade, size: w.size, model: w.model, gunFx: fx ? shipGunFx(ship, w.part) : undefined, fx });
+}
+
+// ---------------------------------------------------------------------------
+// A shell's gun as a number: what a fire event's part field carries, and what a shell keeps (Projectile.gun, a
+// projectile row's data[10]) for its hits to be worked out from (hitRules.ts gunShell):
+//   part + 256 × ammunition code + 65536 × augmented + 131072 × effect mask (0..15) + 2097152 × place
+// `place` (the shell's place in its volley) only on a shell whose share of the shot depends on it (a split's:
+// burstShare), never in a fire event (the ids' order says it). Without a mask or a place, the number it always was.
+// ---------------------------------------------------------------------------
+
+export function gunCode(part: number, ammo = 0, aug = false, fx = 0, place = 0): number {
+  return part + 256 * ammo + (aug ? 65536 : 0) + 131072 * (fx & 15) + 2097152 * place;
+}
+export const gunCodePart = (gun: number): number => gun % 256;
+export const gunCodeAmmo = (gun: number): number => Math.floor(gun / 256) % 256;
+export const gunCodeAug = (gun: number): boolean => Math.floor(gun / 65536) % 2 === 1;
+export const gunCodeFx = (gun: number): number => Math.floor(gun / 131072) % 16;
+export const gunCodePlace = (gun: number): number => Math.floor(gun / 2097152);
+
+/** A volley's shell's gun code: the volley's (a fire event's part field), with its place when its def shares the shot by place */
+export function shellGunCode(gun: number, def: WeaponTuning, place: number): number {
+  return def.burstShare && gun >= 0 ? gun % 2097152 + 2097152 * place : gun;
+}
+
+/** A shell's share of its shot's damage by its place in the volley (1 unless a split's: burstShare) */
+export function burstShareOf(def: WeaponTuning, place: number): number {
+  return def.burstShare ? def.burstShare[Math.min(place, def.burstShare.length - 1)] ?? 1 : 1;
 }
 
 /** The tuning one gun fires with: its kind's, with the part's mods, and its model's or its grade's and size's (from its WeaponInfo) when given */
@@ -260,6 +308,8 @@ export interface FireRecord {
   ammo?: number;
   /** A ports ship's augmented shot (its gun's augment mods, power/ports.ts augMods, go on top) */
   aug?: 1;
+  /** The weapon modifier effects live on it: a mask over the gun's own (PortsMods.gunFx[part]); absent: none */
+  fx?: number;
   /** Its aim offset, in SHOT_AIM_STEPS */
   aimQ: number;
   /** The shells' entity ids, in spawn order */
@@ -274,24 +324,26 @@ export interface FirePose { x: number; y: number; angle: number; vx: number; vy:
  * A fire event's shells, from the firing ship (its structure) and its pose
  * and velocity on that tick. Null if the ship has no such weapon.
  */
-export function rebuildVolley(rec: FireRecord, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; shells: Launched[] } | null {
+export function rebuildVolley(rec: FireRecord, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; def: WeaponTuning; shells: Launched[] } | null {
   const v = fireVolley(rec, ship, pose, tuning);
   if (!v || v.shells.length !== rec.ids.length) return null;
-  return { kind: v.kind, turret: v.turret, shells: v.shells.map((s, i) => ({ ...s, id: rec.ids[i] })) };
+  return { kind: v.kind, turret: v.turret, def: v.def, shells: v.shells.map((s, i) => ({ ...s, id: rec.ids[i] })) };
 }
 
 /**
  * A volley's shells (without ids) from what fired it: the gun (`part`), its tick, aim and ammunition, the firing ship's
- * structure and its pose that tick. What a fire event (a record, or the step's own: sim/guns.ts) comes to on every end
+ * structure and its pose that tick. What a fire event (a record, or the step's own: sim/guns.ts) comes to on every end.
+ * `def`: the tuning the shells fly and hit with (the shot's ammunition, augment and effects on it)
  */
-export function fireVolley(rec: Omit<FireRecord, 'ids'>, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; w: WeaponInfo; shells: Omit<Launched, 'id'>[] } | null {
+export function fireVolley(rec: Omit<FireRecord, 'ids'>, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; w: WeaponInfo; def: WeaponTuning; shells: Omit<Launched, 'id'>[] } | null {
   const w = ship.derived.weapons.find((x) => x.part === rec.part);
   if (!w) return null;
   const aim = [...ship.aim];
   aim[rec.part] = rec.aimQ / SHOT_AIM_STEPS;
   const shot = buildShot(w, { ...ship, aim }, pose, rec.tick, tuning);
-  const shells = volleyShells(rec.owner, ship, w, shot, pose, rec.tick, tuning, stackMods(ammoByCode(rec.ammo ?? 0)?.mods, rec.aug ? ship.derived.ports?.augMods[rec.part] : undefined));
-  return { kind: w.kind, turret: shot.mount === 'turret', w, shells };
+  const mods = stackMods(ammoByCode(rec.ammo ?? 0)?.mods, rec.aug ? ship.derived.ports?.augMods[rec.part] : undefined);
+  const shells = volleyShells(rec.owner, ship, w, shot, pose, rec.tick, tuning, mods, rec.fx);
+  return { kind: w.kind, turret: shot.mount === 'turret', w, def: shipGunDef(tuning, ship, w, mods, rec.fx), shells };
 }
 
 /** The code of a crate whose mods these are (0: none, or not a crate's): a pilot's client knows its rounds by their mods */
@@ -302,8 +354,8 @@ export function ammoCodeOfMods(mods: WeaponMods | undefined): number {
 }
 
 /** A volley's shells (without entity ids), in spawn order: a burst's fanned extras, then the main shell */
-export function volleyShells(owner: number, ship: ShipState, w: WeaponInfo, shot: ProjectileSpec, pose: FirePose, tick: number, tuning: ShipTuning, ammo?: WeaponMods): Omit<Launched, 'id'>[] {
-  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[w.part]?.mods, ammo, grade: w.grade, size: w.size, model: w.model });
+export function volleyShells(owner: number, ship: ShipState, w: WeaponInfo, shot: ProjectileSpec, pose: FirePose, tick: number, tuning: ShipTuning, ammo?: WeaponMods, fx?: number): Omit<Launched, 'id'>[] {
+  const def = shipGunDef(tuning, ship, w, ammo, fx);
   const shape = { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret' };
   const uid = ship.blueprint.parts[w.part]?.uid ?? w.part;
   return volleyAngles(def, shot.angle).map((a, i) => {

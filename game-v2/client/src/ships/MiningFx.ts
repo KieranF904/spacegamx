@@ -20,7 +20,7 @@
 import type { Graphics } from 'pixi.js';
 import { pulseIntensity, mineFalloff, type PulseProfile } from '@space-game/common';
 import type { BeamLook } from '../rendering/weapons/weaponStyles';
-import { drawCone, drawStrands, sputterGain } from './beamLookFx';
+import { drawCone, drawStrands, softGlow, sputterGain } from './beamLookFx';
 import { AnchorList, rideStep, type ImpactAnchor, type PoseSource } from '../rendering/weapons/impactAnchor';
 
 const OUTER = 0x0284c7, MID = 0x4fc3f7, CORE = 0xe6f8ff;
@@ -117,7 +117,7 @@ export class MiningFx {
     line(Math.max(1.4, w * (0.35 + 0.35 * k)), COREC, (0.45 + 0.5 * k) * env * (0.3 + 0.7 * Math.max(0, Math.min(1, power))));
     if (look?.braid) drawStrands(g, x, y, ux, uy, Math.min(len, full), w, look.braid.strands, look.braid.color, lvl, now / 60, key);
     // Its muzzle: a steady glow
-    g.circle(x, y, w * (1.3 + 1.1 * k)).fill({ color: MIDC, alpha: 0.38 * lvl });
+    softGlow(g, x, y, w * (1.7 + 1.4 * k), MIDC, lvl);
     g.circle(x, y, w * (0.55 + 0.4 * k)).fill({ color: COREC, alpha: (0.5 + 0.4 * k) * env });
 
     // Rings drawing in along it, fading in while it cuts and out when it doesn't

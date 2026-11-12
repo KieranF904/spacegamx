@@ -229,12 +229,13 @@ export class Mobs {
   /**
    * A pilot's shot this tick, from (x0, y0) to (x1, y1): the first mob it
    * meets, and how far along (0..1). Their owner's side's shots pass through.
+   * `skip`: mobs the shot has been through already (game/Weapons.ts exclusions).
    */
-  rayHit(systemNum: number, x0: number, y0: number, x1: number, y1: number, pad = 0): { eid: number; t: number } | null {
+  rayHit(systemNum: number, x0: number, y0: number, x1: number, y1: number, pad = 0, skip?: Set<number>): { eid: number; t: number } | null {
     let best: { eid: number; t: number } | null = null;
     const dx = x1 - x0, dy = y1 - y0, len2 = dx * dx + dy * dy || 1;
     for (const m of this.live.values()) {
-      if (InSystem.systemId[m.eid] !== systemNum) continue;
+      if (InSystem.systemId[m.eid] !== systemNum || skip?.has(m.eid)) continue;
       const cx = Position.x[m.eid], cy = Position.y[m.eid], r = m.def.radius + pad;
       if (!segmentNearCircle(x0, y0, x1, y1, cx, cy, r)) continue;
       const t = Math.max(0, Math.min(1, ((cx - x0) * dx + (cy - y0) * dy) / len2));

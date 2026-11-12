@@ -131,6 +131,8 @@ export class Renderer {
   get showDamageNumbers(): boolean { return this.damageNumbers.visible; }
   set showDamageNumbers(v: boolean) { this.damageNumbers.visible = v; }
   public showNames = true;
+  /** Where your cursor is in the world (null: no ship of yours to aim from); a bunch of ships names the one under it (ships/render/labelCrowd.ts) */
+  public pointerWorld: (() => { x: number; y: number } | null) | null = null;
   
   /** The star (plasma, drawn at a share of the screen's resolution: sun/SunRenderer.ts) */
   readonly sun: SunRenderer;
@@ -662,6 +664,16 @@ export class Renderer {
   /** Smoke or sparks off a gun that is reloading (WeaponFx.vent) */
   ventPuff(x: number, y: number, angle: number, kind: 'smoke' | 'spark', color: number): void {
     this.weaponFx.vent(x, y, angle, kind, color);
+  }
+
+  /** A gun's detonation that may be a weapon modifier's blast (WeaponFx.modBlast) */
+  modBlast(kind: string, x: number, y: number, radius: number, out?: number): void {
+    this.weaponFx.modBlast(kind, x, y, radius, out);
+  }
+
+  /** A chain modifier's arc between two hulls (WeaponFx.chainArc) */
+  chainArc(x0: number, y0: number, x1: number, y1: number, k: number): void {
+    this.weaponFx.chainArc(x0, y0, x1, y1, k);
   }
 
   /** The server reported where a projectile hit: stop its tracer there and throw sparks. */

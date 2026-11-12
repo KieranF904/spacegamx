@@ -80,6 +80,7 @@ export class JumpFx {
     window.addEventListener('resize', resize);
 
     this.hud = document.createElement('div');
+    this.hud.className = 'sg-jump-hud';
     this.hud.style.cssText = `position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%); width: 360px; display: none;
       font: 600 10px 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.5px; color: #9fd8ff; text-align: center; pointer-events: none; z-index: 900;`;
     this.hudText = document.createElement('span');

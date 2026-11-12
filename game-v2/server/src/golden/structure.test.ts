@@ -87,8 +87,9 @@ describe('structure pins', () => {
     const server = makeServer({ clock: () => 1_000_000 });
     const types = server.handledMessageTypes().sort();
     // (103: trainingDrone went with protocol 68, nothing sent it; convertGuest came with the guest accounts. 108: the pickup
-    // panel's lootTake, the hold's ghost and ghostTemplate, mining mode's pickupPrefs and oreBlacklist: docs/design/loot-pickup-2026-11.md. 109: fieldOrder, the fabricator's priority and hold lists)
-    expect(types.length).toBe(109);
+    // panel's lootTake, the hold's ghost and ghostTemplate, mining mode's pickupPrefs and oreBlacklist: docs/design/loot-pickup-2026-11.md. 109: fieldOrder, the fabricator's priority and hold lists.
+    // 110: the gun range's gunRangeShip, docs/design/weapon-modifiers-2026-11.md (its rooms are changed at their doors, by interact))
+    expect(types.length).toBe(110);
     pin('clientMessages.json', types);
   }, 120_000);
 

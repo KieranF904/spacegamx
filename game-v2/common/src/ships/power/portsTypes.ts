@@ -127,6 +127,8 @@ export interface PortsLayout {
   /** Per part: its augment's mods (what an augmented shot adds) and name, or undefined */
   augMods: readonly (WeaponMods | undefined)[];
   augName: readonly (string | undefined)[];
+  /** Weapon modifiers (portsMods.ts): absent on a ship with no mounts */
+  mod?: import('../modifiers/types.js').PortsMods;
   /** Weapons: the damage x its infrastructure tier gives it (FunctionDef.infra) */
   tierDmg: Float64Array;
   /** Tools: 1 for a shield generator */

@@ -59,18 +59,37 @@ export function validateSystems(v: V): void {
       if (isObj(ar.outside) && isObj(ar.centre) && typeof ar.radius === 'number' && dhypot(ar.outside.x - ar.centre.x, ar.outside.y - ar.centre.y) <= ar.radius + 100) c.err(`${P}.arena.outside`, 'inside the arena: a pilot put out would be put back in', F);
       if (ar.barrier !== undefined && (!Array.isArray(ar.barrier) || ar.barrier.length !== 2 || ar.barrier.some((p: unknown) => !Array.isArray(p) || p.length !== 2))) c.err(`${P}.arena.barrier`, 'two points, [[x, y], [x, y]]', F);
     }
-    // The gun range: a private, empty system; its spawn and target on the chamber's floor, its target a real faction's
+    // The gun range: a private, empty system of rooms; each room's spawn and targets on its floor, a target a real
+    // faction's ship or a mob (never both, never neither), the rooms' ids each their own
     const gr = s?.gunRange;
-    if (isObj(gr) && isObj(gr.spawn) && Array.isArray(gr.targets) && isObj(gr.centre)) {
+    if (isObj(gr) && Array.isArray(gr.rooms)) {
       if (!s.private) c.err(`${P}.gunRange`, 'a gun range must be `private` (never on the galaxy map, reached only from a station)', F);
       if (list(s.portals).length || list(s.stations).length) c.err(`${P}.gunRange`, 'a gun range has no gates and no stations of its own', F);
-      const inside = (x: number, y: number) => Math.abs(x - gr.centre.x) < gr.width / 2 && Math.abs(y - gr.centre.y) < gr.height / 2;
-      if (!inside(gr.spawn.x, gr.spawn.y)) c.err(`${P}.gunRange.spawn`, 'outside the chamber', F);
-      if (!gr.targets.length) c.err(`${P}.gunRange.targets`, 'a gun range needs at least one target', F);
-      gr.targets.forEach((t: any, k: number) => {
-        if (!isObj(t)) return;
-        if (!inside(t.x, t.y)) c.err(`${P}.gunRange.targets[${k}]`, 'outside the chamber', F);
-        faction(F, `${P}.gunRange.targets[${k}].faction`, t.faction);
+      if (!gr.rooms.length) c.err(`${P}.gunRange.rooms`, 'a gun range needs at least one room', F);
+      const ids = new Set<string>();
+      gr.rooms.forEach((room: any, j: number) => {
+        const R = `${P}.gunRange.rooms[${j}]`;
+        if (!isObj(room) || !isObj(room.spawn) || !Array.isArray(room.targets) || !isObj(room.centre)) return;
+        if (ids.has(room.id)) c.err(`${R}.id`, `"${room.id}" is another room's id`, F);
+        ids.add(room.id);
+        const inside = (x: number, y: number) => Math.abs(x - room.centre.x) < room.width / 2 && Math.abs(y - room.centre.y) < room.height / 2;
+        if (!inside(room.spawn.x, room.spawn.y)) c.err(`${R}.spawn`, 'outside the chamber', F);
+        // Its doors: one exit; any other leads to another room of this range, which has a door back
+        const doors: any[] = list(room.doors).filter(isObj);
+        if (doors.filter((d) => d.to === 'exit').length !== 1) c.err(`${R}.doors`, 'a room has exactly one door `to` "exit"', F);
+        doors.forEach((d, k) => {
+          if (d.to === 'exit') return;
+          const other = gr.rooms.find((x: any) => isObj(x) && x.id === d.to);
+          if (!other || other === room) c.err(`${R}.doors[${k}].to`, `"${d.to}" is not another room of this range (or "exit")`, F);
+          else if (!list(other.doors).some((x: any) => isObj(x) && x.to === room.id)) c.err(`${R}.doors[${k}].to`, `room "${d.to}" has no door back to "${room.id}"`, F);
+        });
+        if (!room.targets.length) c.err(`${R}.targets`, 'a room needs at least one target', F);
+        room.targets.forEach((t: any, k: number) => {
+          if (!isObj(t)) return;
+          if (!inside(t.x, t.y)) c.err(`${R}.targets[${k}]`, 'outside the chamber', F);
+          if (!!t.mob === !!t.ship) c.err(`${R}.targets[${k}]`, 'a target is a `ship` (with its `faction`) or a `mob`, one of the two', F);
+          if (t.ship) faction(F, `${R}.targets[${k}].faction`, t.faction);
+        });
       });
     }
     // A den's features: its vents' cycle takes each vent once; a cache's crust is a material, its loot items

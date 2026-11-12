@@ -76,6 +76,8 @@ export interface HitDone {
   dealt: number;
   ignite: number;
   igniteTicks: number;
+  /** A spreading fire's (a Burn modifier's: tuning.ts ignite.fire): the `gen` its ignite carries, 1 */
+  igniteGen?: number;
   fx: HitEndFx | null;
   at: [number, number];
   /** It found this one itself (else the server's record) */
@@ -180,7 +182,7 @@ export class ConfirmedHits {
       this.stats.own++;
       this.pending.push({
         shell: o.shell, target: o.target, part: o.part, tick: o.tick, owner: s.owner, glancing: d.glancing, gone: d.gone, dealt: d.dealt,
-        ignite: d.ignite, igniteTicks: sh.def.ignite?.ticks ?? 0, fx: d.fx, at: [Math.round(o.x * 10) / 10, Math.round(o.y * 10) / 10], own: true,
+        ignite: d.ignite, igniteTicks: sh.def.ignite?.ticks ?? 0, igniteGen: sh.def.ignite?.fire ? 1 : undefined, fx: d.fx, at: [Math.round(o.x * 10) / 10, Math.round(o.y * 10) / 10], own: true,
         undo: d.part >= 0 ? this.undoOf(o.target, ship, d.part, before[d.part]) : null, prev: passes,
       });
     }
@@ -338,7 +340,7 @@ export class ConfirmedHits {
     if (r.ignite !== undefined) ignite = r.ignite;
     return {
       shell: r.shell, target: r.target, part: r.part, tick, owner: s.owner, glancing: r.glancing, gone: r.gone, dealt, ignite,
-      igniteTicks: sh.def.ignite?.ticks ?? 0, fx: hitEndFx(sh.kind, sh.def, r.gone), at, own: false, undo, prev: passes,
+      igniteTicks: sh.def.ignite?.ticks ?? 0, igniteGen: sh.def.ignite?.fire ? 1 : undefined, fx: hitEndFx(sh.kind, sh.def, r.gone), at, own: false, undo, prev: passes,
     };
   }
 
@@ -350,7 +352,7 @@ export class ConfirmedHits {
       if (d.gone) out.gone.push(d.shell);
       if (d.undo) out.ships.add(d.target);
       out.msgs.push({ type: 'projectileHit', id: d.shell, x: d.at[0], y: d.at[1] });
-      if (d.ignite >= 0 && d.igniteTicks) out.msgs.push({ type: 'ignite', bodyId: d.target, part: d.ignite, ticks: d.igniteTicks });
+      if (d.ignite >= 0 && d.igniteTicks) out.msgs.push(d.igniteGen ? { type: 'ignite', bodyId: d.target, part: d.ignite, ticks: d.igniteTicks, gen: d.igniteGen } : { type: 'ignite', bodyId: d.target, part: d.ignite, ticks: d.igniteTicks });
       if (d.fx) out.msgs.push({ type: 'detonation', kind: d.fx.kind, x: Math.round(d.at[0]), y: Math.round(d.at[1]), radius: d.fx.radius });
       const key = `${d.target},${d.owner},${d.glancing ? 1 : 0}`;
       const e = sums.get(key);

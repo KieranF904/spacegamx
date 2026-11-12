@@ -1,7 +1,7 @@
 /**
  * @contract client.ships.build-keys
  * owns:       the keys both build editors add on top of the game's key table: Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo and M for
- *             symmetry, caught before the game's own handlers (M is the system map there, and the table only passes a key's code)
+ *             symmetry, caught before the game's own handlers (M is a quick bar key there, and the table only passes a key's code)
  * needs:      DOM window keydown events
  * invariants: the three keys are told apart from plain letters and from typing in a text box — client/src/ships/build/buildKeys.test.ts
  * extend:     a new editor-wide key is one more case in buildKeyAction() and one more member of BuildKeyActions

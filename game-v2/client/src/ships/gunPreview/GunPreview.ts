@@ -20,7 +20,7 @@ import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { EntityType, type Catalog } from '@space-game/common';
 import { WeaponFx, type ShellLook } from '../../rendering/weapons/WeaponFx';
 import { beamLook, weaponStyle } from '../../rendering/weapons/weaponStyles';
-import { drawCone, drawStrands } from '../beamLookFx';
+import { drawBeamBody, drawCone, drawEmitter, drawShaft, drawStrands, fanWidth, ignition, softGlow } from '../beamLookFx';
 import { PROFILES, type QualityTier } from '../../settings/quality';
 import { settings } from '../../settings/Settings';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
@@ -34,6 +34,7 @@ import { BLOCK_ID, BlockTarget, DEFAULT_SPEC, blockSpec, type HitDamage } from '
 import { BlockArt } from './blockArt';
 import { PREVIEW_H, PREVIEW_W, frame as frameFor, type Framing } from './framing';
 import { SupportFx } from './supportFx';
+import { modBeam, type ModFx } from '../../rendering/weapons/fx/mods';
 
 export { PREVIEW_W, PREVIEW_H };
 /** A hurt wall a Repair Beam mends starts at this share of its HP, and the least it mends a tick */
@@ -82,6 +83,8 @@ export class GunPreview {
   private clock: FireClock | null = null;
   private rows: Row[] = [];
   private looks = new Map<number, ShellLook>();
+  /** Modifier effects the gun is shown with (each an effect id and a strength): its shells' and its beam's layers (fx/mods) */
+  modFx: readonly ModFx[] | undefined;
   private support = new SupportFx();
   private pdFired = false;
   /** The view's room behind the muzzle and across */
@@ -93,6 +96,8 @@ export class GunPreview {
   private acc = 0;
   private salvo: { at: number; n: number }[] = [];
   private beamFrame = 0;
+  /** Seconds the held beam has been lit (its emitter's ignition) */
+  private beamOn = 0;
   private visible = false;
   private seed = 1;
   private readonly state = {
@@ -298,7 +303,7 @@ export class GunPreview {
       id, type: EntityType.Projectile, x: 0, y: 0, angle: off, vx: ux * v, vy: uy * v, renderX: 0, renderY: 0, renderAngle: off,
       hp: 1, maxHp: 1, data: [p.type, 1, 30, this.tick, 4, 0, PLAYER, p.size, 0, p.lob ? this.tick + ticks : 0], spawnX: 0, spawnY: 0, spawnTick: this.tick,
     } as unknown as InterpolatedEntity;
-    this.looks.set(id, { model: p.model, damage: p.damage, splash: p.splash, life });
+    this.looks.set(id, { model: p.model, damage: p.damage, splash: p.splash, life, fx: this.modFx });
     this.rows.push({ id, e, born: this.tick, end: this.tick + (p.lob || p.tracked ? ticks : life), v: p.tracked ? Math.max(1, p.speed) : v, ux, uy });
   }
 
@@ -351,7 +356,8 @@ export class GunPreview {
       // (a beam burns the first block on its line each tick; a Repair Beam mends it)
       if (p.beam && p.support !== 'pd') {
         const a = this.beamLevel(p);
-        if (a > 0) this.blocks.beam(p.support === 'repair' ? -Math.max(p.perTick, MIN_MEND) : p.perTick * a, fr.farX);
+        if (a > 0 && p.beamFan && !p.support) for (let r = 0; r < p.beamFan.off.length; r++) this.blocks.beam(p.perTick * a * p.beamFan.share[r], fr.farX, fr.farX * Math.tan(p.beamFan.off[r]));
+        else if (a > 0) this.blocks.beam(p.support === 'repair' ? -Math.max(p.perTick, MIN_MEND) : p.perTick * a, fr.farX);
       }
       this.stepRows();
     }
@@ -365,7 +371,8 @@ export class GunPreview {
     this.kick = Math.max(0, this.kick - (deltaMS / 16.667) * RECOIL_RETURN);
     this.gun.position.set(this.kick > 0 ? -RECOIL * (this.art?.back ?? 60) * 0.5 * this.kick * this.kick : 0, 0);
     const frames = Math.min(4, deltaMS / 16.667);
-    fx.update(this.state, frames, this.tick, this.tick);
+    // (WeaponFx.update takes seconds, as the Renderer gives it)
+    fx.update(this.state, frames / 60, this.tick, this.tick);
     if (this.parts) { this.parts.begin(); this.parts.draw(frames); this.parts.end(); }
   }
 
@@ -389,7 +396,7 @@ export class GunPreview {
     const g = this.beamG, fr = this.fr!;
     g.clear();
     this.beamFrame += deltaMS / 16.667;
-    if (!this.clock!.lit()) return;
+    if (!this.clock!.lit()) { this.beamOn = 0; return; }
     const look = beamLook(p.model);
     const [outer, mid, core] = [look?.outer, look?.mid, look?.core].every((c) => c !== undefined)
       ? [look!.outer!, look!.mid!, look!.core!] : BEAM_COLORS[p.color ?? ''] ?? DEFAULT_BEAM;
@@ -398,17 +405,26 @@ export class GunPreview {
     else a = 0.85 + 0.15 * Math.sin(this.beamFrame * 0.6);
     if (a < 0.02) return;
     const wid = Math.max(6, Math.min(34, p.width * (look?.width ?? 1) * (p.pulse ? a : 1)));
-    // (to the first block's face; past the wall once it is gone, to the gun's reach if that is nearer)
-    const hitX = this.blocks.beamEnd(fr.farX);
-    const x0 = 0, x1 = hitX ?? Math.min(fr.reach || fr.farX + 120, fr.farX + 120), ux = 1, uy = 0;
-    if (look?.cone) drawCone(g, x0, 0, ux, uy, Math.min(x1 - x0, look.coneLen ?? x1 - x0), look.cone, mid, 0.22 * a);
-    g.moveTo(x0, 0).lineTo(x1, 0).stroke({ color: outer, width: wid * 1.9, alpha: 0.28 * a });
-    g.moveTo(x0, 0).lineTo(x1, 0).stroke({ color: mid, width: wid, alpha: 0.7 * a });
-    g.moveTo(x0, 0).lineTo(x1, 0).stroke({ color: core, width: wid * 0.4, alpha: a });
-    if (look?.braid) drawStrands(g, x0, 0, ux, uy, x1 - x0, wid, look.braid.strands, look.braid.color, a, this.beamFrame / 60, 0);
-    g.circle(x1, 0, wid * 1.3).fill({ color: mid, alpha: 0.35 * a });
-    g.circle(x1, 0, wid * 0.6).fill({ color: core, alpha: 0.8 * a });
-    // (the burn throws its impact off the block it lights: WeaponFx.beamBurn asks surfaceAt for the normal and the target)
-    if (hitX !== null && look?.burn && Math.floor(this.beamFrame) % look.burn.every === 0) this.fx?.beamBurn(x1, 0, 1, 0, PLAYER, look.burn);
+    this.beamOn = p.pulse ? 1 : this.beamOn + deltaMS / 1000;
+    // (A split beam's fan, tuning.ts beamFan: each of its beams from the one muzzle, as wide as its share)
+    const fan = p.beamFan, rays = fan ? fan.off.length : 1, midRay = (rays - 1) >> 1;
+    for (let r = 0; r < rays; r++) {
+      const off = fan ? fan.off[r] : 0, rk = fan ? fanWidth(fan.share, r) : 1, ux = Math.cos(off), uy = Math.sin(off), seed = r * 1.7;
+      // (to the first block's face; past the wall once it is gone, to the gun's reach if that is nearer)
+      const hitX = this.blocks.beamEnd(fr.farX, fr.farX * Math.tan(off));
+      const x0 = 0, x1 = hitX ?? Math.min(fr.reach || fr.farX + 120, fr.farX + 120), y1 = x1 * Math.tan(off), len = Math.hypot(x1 - x0, y1);
+      if (look?.cone) drawCone(g, x0, 0, ux, uy, Math.min(len, look.coneLen ?? len), look.cone, mid, 0.22 * a);
+      // (the game's own body and emitter: ships/beamLookFx.ts, its width the game's measure)
+      const bw = (wid / 1.5) * rk;
+      if (look?.shaft) drawShaft(g, x0, 0, ux, uy, len, bw, look.shaft.spread, look.shaft.color, a, this.beamFrame / 60, seed, look.shaft.dust, hitX !== undefined && hitX !== null);
+      drawBeamBody(g, x0, 0, x1, y1, bw, outer, mid, core, a);
+      if (look?.braid) drawStrands(g, x0, 0, ux, uy, len, wid * rk, look.braid.strands, look.braid.color, a, this.beamFrame / 60, seed);
+      if (r === midRay) drawEmitter(g, x0, 0, ux, uy, bw, mid, core, a, this.beamFrame / 60, 0, ignition(this.beamOn));
+      softGlow(g, x1, y1, bw * 3, mid, 0.9 * a);
+      g.circle(x1, y1, wid * rk * 0.6).fill({ color: core, alpha: 0.8 * a });
+      modBeam(g, this.modFx, x0, 0, x1, y1, bw, a, this.beamFrame / 60, seed, hitX !== null);
+      // (the burn throws its impact off the block it lights: WeaponFx.beamBurn asks surfaceAt for the normal and the target)
+      if (hitX !== null && look?.burn && Math.floor(this.beamFrame) % look.burn.every === 0) this.fx?.beamBurn(x1, y1, ux, uy, PLAYER, look.burn);
+    }
   }
 }

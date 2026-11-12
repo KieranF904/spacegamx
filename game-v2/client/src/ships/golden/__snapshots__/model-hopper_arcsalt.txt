@@ -1,0 +1,42 @@
+== partTip (tooltip) ==
+Arc Salt Hopper
+Mk II · Square · 1 cell
+Hull · mass55 hp · 1.5
+Armour · build2 · 1.6 pts
+Holdsholds 60 Arc Salt for the special modifier that uses it, touching it or joined by pipes; refilled at a station
+
+== partStats (stats rows) ==
+GradeMk II
+Hull · mass55 hp · 1.5
+Armour · build2 · 1.6 pts
+Rating scoretoughness 55
+
+== familyLabel ==
+Modifiers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Feeds an Arc Lattice
+
+== keyStats ==
+hopper
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 14","why":"Unlocks at level 14 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 14","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":54.75,"mass":1.5,"firepower":0,"toughness":54.75,"armour":2}

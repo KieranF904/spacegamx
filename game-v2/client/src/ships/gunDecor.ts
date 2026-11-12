@@ -10,7 +10,8 @@
  *   cannon      Pip a light gun on a dome; Hammer a thick short barrel with a
  *               slotted muzzle brake; Twinlink two linked barrels; Longbarrel
  *               a slim barrel with cooling rings; Bastion a massive armoured
- *               house, fume extractor and brake
+ *               house, fume extractor and brake; Mauler one great open bore in a
+ *               jacket, recoil cylinders either side
  *   autocannon  rotary clusters (3 or 6 barrels in clamps); Stinger a vented shroud
  *   flak        quad barrels with flash hiders, fed from drums
  *   mortar      stubby wide tubes, the bore seen as a dark mouth
@@ -249,6 +250,17 @@ const DESIGNS: Record<string, Design> = {
     g.cyl(b0, m - 0.2 * k, 0, 0.11 * k);
     g.cyl(b0 + (m - b0) * 0.5, b0 + (m - b0) * 0.66, 0, 0.15 * k, true, LT);
     g.brake(m - 0.22 * k, m, 0.2 * k);
+  },
+  // One great bore: a thick barrel in a reinforcing jacket, a recoil cylinder either side, a heavy collar round an open muzzle
+  cannon_mauler: (g) => {
+    const { k, m, b0 } = g, span = m - b0;
+    g.house(-0.32 * k, 0.26 * k, 0.3 * k, 0.1);
+    for (const s of [-1, 1]) g.cyl(b0, b0 + span * 0.5, s * 0.2 * k, 0.035 * k, true, LT);
+    g.cyl(b0, m - 0.06 * k, 0, 0.125 * k);
+    g.cyl(b0, b0 + span * 0.55, 0, 0.16 * k, true, LT);
+    g.band(b0 + span * 0.68, 0, 0.15 * k, 0.06 * k);
+    g.band(m - 0.1 * k, 0, 0.17 * k, 0.1 * k);
+    g.mouth(m - 0.08 * k, 0, 0.13 * k);
   },
   // ---- autocannon: rotary
   autocannon_rattler: (g) => rotary(g, 3, 0.085, 0.03, [0.55, 0.85], 0.24),
@@ -600,7 +612,7 @@ const designOf = (id: GunId): Design => DESIGNS[id.model] ?? DESIGNS[id.family] 
 
 /** How far a fixed gun's barrels reach past its edge (×√cells), by model or family */
 const REACH: Record<string, number> = {
-  cannon_pip: 0.5, cannon_hammer: 0.48, cannon_twinlink: 0.55, cannon_longbarrel: 0.95, cannon_bastion: 0.62,
+  cannon_pip: 0.5, cannon_hammer: 0.48, cannon_twinlink: 0.55, cannon_longbarrel: 0.95, cannon_bastion: 0.62, cannon_mauler: 0.6,
   autocannon_rattler: 0.5, autocannon_chainsaw: 0.6, autocannon_stinger: 0.66, flak_burst: 0.42, flak_cloudmaker: 0.52,
   mortar_lobber: 0.32, mortar_quake: 0.38, laser_glint: 0.45, laser_cutter: 0.38, laser_searchlight: 0.5,
   pulse_strobe: 0.5, pulse_overpulse: 0.6, missile_dart: 0.18, missile_swarm: 0.18, missile_hammerhead: 0.2,

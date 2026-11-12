@@ -6,40 +6,15 @@
  * extend:     a new port consumer's layout case is in partRoles (buildPortsLayout's first phase)
  */
 
-import type { FunctionDef, PlacedPart, Rot, Side, Vec2, WeaponMods } from '../types.js';
-import { SIDE_NORMAL, transformPoint, transformSide } from '../catalog.js';
+import type { FunctionDef, PlacedPart, Side, Vec2, WeaponMods } from '../types.js';
 import { fnOutput, isEngine, partDemand, partSupply } from '../grades.js';
 import { EU, perTick, perTickUp, toEu } from './units.js';
+import { buildPortsMods, portsModsSig } from './portsMods.js';
+import { frameOf, placeEdge, type PartFrame } from './portsFrame.js';
+export { frameOf, placeEdge, type PartFrame } from './portsFrame.js';
 import { MACHINE_FAB, P_INERT, MAT_UNIT, BOOST_DRAW, TOUCH_LINE_RATE, TOUCH_LINE_HOLDS, TPS, TK_STRAFER, TK_GYRO, MACHINE_REF, P_GEN, P_RELAY, P_THRUSTER, P_TOOL, P_WEAPON, P_TANK, P_SELECTOR, P_PIPE, type EdgeSpec, type FeedDef, type PortSpec, type PortsLayout, type PortsLayoutInput, type PortsWeaponInput } from './portsTypes.js';
 
-const SIDE_ORDER: readonly Side[] = ['N', 'E', 'S', 'W'];
 const OPP: Record<Side, Side> = { N: 'S', S: 'N', E: 'W', W: 'E' };
-
-/**
- * The frame a part's ports and feed points are given in: its piece's own (rot, flip), or, for a part with a facing (a gun,
- * an engine), the frame whose N is that facing, so "S" is always its back. `cells` are the part's cells in that frame
- * (the piece's cells, un-placed: a rectangle from its own origin for the rectangular pieces)
- */
-export interface PartFrame { rot: Rot; flip: boolean; cells: Vec2[] }
-export function frameOf(part: PlacedPart, placed: readonly Vec2[]): PartFrame {
-  const rot = (part.facing ? SIDE_ORDER.indexOf(part.facing) : part.rot) as Rot, flip = part.flip, inv = ((4 - rot) % 4) as Rot;
-  const cells: Vec2[] = placed.map((c) => {
-    const p = transformPoint([c[0] - part.x + 0.5, c[1] - part.y + 0.5], inv, false);
-    return [Math.floor(flip ? 1 - p[0] : p[0]), Math.floor(p[1])];
-  });
-  return { rot, flip, cells };
-}
-/** A part's edge point (its frame) placed: the cell it sits on, its side and the cell across, in grid coordinates */
-export function placeEdge(part: PlacedPart, F: PartFrame, side: Side, cell: number): { x: number; y: number; side: Side; nx: number; ny: number } {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const c of F.cells) { if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0]; if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1]; }
-  const k = Math.max(0, cell);
-  const lx = side === 'W' ? x0 : side === 'E' ? x1 : Math.min(x1, x0 + k), ly = side === 'N' ? y0 : side === 'S' ? y1 : Math.min(y1, y0 + k);
-  const c = transformPoint([lx + 0.5, ly + 0.5], F.rot, F.flip);
-  const x = Math.floor(c[0]) + part.x, y = Math.floor(c[1]) + part.y;
-  const ws = transformSide(side, F.rot, F.flip), nrm = SIDE_NORMAL[ws];
-  return { x, y, side: ws, nx: x + nrm[0], ny: y + nrm[1] };
-}
 
 /**
  * A ports layout, in phases (each its own function below, in the order one function ran them, so the layout is the same
@@ -71,6 +46,9 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw,
   };
   L.sig = portsSig(L);
+  // (Weapon modifiers: nothing at all on a ship with no working mount)
+  const mod = buildPortsMods(L, input);
+  if (mod) { L.mod = mod; L.sig = portsModsSig(L.sig, mod); }
   return L;
 }
 
@@ -111,6 +89,8 @@ function partRoles(input: PortsLayoutInput) {
       // (A touch-routed line with no store of its own holds a few ticks' worth, as a Conduit does)
       cap[i] = toEu(i === input.core ? ((tuning as { energy?: { coreCapacity?: number } }).energy?.coreCapacity ?? 240) : (fn.store ?? 0) > 0 ? (fn.store ?? 0) * a * out : TOUCH_LINE_HOLDS * a);
       if (fn.relayOnly || fn.combiner || fn.pipeThrough) { carrier[i] = 1; matCap[i] = (fn.combiner ? 4 : 2) * MAT_UNIT; }
+      // (A mount's reserve for its upkeep: power/portsMods.ts portsModsTick)
+      if (fn.modMount) augCap[i] = toEu(fn.modMount.hold * fn.modMount.sockets.length);
     } else if (fn.tank) {
       role[i] = P_TANK;
       tankFeed[i] = feedIdx(fn.tank.feed);
@@ -120,6 +100,9 @@ function partRoles(input: PortsLayoutInput) {
       role[i] = P_SELECTOR;
     } else if (fn.pipe) {
       role[i] = P_PIPE;
+    } else if (fn.hopper) {
+      // (A hopper's material, in eu: no ports and no role, so it is never power; power/portsMods.ts spends it)
+      cap[i] = toEu(fn.hopper.holds * a);
     } else if (fn.weapon) {
       const w = weaponOf.get(i);
       if (!w) continue;

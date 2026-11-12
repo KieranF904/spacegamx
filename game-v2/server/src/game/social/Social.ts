@@ -58,6 +58,11 @@ export interface SocialHost {
   /** Everyone connected and joined */
   conns(): Iterable<PilotConn>;
   now(): number;
+  /**
+   * A private message to a name that isn't on: is it for an admin writing from the website (game/AdminChat.ts)? True
+   * when it was taken (and the sender shown it as sent); else the usual "offline" answer follows
+   */
+  adminReply?(conn: PilotConn, name: string, text: string): boolean;
 }
 
 const NOTE = '#7dd3fc';
@@ -394,6 +399,8 @@ export class Social {
     if (!this.limit(conn).whisper.take(this.host.now())) return this.host.note(conn, 'Slow down: too many private messages at once.', '#fca5a5');
     // (Appear offline looks exactly like offline: nothing tells the sender otherwise)
     if (!target || this.shown(target) === 'offline') {
+      // (An admin on the website, not in the game: their reply goes to the admin log, never the public feed)
+      if (!target && this.host.adminReply?.(conn, name, body)) return;
       const uid = this.joined.get(conn);
       const known = uid != null ? this.lists.get(uid)?.friends.find((f) => f.name.toLowerCase() === name.toLowerCase()) : undefined;
       return this.host.note(conn, `${known?.name ?? target?.username ?? name} is offline. Private messages only reach pilots who are online.`, NOTE);

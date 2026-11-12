@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Joiner Bank III
+Mk III · Panel · 2 cells
+Hull · mass192 hp · 2.8
+Armour · build3 · 5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Holds300 energy
+Effectscarries 4 weapon effects and 900 treated E a second; over that the weakest effects are dropped and the rest weakened to fit
+
+== partStats (stats rows) ==
+GradeMk III
+Hull · mass192 hp · 2.8
+Armour · build3 · 5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 192
+
+== familyLabel ==
+Batteries
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+Carries four weapon effects
+
+== keyStats ==
+holds 300 · 4 effects
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":2,"hp":191.76,"mass":2.8,"firepower":0,"toughness":191.76,"armour":3,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

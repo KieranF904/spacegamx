@@ -15,8 +15,9 @@ import { FlakAimFx, MAX_AIM_MARKS, type AimMark } from './FlakAimFx';
 import { FxField } from './FxField';
 import { ImpactFx } from './ImpactFx';
 import { MuzzleFx } from './MuzzleFx';
-import { fadeState } from './TracerFx';
+import { TracerFx, fadeState } from './TracerFx';
 import { drawHits } from './hitDraw';
+import { modMarkCount } from './mods';
 import { FADE_FRAMES, FRAG_CAP, HIT_CAP, SMOKE_CAP } from './particleTypes';
 import { weaponStyle } from '../weaponStyles';
 import { Container } from 'pixi.js';
@@ -46,7 +47,7 @@ describe('client.weapon-fx.muzzle', () => {
     owner: 1, spawnX: 0, spawnY: 0, vx: 10, vy: 0, power: 1, size: 1, hot, glow: 0xffffff, pose: undefined,
     style: { muzzle: { size: 10, life: 6, sparks: 0, smoke: 0, color: 0xffaa00 }, casings: 10, heat: { cold: 0xff0000, hot: 0xffffff } },
   });
-  const field = () => ({ flashes: [] as unknown[], sparks: [] as { color: number }[], rings: [] as unknown[], smoke: [] as unknown[], particleKeep: 1 });
+  const field = () => ({ flashes: [] as unknown[], sparks: [] as { color: number }[], rings: [] as unknown[], smoke: [] as unknown[], hitGlows: [] as unknown[], shocks: [] as unknown[], particleKeep: 1 });
   const brass = (spin: number) => {
     const f = field();
     new MuzzleFx(f as never, { onMuzzle: null, barrelTip: null, spinAt: () => spin }).flash(shot(0) as never);
@@ -78,6 +79,71 @@ describe('client.weapon-fx.tracer', () => {
     expect(fadeState(FADE_FRAMES - 1)!.k).toBeCloseTo((FADE_FRAMES - 1) / FADE_FRAMES);
     expect(fadeState(FADE_FRAMES)).toBeNull();
     expect(fadeState(FADE_FRAMES + 5)).toBeNull();
+  });
+});
+
+describe('the Mauler reads as a cannon, not a rocket', () => {
+  const style = weaponStyle(WeaponType.Cannon, 1, 'cannon_mauler');
+
+  it('its shell is a slug on long straight trails, none of them a motor\'s: no smoke (trail, sweep, flying cloud), no tapering flame, no wobble', () => {
+    expect(style.shell?.kind).toBe('slug');
+    expect(style.trail).toBeUndefined();
+    expect(style.sweep).toBeUndefined();
+    expect(style.smokeCloud?.fly).toBeFalsy();
+    expect(style.taper).toBeFalsy();
+    expect(style.wobble).toBeUndefined();
+    expect(style.motion).toBe('linear');
+    // (its trails: a long tracer, a thin line left down its path, ripples and shed flecks)
+    expect(style.tracerTicks).toBeGreaterThanOrEqual(8);
+    expect(style.contrail!.size).toBeLessThanOrEqual(3);
+    expect(style.ripple).toBeDefined();
+    expect(style.drip).toBeDefined();
+  });
+
+  it('a shell in flight makes no smoke, and its ripples and flecks stay few however long it flies', () => {
+    const f = new FxField(new Container());
+    for (const pool of [f.glow, f.smokeG, f.extraG, f.hitG]) vi.spyOn(pool, 'take').mockImplementation((() => {}) as never);
+    const band = vi.spyOn(f, 'band').mockImplementation((() => {}) as never);
+    const tracer = new TracerFx(f, { guideTo: null, state: null });
+    const shot = {
+      id: 1, owner: 1, style, size: 2, dim: 1, arc: 0, glow: 0xff9a30, phase: 0.3, hot: 0, pulse: 0, fading: null, ended: false,
+      head: { x: 100, y: 0 }, tail: { x: 60, y: 0 }, vx: 20, vy: 0, ctX: NaN, ctY: NaN, t: 5, spawnTick: 0, endTick: 0, endAt: Infinity,
+    };
+    let ripples = 0, flecks = 0, segs = 0;
+    for (let i = 0; i < 200; i++) {
+      shot.head.x += 20; shot.tail.x += 20;
+      band.mockClear();
+      tracer.drawAll(new Map([[1, shot as never]]), i, 1);
+      // (aged as the field would age them: drawParticles and drawLayered are not run here)
+      for (const list of [f.shocks, f.sparks] as { life: number; max: number }[][]) for (let k = list.length - 1; k >= 0; k--) if (++list[k].life >= list[k].max) list.splice(k, 1);
+      ripples = Math.max(ripples, f.shocks.length); flecks = Math.max(flecks, f.sparks.length); segs = Math.max(segs, band.mock.calls.length);
+    }
+    expect(f.smoke).toHaveLength(0);
+    expect(ripples).toBeGreaterThan(0);
+    expect(ripples).toBeLessThanOrEqual(4);
+    expect(flecks).toBeGreaterThan(0);
+    expect(flecks).toBeLessThanOrEqual(32);
+    // (the line left down its path: a segment a frame, each gone after the contrail's life)
+    expect(segs).toBeGreaterThan(0);
+    expect(segs).toBeLessThanOrEqual(style.contrail!.life);
+    // (every trail segment lies on the shell's own line: straight)
+    expect(band.mock.calls.every((c) => c[1] === 0 && c[3] === 0)).toBe(true);
+    expect(f.glow.take).toHaveBeenCalled();
+    expect(f.extraG.take).toHaveBeenCalled();
+  });
+
+  it('its muzzle is a heavy gun\'s blast: a flash, pressure rings, smoke at the bore and sparks', () => {
+    expect(style.blast).toBe('heavy');
+    const f = new FxField(new Container());
+    new MuzzleFx(f, { onMuzzle: null, barrelTip: null, spinAt: null }).flash({ owner: 1, spawnX: 0, spawnY: 0, vx: 20, vy: 0, power: 1, size: 2, hot: 0, glow: 0xff9a30, style } as never);
+    expect(f.flashes).toHaveLength(1);
+    expect(f.shocks.length).toBeGreaterThanOrEqual(2);
+    expect(f.smoke.length).toBeGreaterThan(8);
+    expect(f.sparks.length).toBeGreaterThan(8);
+    expect(f.hitGlows.length).toBeGreaterThan(0);
+    // (within the pool's budgets, as the other heavy guns)
+    expect(f.smoke.length).toBeLessThan(40);
+    expect(f.sparks.length).toBeLessThan(40);
   });
 });
 
@@ -161,6 +227,26 @@ describe('client.weapon-fx.impact and particles', () => {
     expect(frags[0].id).toBeGreaterThan(0);                 // the first went
     expect(frags.some((x) => x.id === FRAG_CAP - 1)).toBe(true); // the newest old one is still there
     expect(frags[frags.length - 1].id).toBeUndefined();     // and the new ones are at the end
+  });
+
+  it('a plain shell\'s hit leaves no modifier\'s blast; a blast told alone adds a ring and one hanging mark, and no ring past HIT_CAP', () => {
+    const real = () => new FxField(new Container());
+    const impact = (f: FxField) => new ImpactFx(f, { surfaceAt: null, sounds: null, state: null } as never);
+    // (an unmodified slug: its own layers only, nothing hanging after)
+    const a = real();
+    impact(a).at({ style: weaponStyle(WeaponType.Cannon), size: 1, power: 1, vx: 10, vy: 0, owner: 1, id: 1, glow: 0xffffff, splash: 0 } as never, 0, 0);
+    expect(modMarkCount(a)).toBe(0);
+    const b = real();
+    impact(b).blast(0, 0, 30);
+    expect(b.shocks.some((s) => s.size === 30)).toBe(true);
+    expect(modMarkCount(b)).toBe(1);
+    // (a way out of a hull: its heading given, a second mark of its own)
+    impact(b).blast(400, 0, 30, 1);
+    expect(modMarkCount(b)).toBe(2);
+    const c = real();
+    c.shocks.push(...new Array(HIT_CAP).fill({ x: 0, y: 0, life: 0, max: 1, size: 1, width: 1, color: 0 }));
+    impact(c).blast(0, 0, 30);
+    expect(c.shocks).toHaveLength(HIT_CAP);
   });
 });
 

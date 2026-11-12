@@ -1,9 +1,9 @@
 /**
  * @contract client.damage.flak-burst
  * owns:       the maths of a flak burst's fragmentation: how many fragments a quality tier throws, where each one flies (a
- *             ring of streaks that end exactly on the burst's damage radius) and which ships' outlines the ends land inside
+ *             ragged ring of streaks, each its own length, none past the burst's damage radius) and which ships' outlines the ends land inside
  * needs:      ShipSource (bodies, geometry, tuning), GameState (drawn ship poses), common standing/localToWorldDir
- * invariants: every fragment ends at the damage radius from the burst, whatever its count — client/src/ships/damage/flakBurst.test.ts
+ * invariants: no fragment ends past the damage radius, the longest reach it and the rest stop anywhere from FRAGMENT_SHORT of it out — client/src/ships/damage/flakBurst.test.ts
  *             a fragment's end is on a ship only when it is inside a standing part's outline — client/src/ships/damage/flakBurst.test.ts
  *             nothing here changes a hit or a blast: the fragment plan is pure and the ship search only reads the drawn world — client/src/ships/damage/flakBurstShips.test.ts
  * extend:     a new quality tier is one more row of FRAGMENT_TIERS
@@ -20,8 +20,10 @@ export const FRAGMENT_TIERS: readonly { keep: number; count: number }[] = [
   { keep: 0, count: 10 },
 ];
 
-/** Frames a fragment takes to fly out to the damage radius */
+/** Frames a fragment takes to fly out to its end */
 export const FRAGMENT_FRAMES = 16;
+/** The shortest a fragment flies, as a share of the damage radius */
+export const FRAGMENT_SHORT = 0.35;
 
 /** How many fragments a burst throws at this quality share (10 on the lowest tier, 16 on the highest) */
 export function fragmentCount(keep: number): number {
@@ -32,24 +34,26 @@ export function fragmentCount(keep: number): number {
 export interface Fragment {
   /** Direction of flight (radians) */
   angle: number;
-  /** World units a frame: over FRAGMENT_FRAMES it covers exactly the damage radius */
+  /** World units a frame: over FRAGMENT_FRAMES it covers its own reach (FRAGMENT_SHORT of the damage radius, up to all of it) */
   speed: number;
 }
 
 /**
- * `count` fragments evenly round a burst (each nudged by up to a fifth of the gap between them), every one flying out to
- * exactly `radius` in FRAGMENT_FRAMES. `rnd` is the randomness (Math.random in play).
+ * `count` fragments evenly round a burst (each nudged by up to nearly half the gap between them, so they do not read as a wheel), each flying its own
+ * length: one in four the whole `radius`, the rest anywhere from FRAGMENT_SHORT of it out. `rnd` is the randomness (Math.random in play).
  */
 export function fragmentPlan(count: number, radius: number, rnd: () => number, out: Fragment[] = []): Fragment[] {
   out.length = 0;
   const gap = (Math.PI * 2) / Math.max(1, count), base = rnd() * gap;
   for (let i = 0; i < count; i++) {
-    out.push({ angle: base + i * gap + (rnd() - 0.5) * gap * 0.4, speed: radius / FRAGMENT_FRAMES });
+    // (the first always goes the whole way, so the burst still shows how far it hurts)
+    const far = i === 0 || rnd() < 0.25, reach = radius * (far ? 1 : FRAGMENT_SHORT + rnd() * (1 - FRAGMENT_SHORT));
+    out.push({ angle: base + i * gap + (rnd() - 0.5) * gap * 0.9, speed: reach / FRAGMENT_FRAMES });
   }
   return out;
 }
 
-/** Where a fragment ends (written into `out`): its direction out to the damage radius */
+/** Where a fragment ends (written into `out`): its direction out to its reach */
 export function fragmentEnd(x: number, y: number, f: Fragment, out: { x: number; y: number }): void {
   const r = f.speed * FRAGMENT_FRAMES;
   out.x = x + Math.cos(f.angle) * r;

@@ -7,6 +7,7 @@
  */
 
 import type { WeaponStyle } from '../weaponStyles';
+import type { ModFx } from './mods/kit';
 
 export interface Shot {
   id: number;
@@ -89,12 +90,14 @@ export interface Shot {
   unconfirmed: number;
   /** Ticks into its flight before it can strike anything (a shell that arms late: the Leviathan's) */
   arm: number;
+  /** Its gun's live modifier effects (each an effect id and a strength): what its modifier layers draw (fx/mods) */
+  fx?: readonly ModFx[];
 }
 
 /** Where a shell's drawn line meets a drawn surface (WeaponFx.castHit fills it) */
 export interface DrawnHit { t: number; x: number; y: number; target: number }
 
-export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number }
+export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number; /** Its gun's live modifier effects (fx/mods) */ fx?: readonly ModFx[] }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
 
@@ -116,8 +119,12 @@ export interface PredictedShell {
   life?: number;
   /** Ticks before it can strike anything (it arms late), if any */
   arm?: number;
+  /** Ticks it flies to where it ends at the aim (an aim burst's fuse), if it does */
+  fuse?: number;
   /** Fired from a turret (its shot's sound) */
   turret?: boolean;
+  /** Its gun's live modifier effects (fx/mods) */
+  fx?: readonly ModFx[];
   spawnX: number;
   spawnY: number;
   spawnTick: number;

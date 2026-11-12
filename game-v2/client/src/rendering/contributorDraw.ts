@@ -4,10 +4,12 @@
  * the system map share it. Each note's outline is built once as a Path2D in
  * world units about its anchor (cached by id and update time), so a frame is
  * just: where's the anchor now, translate, scale, stroke. Labels and the pin
- * are drawn at screen size.
+ * are drawn at screen size. Your own notes have a white dot in the pin and
+ * "you" under it; other people's a dark dot and their name, with the note's
+ * score (thumbs up minus down) when it has one.
  */
 
-import { noteAnchorPosition, noteShapeReach, type ContributorNote, type NoteBodies, type NoteShape } from '@space-game/common';
+import { noteAnchorPosition, noteScore, noteShapeReach, type ContributorNote, type NoteBodies, type NoteShape } from '@space-game/common';
 
 interface Cached { key: string; path: Path2D | null; closed: boolean }
 const cache = new Map<string, Cached>();
@@ -74,6 +76,8 @@ export interface NoteView {
   bodies: NoteBodies;
   /** Highlighted (being edited, or picked in the list) */
   focus?: string | null;
+  /** Is this note the viewer's own (drawn apart from other people's) */
+  mine?(n: ContributorNote): boolean;
 }
 
 /** Where each drawn note's pin is on screen (for clicks and tooltips) */
@@ -121,8 +125,9 @@ export function drawNotes(ctx: CanvasRenderingContext2D, notes: Iterable<Contrib
     ctx.bezierCurveTo(s.x + 7, s.y - 19, s.x + 9, s.y - 9, s.x, s.y);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.beginPath(); ctx.arc(s.x, s.y - 13, 2.6, 0, Math.PI * 2); ctx.fill();
+    const own = !!v.mine?.(n);
+    ctx.fillStyle = own ? '#ffffff' : 'rgba(0,0,0,0.55)';
+    ctx.beginPath(); ctx.arc(s.x, s.y - 13, own ? 3 : 2.6, 0, Math.PI * 2); ctx.fill();
     // Title, and who left it
     const label = `${n.status === 'done' ? '✓ ' : n.status === 'wontdo' ? '✗ ' : ''}${n.title}`;
     ctx.lineWidth = 3;
@@ -131,9 +136,11 @@ export function drawNotes(ctx: CanvasRenderingContext2D, notes: Iterable<Contrib
     ctx.fillStyle = '#f1f5f9';
     ctx.fillText(label, s.x, s.y - 25);
     ctx.font = '10px "Segoe UI", sans-serif';
-    ctx.strokeText(n.author, s.x, s.y + 13);
-    ctx.fillStyle = n.color;
-    ctx.fillText(n.author, s.x, s.y + 13);
+    const score = noteScore(n);
+    const who = `${own ? 'you' : n.author}${score ? ` · ${score > 0 ? '+' : ''}${score}` : ''}`;
+    ctx.strokeText(who, s.x, s.y + 13);
+    ctx.fillStyle = own ? '#f1f5f9' : n.color;
+    ctx.fillText(who, s.x, s.y + 13);
     ctx.font = '600 11px "Segoe UI", sans-serif';
     pins.push({ id: n.id, x: s.x, y: s.y - 10 });
   }

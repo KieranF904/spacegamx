@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Passthrough II
+Mk II · Square · 1 cell
+Hull · mass49 hp · 1.0
+Armour · build2 · 1.6 pts
+Holds10 energy
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+Effectscarries 3 weapon effects and 300 treated E a second; over that the weakest effects are dropped and the rest weakened to fit
+
+== partStats (stats rows) ==
+GradeMk II
+Carriespasses power between the parts it touches
+Hull · mass49 hp · 1.0
+Armour · build2 · 1.6 pts
+Rating scoretoughness 49
+
+== familyLabel ==
+Relays
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Carries three weapon effects
+
+== keyStats ==
+holds 10 · power line · 3 effects
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 14","why":"Unlocks at level 14 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 14","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":48.75,"mass":1,"firepower":0,"toughness":48.75,"armour":2}

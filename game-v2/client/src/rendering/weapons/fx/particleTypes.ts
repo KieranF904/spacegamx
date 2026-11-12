@@ -7,8 +7,9 @@
  * extend:     a new kind of particle is one interface here, one list on FxField and its draw in FxField / hitDraw
  */
 
-import { disc, softDot, streak, petal, ring, puff, glowBall } from '../../fxTextures';
+import { band, disc, softDot, streak, petal, ring, puff, glowBall } from '../../fxTextures';
 import type { ImpactAnchor } from '../impactAnchor';
+import type { MuzzleBlast } from '../weaponStyles';
 
 export interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color?: number; alpha?: number; /** The impact it came off rides its target: it flies in the target's frame (impactAnchor rideStep) */ anc?: ImpactAnchor }
 export interface Spark {
@@ -40,11 +41,13 @@ export interface Flare { x: number; y: number; a: number; len: number; width: nu
 export interface HitLight { x: number; y: number; life: number; max: number; radius: number; power: number; color: number; anc?: ImpactAnchor }
 export interface Ring { x: number; y: number; life: number; max: number; size: number; color: number; anc?: ImpactAnchor }
 
-/** A muzzle flash: pinned to the ship that fired it (`owner`, at `ox, oy` and `rel` in its frame) */
+/** A muzzle flash (`sparks`: its licks of flame or rays, each an angle off its line and a length): pinned to the ship that fired it (`owner`, at `ox, oy` and `rel` in its frame) */
 export interface Flash {
   x: number; y: number; angle: number; life: number; max: number; size: number; color: number; sparks: { a: number; l: number }[]; petals: number[];
   /** Its flash's width × this (a heavy shell's is fat) */
   girth: number;
+  /** Its gun's kind (flashDraw); default powder */
+  kind?: MuzzleBlast;
   owner: number; ox: number; oy: number; rel: number;
 }
 export const FADE_FRAMES = 9;
@@ -53,6 +56,8 @@ export const HIT_CAP = 600;
 /** Fragments live at most (the oldest go first past it), and smoke puffs they may add */
 export const FRAG_CAP = 240;
 export const SMOKE_CAP = 700;
+/** How much longer than its written life a hit's glow, fire, smoke and scorch hang (its sparks and fragments fly as written) */
+export const LINGER = 1.6;
 
 /** A layered impact's scale from its shot's (shell size × damage scale): the square root, so a big shell reads big without taking over */
 export function impactScale(size: number): number {
@@ -74,7 +79,7 @@ export function hueColor(h: number): number {
   return (Math.round(f(0) * 255) << 16) | (Math.round(f(8) * 255) << 8) | Math.round(f(4) * 255);
 }
 
-export const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1); }, get streak() { return streak(); }, get petal() { return petal(); } };
+export const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1); }, get streak() { return streak(); }, get band() { return band(); }, get petal() { return petal(); } };
 export const TEX2 = { get ring() { return ring(); }, get puff() { return puff(); } };
 /** The layered impacts' pool's texture */
 export const TEX3 = { get ball() { return glowBall(); } };

@@ -47,6 +47,8 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
+  // The production build says nothing in the console: its logs, debug and info calls are dropped (warnings and errors stay, for bug reports)
+  esbuild: command === 'build' ? { pure: ['console.log', 'console.debug', 'console.info'] } : undefined,
   build: {
     target: 'esnext',
     // (maps are written for local debugging, but no bundle links to them: nothing tells a browser they exist)
@@ -62,6 +64,8 @@ export default defineConfig(({ command }) => ({
       },
       input: {
         main: resolve(__dirname, 'index.html'),
+        // The donation page (src/support): its own small entry, nothing of the game in it
+        support: resolve(__dirname, 'support.html'),
       },
     },
   },

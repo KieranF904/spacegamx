@@ -21,6 +21,7 @@ import { BossDev } from '../../game/dev/bossDev.js';
 import { EnemyRecovery } from '../../game/enemies/recovery.js';
 import { Dens } from '../../game/dens/Dens.js';
 import { ContributorNotes } from '../../game/ContributorNotes.js';
+import { AdminChat } from '../../game/AdminChat.js';
 import { Social } from '../../game/social/Social.js';
 import { Trade } from '../../game/Trade.js';
 import { Market } from '../../game/Market.js';
@@ -270,6 +271,16 @@ export function socialDeps(gs: GameServer): ConstructorParameters<typeof Social>
     toast: (conn, text, kind) => gs.pilots.toast(conn as ClientConnection, text, kind),
     note: (conn, text, color) => gs.send((conn as ClientConnection).ws, { type: 'systemMessage', text, color }),
     conns: () => gs.clients.values(),
+    now: gs.clock,
+    adminReply: (conn, name, text) => gs.adminChat.replyTo(conn as ClientConnection, name, text),
+  };
+}
+
+export function adminChatDeps(gs: GameServer): ConstructorParameters<typeof AdminChat<ClientConnection>>[0] {
+  return {
+    conns: () => gs.clients.values(),
+    send: (c, msg) => gs.send(c.ws, msg),
+    note: (c, text, color) => gs.send(c.ws, { type: 'systemMessage', text, color }),
     now: gs.clock,
   };
 }

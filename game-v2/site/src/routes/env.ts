@@ -9,7 +9,7 @@ import type { CatalogBook } from '../catalog/book.js';
 import type { SiteConfig } from '../config.js';
 import type { SafeHtml } from '../html.js';
 import type { Router } from '../http.js';
-import type { LobbyUser } from '../lobby.js';
+import type { Lobby, LobbyUser } from '../lobby.js';
 import type { ServerStatus } from '../status.js';
 import type { SiteStore } from '../store/types.js';
 
@@ -27,6 +27,10 @@ export interface RouteEnv {
   fields(ctx: Ctx, max?: number): Promise<Record<string, any>>;
   /** The lobbies' activity feeds (routes/activity.ts) */
   activity: ActivityClient;
+  /** The accounts (the lobby) */
+  lobby: Lobby;
+  /** Drop a session's cached account, so the next page asks the lobby again */
+  forgetSession(token: string): void;
   /** Add a Set-Cookie (security.ts cookie()) */
   setCookie(ctx: Ctx, cookie: string): void;
 }

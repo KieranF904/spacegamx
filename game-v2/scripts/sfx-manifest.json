@@ -418,6 +418,13 @@
    "variants": 2
   },
   {
+   "id": "mauler_shot",
+   "prompt": "Big-bore explosive cannon shot, deep punchy concussive boom with a hard gritty crack and a short heavy thud, a thick shell leaving a wide barrel, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
    "id": "twinlink_shot",
    "prompt": "Twin-barrel rapid cannon turret, quick double-tap low thump, two fast punchy shots, tight, sci-fi spaceship weapon, bassy, no high whine, no echo",
    "duration": 0.5,

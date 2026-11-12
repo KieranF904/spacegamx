@@ -30,7 +30,12 @@ interface P {
   hot?: Graphics;
   /** A hit's spark, glow or chip riding the ship it struck (impactAnchor): its velocity is relative to that ship */
   anc?: ImpactAnchor;
+  /** Flak fragments: frames it flies before it is spent; its ember then fades over the rest of its life */
+  fly?: number;
 }
+
+/** Frames a flak fragment's ember glows where it stopped, and the frames between the smoke puffs it drops in flight */
+const TRAIL_LINGER = 14, FRAGMENT_SMOKE_EVERY = 4;
 
 
 const MAX_PARTICLES = 2500;
@@ -72,9 +77,13 @@ export class DamageParticles {
   /** The share of small particles kept (1 at full quality) */
   get keepShare(): number { return this.keep; }
 
-  /** A flak fragment: a bright streak flying straight at `speed` for `life` frames; never dropped by the quality share (its count is the tier's) */
+  /**
+   * A flak fragment: a white-hot chip thrown straight out, fast at first and slowing to a stop after `life` frames (its
+   * velocity here is its average over them), dropping smoke behind it and left glowing where it stops; never dropped by
+   * the quality share (its count is the tier's)
+   */
   fragment(x: number, y: number, vx: number, vy: number, life: number, size: number, color: number): void {
-    if (this.ps.length < this.cap) this.ps.push({ kind: 'spark', x, y, vx, vy, life: 0, max: life, size, grow: 0, color, alpha: 1, drag: 1, rot: 0, vr: 0 });
+    if (this.ps.length < this.cap) this.ps.push({ kind: 'spark', x, y, vx, vy, life: 0, max: life + TRAIL_LINGER, size, grow: 0, color, alpha: 1, drag: 1, rot: 0, vr: 0, fly: life, pts: [x, y] });
   }
 
   setQuality(keep: number, cap: number): void {
@@ -127,6 +136,12 @@ export class DamageParticles {
 
   ring(x: number, y: number, vx: number, vy: number, from: number, to: number, life: number, color: number, alpha: number): void {
     this.push({ kind: 'ring', x, y, vx, vy, life: 0, max: life, size: from, grow: (to - from) / life, color, alpha, drag: 1, rot: 0, vr: 0 });
+  }
+
+  /** A dark smudge drawn this frame (the pools open): a part's char where a fire burned out (damage/fires.ts) */
+  char(x: number, y: number, r: number, color: number, alpha: number): void {
+    const s = (r * 2.3) / DOT_SIZE;
+    this.smokeSprites.take(puff(), x, y, 0.5, 0.5, color, alpha, 0, s, s);
   }
 
   dustPuff(x: number, y: number, vx: number, vy: number, size: number, life: number, color: number, alpha: number, grow = 0.08): void {
@@ -184,6 +199,29 @@ export class DamageParticles {
       const k = p.life / p.max, fade = 1 - k;
       switch (p.kind) {
         case 'spark': {
+          if (p.fly !== undefined) {
+            // A fragment: thrown hard and slowing to a stop at its end. A white-hot head on a tail that shortens as it slows,
+            // smoke dropped behind it along the way, and an ember where it stops, winking out
+            const u = Math.min(1, p.life / p.fly), ox = p.pts![0], oy = p.pts![1], a = Math.atan2(p.vy, p.vx), ca = Math.cos(a), sa = Math.sin(a);
+            const avg = Math.hypot(p.vx, p.vy), d = avg * p.fly * (1 - (1 - u) * (1 - u)), hx = ox + ca * d, hy = oy + sa * d;
+            if (u < 1) {
+              const speed = avg * 2 * (1 - u), tail = Math.max(p.size * 2, speed * 3), sc = streakScale(tail, p.size * 1.3);
+              this.addSprites.take(streak(), hx - ca * tail * 0.5, hy - sa * tail * 0.5, 0.5, 0.5, p.color, p.alpha * (0.9 - 0.4 * u), a, sc.x, sc.y);
+              const hs = (p.size * 2.6) / DOT_SIZE;
+              this.addSprites.take(glowBall(), hx, hy, 0.5, 0.5, 0xffffff, 0.9 * p.alpha, 0, hs, hs);
+              // (`rot` counts the frames since its last puff)
+              p.rot += frames;
+              if (p.rot >= FRAGMENT_SMOKE_EVERY) {
+                p.rot = 0;
+                this.push({ kind: 'smoke', x: hx, y: hy, vx: ca * speed * 0.06, vy: sa * speed * 0.06, life: 0, max: 30 + Math.random() * 26, size: p.size * (1.6 + Math.random() * 1.2), grow: 0.1,
+                  color: 0x5c5650, alpha: 0.42, drag: 0.96, rot: Math.random() * 6, vr: 0 });
+              }
+            } else {
+              const s = 1 - (p.life - p.fly) / (p.max - p.fly), es = (p.size * (1.6 + 1.6 * s)) / DOT_SIZE;
+              this.addSprites.take(glowBall(), hx, hy, 0.5, 0.5, 0xff8a40, 0.85 * p.alpha * s * s, 0, es, es);
+            }
+            break;
+          }
           // A streak back along its motion
           const len = 2.2, w = p.size * 1.4;
           const sl = Math.hypot(p.vx, p.vy) * len;

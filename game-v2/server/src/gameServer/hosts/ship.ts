@@ -9,7 +9,7 @@
 import { addEntity, removeEntity, addComponent, hasComponent } from 'bitecs';
 import { Position, Velocity, Rotation, Radius, Player, InSystem, contactHurts, dhypot } from '@space-game/common';
 import type { ShipHost } from '../../ships/ShipBridge.js';
-import { partItemId, hazardFlight } from '@space-game/common';
+import { partItemId, hazardFlight, arcRadius } from '@space-game/common';
 import { stationQuery } from '../../game/Docking.js';
 import type { GameServer } from '../../GameServer.js';
 
@@ -42,11 +42,13 @@ export function createShipHost(gs: GameServer): ShipHost {
     // (Only pilots' splash and beams hurt mobs: a boss's own shells pass through its drones)
     splashMobs: (num, x, y, radius, damage, source) => { if (source >= 0 && hasComponent(gs.world, Player, source)) gs.mobs.splash(num, x, y, radius, damage); },
     beamMobs: (num, x0, y0, x1, y1, width, damage, source) => { if (source >= 0 && hasComponent(gs.world, Player, source)) gs.mobs.beam(num, x0, y0, x1, y1, width, damage); },
-    arcHop: (num, x, y, fx, fy) => gs.broadcastToSystem(num, { type: 'detonation', kind: 'tesla_arc', x: Math.round(x), y: Math.round(y), radius: 30, from: [Math.round(fx), Math.round(fy)] }),
+    arcHop: (num, x, y, fx, fy, step) => gs.broadcastToSystem(num, { type: 'detonation', kind: 'tesla_arc', x: Math.round(x), y: Math.round(y), radius: arcRadius(step), from: [Math.round(fx), Math.round(fy)] }),
+    fireLit: (eid, part, ticks, gen) => gs.broadcastToSystem(InSystem.systemId[eid], { type: 'ignite', bodyId: eid, part, ticks: Math.max(1, Math.round(ticks)), ...(gen !== undefined ? { gen } : {}) }),
+    beamBlast: (num, x, y, radius, kind, out) => gs.broadcastToSystem(num, { type: 'detonation', kind, x: Math.round(x), y: Math.round(y), radius, ...(out !== undefined ? { out } : {}) }),
     fireBaseShot: (ownerEid, x, y, angle, damageScale, shape) => {
       const ids: number[] = [];
       gs.weapons.spawn(ownerEid, shape?.kind ?? 'cannon', x, y, angle, damageScale,
-        { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model, gun: shape?.gun }, ids);
+        { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model, gun: shape?.gun, gunFx: shape?.gunFx, fx: shape?.fx }, ids);
       return ids;
     },
     shotVs: (proj) => gs.weapons.vsOf(proj),

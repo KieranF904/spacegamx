@@ -59,6 +59,13 @@ import { gameIndex, injectHandoff, isDevGamePath, proxyToDev, proxyUpgradeToDev 
 import { checkPost } from './posts.js';
 import { HttpActivityClient, type ActivityClient } from './activity.js';
 import { registerActivity } from './routes/activity.js';
+import { registerDonations } from './routes/donations.js';
+import { registerMine } from './routes/mine.js';
+import { registerLegal } from './routes/legal.js';
+import { registerAdminChat } from './routes/adminChat.js';
+import type { AdminChatApi } from './adminChat.js';
+import { LATER_COOKIE, registerNewsletter } from './routes/newsletter.js';
+import { NEWSLETTER_MISSING, readChoice } from './views/newsletter.js';
 import { registerCatalog } from './routes/catalog.js';
 import { registerChangelog } from './routes/changelog.js';
 import { registerLauncherNews } from './routes/launcherNews.js';
@@ -90,6 +97,8 @@ export interface AppDeps {
   limiter?: RateLimiter;
   catalog?: CatalogBook;
   status?: { get(): Promise<ServerStatus | null> };
+  /** (tests) The admin chat's lobby calls */
+  adminChat?: AdminChatApi;
   /** (tests) The lobbies' activity feeds */
   activity?: ActivityClient;
 }
@@ -118,6 +127,7 @@ const NOTICES: Record<string, string> = {
   deleted: 'Account deleted.', suggested: 'Suggestion posted.', commented: 'Comment posted.',
   saved: 'Saved.', published: 'Published.', unpublished: 'Unpublished: it is a draft again.', postdeleted: 'Post deleted.',
   hidden: 'Hidden.', shown: 'Shown again.', removed: 'Deleted.', banned: 'Banned.', unbanned: 'Ban lifted.', revoked: 'Token revoked.',
+  'newsletter-on': "You're signed up to the email newsletter.", 'newsletter-off': "You're not signed up to the email newsletter.",
   promoted: 'Now an admin.', demoted: 'No longer an admin.', accountdeleted: 'Account deleted for good.',
 };
 
@@ -400,11 +410,14 @@ export function createApp(deps: AppDeps) {
     const email = str(f.email, 254).trim();
     const password = str(f.password, 500);
     const next = safeNext(f.next);
-    const again = (status: number, error: string) => page(ctx, status, V.signInPage(ctx.page, { mode, next, error, username, email }));
+    // (A new account: their own yes or no to the email newsletter, which the form can't be sent without)
+    const newsletter = mode === 'register' ? readChoice(str(f.newsletter, 8)) : null;
+    const again = (status: number, error: string) => page(ctx, status, V.signInPage(ctx.page, { mode, next, error, username, email, newsletter }));
     const key = `${mode}:${ctx.ip}`;
     if (limited(ctx, key, mode === 'signin' ? LIMITS.signin : LIMITS.register)) return again(429, slow(ctx, key, mode === 'signin' ? LIMITS.signin : LIMITS.register));
     if (!username || !password || (mode === 'register' && !email)) return again(400, 'Fill in every field.');
-    const r = mode === 'signin' ? await lobby.login(username, password, ctx.ip) : await lobby.register(username, email, password, ctx.ip);
+    if (mode === 'register' && newsletter === null) return again(400, `${NEWSLETTER_MISSING}.`);
+    const r = mode === 'signin' ? await lobby.login(username, password, ctx.ip) : await lobby.register(username, email, password, ctx.ip, newsletter!);
     if (!r.ok) return again(r.status === 429 ? 429 : r.status >= 500 ? 503 : 400, r.error);
     sessions.set(r.token, { user: r.user, until: Date.now() + SESSION_CACHE_MS });
     setSession(ctx, r.token);
@@ -689,10 +702,10 @@ export function createApp(deps: AppDeps) {
   /** The pilots list (a refusal from the lobby shown above it, with the status it came with) */
   async function pilotsPage(ctx: Ctx, search: string, refused?: { error: string; status: number }) {
     if (!cfg.lobbyAdminSecret) return page(ctx, 200, A.adminPilots(ctx.page, { users: [], total: 0, search, enabled: false }));
-    const r = await lobby.listUsers(search, 0, 100);
+    const [r, newsletter] = await Promise.all([lobby.listUsers(search, 0, 100), lobby.newsletterCounts()]);
     const status = refused ? (refused.status === 403 ? 403 : 400) : 200;
     const n = refused ? { kind: 'error' as const, text: refused.error } : notice(ctx);
-    page(ctx, status, A.adminPilots(ctx.page, r.ok ? { users: r.users, total: r.total, search, enabled: true } : { users: [], total: 0, search, enabled: true, error: r.error }, n));
+    page(ctx, status, A.adminPilots(ctx.page, r.ok ? { users: r.users, total: r.total, search, enabled: true, newsletter } : { users: [], total: 0, search, enabled: true, error: r.error, newsletter }, n));
   }
 
   router.get('/admin/pilots', async (ctx) => {
@@ -867,8 +880,15 @@ export function createApp(deps: AppDeps) {
     fields: (ctx, max) => fields(ctx, max),
     activity: deps.activity ?? new HttpActivityClient(),
     setCookie: (ctx, c) => appendCookie(ctx.res, c),
+    lobby,
+    forgetSession: (token) => forget(token),
   };
   registerActivity(env);
+  registerDonations(env);
+  registerMine(env);
+  registerLegal(env);
+  registerAdminChat(env, deps.adminChat);
+  registerNewsletter(env);
   registerCatalog(env);
   registerChangelog(env);
   registerLauncherNews(env);
@@ -964,7 +984,9 @@ export function createApp(deps: AppDeps) {
     const live = await pilots.live();
     const ctx: Ctx = {
       req, res, url, path: pathname, ip, token, user, csrf: csrfToken, csrfSeed, api, game,
-      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin, authors: cfg.authors, guides: cfg.guides },
+      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin, authors: cfg.authors, guides: cfg.guides,
+        // (An account that was never asked about the email newsletter is asked once, unless they said "later" this session)
+        newsletterPrompt: user?.newsletterAsked === false && !cookies[LATER_COOKIE] },
     };
 
     const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');

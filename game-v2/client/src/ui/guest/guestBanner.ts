@@ -3,7 +3,7 @@
  * owns:       the guest's banner in the top right (title, rules, time left, a Register button that opens the form in place) and,
  *             for a guest past their 3 days, the one screen that asks them to register to play on; sends convertGuest
  * needs:      DOM (optional: with none every call does nothing), guestBannerModel, the hooks Game gives it (send, the lobby's
- *             register, what to do once registered); @space-game/common (types)
+ *             register, what to do once registered); @space-game/common (types); ../join/newsletterChoice (the newsletter yes/no)
  * invariants: an expired guest is told to register to keep playing — client/src/ui/guest/guestBannerModel.test.ts
  * extend:     the words are guestBannerModel.ts; the server's side is net/handlers/guestAccount.ts. No prompts or popups while a
  *             guest plays (the banner is always there, the form opens only when asked); the lobby's account is made once: a
@@ -12,11 +12,13 @@
 
 import type { ClientMessage, ServerGuestStatusMessage, ServerGuestConvertedMessage } from '@space-game/common';
 import { guestBannerModel } from './guestBannerModel';
+import { LEGAL_LINK_CSS, privacyLinkHtml } from '../join/legalLinks';
+import { NEWSLETTER_CHOICE_CSS, NEWSLETTER_FIELD, NEWSLETTER_MISSING, newsletterChoiceHtml, readNewsletterChoice } from '../join/newsletterChoice';
 
 export interface GuestHooks {
   send(msg: ClientMessage): void;
   /** The lobby makes the account (POST /auth/register) */
-  register(username: string, email: string, password: string): Promise<{ success: boolean; token?: string; username?: string; error?: string }>;
+  register(username: string, email: string, password: string, newsletter: boolean): Promise<{ success: boolean; token?: string; username?: string; error?: string }>;
   /** The pilot is the account's now (the token to join with from now on) */
   registered(token: string, username: string): void;
   /** Leave the game (an expired guest who won't register) */
@@ -33,6 +35,8 @@ let busy = false;
 let error = '';
 /** The lobby made the account but the move of the pilot was refused: tried again with this, not with a second account */
 let made: { token: string; username: string } | null = null;
+/** The newsletter answer picked on the form (null: not yet), kept across repaints */
+let newsletter: boolean | null = null;
 
 export function initGuestBanner(h: GuestHooks): void { hooks = h; }
 
@@ -60,7 +64,7 @@ export function onGuestConverted(msg: ServerGuestConvertedMessage): void {
 
 /** No guest in play (left, or registered): nothing shown */
 export function hideGuestBanner(): void {
-  status = null; made = null; formOpen = false; busy = false; error = '';
+  status = null; made = null; formOpen = false; busy = false; error = ''; newsletter = null;
   if (timer) clearInterval(timer);
   timer = null;
   root?.remove();
@@ -86,6 +90,8 @@ function paint(): void {
   // (The typed values survive a repaint: the clock repaints every half minute)
   const typed: Record<string, string> = {};
   root?.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((i) => { typed[i.dataset.field!] = i.value; });
+  const picked = root?.querySelector<HTMLInputElement>(`input[name="${NEWSLETTER_FIELD}"]:checked`);
+  if (picked) newsletter = readNewsletterChoice(picked.value);
   root?.remove();
 
   const box = el('div', `background:#101a2c;color:#e5ecf6;border:1px solid ${m.urgent ? '#fbbf24' : '#3b4a63'};border-radius:8px;padding:10px 12px;width:min(260px,92vw);box-sizing:border-box;box-shadow:0 4px 18px rgba(0,0,0,.45);${FONT}`);
@@ -127,6 +133,10 @@ function form(typed: Record<string, string>, canClose: boolean): HTMLFormElement
     f.append(el('div', 'color:#a9b7cc;margin-bottom:6px', `Account ${made.username} created, but your pilot is not on it yet. Try again to move it.`));
   } else {
     f.append(field('username', 'text', 'Account name', 'username'), field('email', 'email', 'Email', 'email'), field('password', 'password', 'Password (8+ characters)', 'new-password'));
+    // (The newsletter: their own yes or no, nothing picked for them; ui/join/newsletterChoice.ts)
+    const ask = el('div', 'margin-top:8px');
+    ask.innerHTML = `<style>${NEWSLETTER_CHOICE_CSS}${LEGAL_LINK_CSS}</style>${newsletterChoiceHtml(newsletter)}<div style="margin-top:4px">${privacyLinkHtml()}</div>`;
+    f.append(ask);
   }
   if (error) f.append(el('div', 'color:#fca5a5;margin-top:6px', error));
   const row = el('div', 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap');
@@ -149,6 +159,7 @@ function form(typed: Record<string, string>, canClose: boolean): HTMLFormElement
   f.onsubmit = (e) => {
     e.preventDefault();
     const v = (n: string) => (f.querySelector<HTMLInputElement>(`input[data-field="${n}"]`)?.value ?? '').trim();
+    newsletter = readNewsletterChoice(f.querySelector<HTMLInputElement>(`input[name="${NEWSLETTER_FIELD}"]:checked`)?.value);
     void submit(v('username'), v('email'), (f.querySelector<HTMLInputElement>('input[data-field="password"]')?.value ?? ''));
   };
   return f;
@@ -160,7 +171,9 @@ async function submit(username: string, email: string, password: string): Promis
   busy = true;
   paint();
   if (!made) {
-    const r = await hooks.register(username, email, password);
+    // (No account without their yes or no)
+    if (newsletter === null) { busy = false; error = NEWSLETTER_MISSING; paint(); return; }
+    const r = await hooks.register(username, email, password, newsletter);
     if (!r.success || !r.token) { busy = false; error = r.error || 'Could not register. Try again.'; paint(); return; }
     made = { token: r.token, username: r.username ?? username };
   }

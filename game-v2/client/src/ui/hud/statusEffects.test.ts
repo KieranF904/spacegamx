@@ -27,6 +27,18 @@ describe('activeStatuses', () => {
     expect(activeStatuses({ tick: 0, warmth: 0 })[0].def.id).toBe('frozen');
   });
 
+  it('holding with a landmark: on while it carries the ship, with how much, named in the tooltip; last in the row', () => {
+    expect(activeStatuses({ tick: 0, held: null })).toEqual([]);
+    expect(activeStatuses({ tick: 0, held: { name: 'Sol Central Station', weight: 0 } })).toEqual([]);
+    const full = activeStatuses({ tick: 0, empUntil: 60, held: { name: 'Sol Central Station', weight: 1 } });
+    expect(full.map((a) => a.def.id)).toEqual(['emp', 'holding']);
+    expect(full[1]).toMatchObject({ secs: null, pct: 100, name: 'Sol Central Station' });
+    expect(statusTip(full[1]).split('\n')[0]).toBe('Holding with Sol Central Station');
+    const fading = activeStatuses({ tick: 0, held: { name: 'Vesta', weight: 0.42 } })[0];
+    expect(fading.pct).toBe(42);
+    expect(statusTip(fading)).toContain('Holding with Vesta (42%, fading)');
+  });
+
   it('reuses the list it is given (no allocation a frame)', () => {
     const out = [{ def: STATUS_DEFS.emp, secs: 9 }];
     const r = activeStatuses({ tick: 0, slowUntil: 60 }, out);

@@ -1,5 +1,5 @@
 /**
- * Pushover notices to Kieran's phone when someone registers an account (every sign-up, from the game or the website,
+ * Pushover notices to Kieran's phone when someone registers an account, never saying who (every sign-up, from the game or the website,
  * comes through here). The game server sends its own for joins (server/src/auth/pushover.ts, the same rules): on in
  * production when PUSHOVER_TOKEN and PUSHOVER_USER are set (deploy/vps/deploy.sh copies them into
  * /etc/spacegame/secrets.env), NOTIFY_EVENTS=0 turns it off; elsewhere off unless NOTIFY_EVENTS=1 (keys then from
@@ -37,9 +37,9 @@ export class Notifier {
     return this.k !== null;
   }
 
-  /** A new account */
-  registered(name: string): void {
-    this.notify('Space Game: new pilot', `${name} registered an account.`);
+  /** A new account (that one was made, never whose: no name or other account detail leaves for Pushover) */
+  registered(): void {
+    this.notify('Space Game: new pilot', 'A new account was registered.');
   }
 
   notify(title: string, message: string): void {

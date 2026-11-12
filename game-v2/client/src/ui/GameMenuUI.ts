@@ -9,7 +9,7 @@
 
 import type { GuideTab } from './fieldGuide';
 import { fieldGuide } from './fieldGuideLazy';
-import { ACTIONS, ActionDef, RESERVED_KEYS, keyName } from '../input/keybindings';
+import { ACTIONS, ActionDef, RESERVED_KEYS, boundKeyName, keyName } from '../input/keybindings';
 import { settings, SettingsData, defaultSettings } from '../settings/Settings';
 import { FPS_CAPS, type QualitySetting } from '../settings/quality';
 import { esc } from './escape';
@@ -279,7 +279,7 @@ export class GameMenuUI {
       }
       const b = document.createElement('button');
       b.className = `gm-item${it.danger ? ' danger' : ''}${this.page === it.page ? ' active' : ''}`;
-      const key = it.page === 'map' ? keyName(settings.data.bindings.map ?? 'KeyM') : it.key;
+      const key = it.page === 'map' ? boundKeyName('map', settings.data.bindings) : it.key;
       b.innerHTML = `<span class="ic">${it.icon}</span>${it.label}${key ? `<span class="k">${key}</span>` : ''}`;
       b.addEventListener('click', () => this.choose(it.page));
       this.side.appendChild(b);
@@ -412,7 +412,7 @@ export class GameMenuUI {
       );
     } else if (this.tab === 'ui') {
       body.append(
-        toggle('Navigation markers', s.ui.navMarkers, (v) => upd((d) => { d.ui.navMarkers = v; }), `Edge-of-screen pointers to stations, gates and more (${keyName(s.bindings.nav ?? 'KeyN')})`),
+        toggle('Navigation markers', s.ui.navMarkers, (v) => upd((d) => { d.ui.navMarkers = v; }), `Edge-of-screen pointers to stations, gates and more (${boundKeyName('nav', s.bindings)})`),
         toggle('Minimap', s.ui.minimap, (v) => upd((d) => { d.ui.minimap = v; })),
         toggle('Ship schematic', s.ui.shipHud, (v) => upd((d) => { d.ui.shipHud = v; })),
         toggle('Performance monitor', s.ui.netStats, (v) => upd((d) => { d.ui.netStats = v; }), 'FPS, frame time, ping and jitter graphs, entities'),
@@ -432,7 +432,6 @@ export class GameMenuUI {
         slider('Zoom speed', s.gameplay.zoomSpeed, 0.4, 2, 0.1, (v) => `${v.toFixed(1)}×`, (v) => upd((d) => { d.gameplay.zoomSpeed = v; })),
         toggle('Invert mouse wheel zoom', s.gameplay.invertZoom, (v) => upd((d) => { d.gameplay.invertZoom = v; })),
         toggle('Mouse wheel changes weapon group', s.gameplay.wheelGroups, (v) => upd((d) => { d.gameplay.wheelGroups = v; }), 'The wheel picks the left group instead of zooming'),
-        toggle('Number keys pick weapon group', s.gameplay.digitGroups, (v) => upd((d) => { d.gameplay.digitGroups = v; }), '1-4 pick a group, 5 picks all. Off: the quick bar'),
       );
       const note = document.createElement('p');
       note.className = 'muted';

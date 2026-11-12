@@ -3,11 +3,12 @@
  * owns:       host adapters for pilots, quests, party, people and arenas
  * needs:      GameServer (type); npm: @space-game/common, bitecs
  * invariants: a wreck the pilot host spawns is kept for its key for the seconds given, and lasts its life — server/src/gameServer/hosts/hosts.test.ts
+ *             a save's landmark offset is taken and placed at the system's own tick — server/src/game/pilots/landmarkLogin.test.ts
  * extend:      a new host member is added to the matching create*Host
  */
 
 import { hasComponent, entityExists } from 'bitecs';
-import { Position, Player, Station, InSystem, Dead, inSafeSpace, dhypot } from '@space-game/common';
+import { Position, Player, Station, InSystem, Dead, inSafeSpace, dhypot, landmarkOffsetAt, landmarkOffsetPoint } from '@space-game/common';
 import { ServerMessage } from '@space-game/common';
 import { unlocks, lookFn } from '@space-game/common';
 import { PilotHost } from '../../game/Pilots.js';
@@ -76,6 +77,15 @@ export function createPilotHost(gs: GameServer): PilotHost {
     payout: (name, ...keys) => gs.payout.stream(name, ...keys),
     safeAt: (num, x, y) => inSafeSpace(gs.gameData.getSystemByNum(num), x, y),
     transient: (num) => !!gs.gameData.getSystemByNum(num)?.gunRange,
+    // (Landmark tracking: at the system's own tick, a dilated system's included: sim/SystemClocks.ts)
+    landmarkOffset: (num, x, y) => {
+      const set = gs.replicaEnv(num).landmarks;
+      return set?.length ? landmarkOffsetAt(set, gs.clocks?.tickOf(num) ?? gs.currentTick, x, y) : null;
+    },
+    landmarkPoint: (num, at) => {
+      const set = gs.replicaEnv(num).landmarks;
+      return set?.length ? landmarkOffsetPoint(set, gs.clocks?.tickOf(num) ?? gs.currentTick, at) : null;
+    },
   };
 }
 

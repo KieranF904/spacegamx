@@ -7,6 +7,8 @@
  *             steered home and let go near its spot — server/src/game/gunRange/gunRange.test.ts
  * extend:     another target is another entry of systems.json gunRange.targets (GunRange makes a RangeTarget for each and ticks them)
  *
+ * A target with `mob` is a mob laid at its spot instead (Mobs: one that sits still, a mine): it is never steered, bursts
+ * like any of its kind, and comes back the same way.
  * The target is a live ship (Enemies.spawnTarget: no AI, never fires, pays nothing), not pinned: shots, beams and
  * collisions treat it as every client's prediction treats any ship. It holds still by itself (no controls: CTL.hold, and
  * friction) and is heavy, so a ram only nudges it; past keepRadius its autopilot flies it home, which clients replay from
@@ -17,9 +19,9 @@ import type { GunRangeTargetDef } from '@space-game/common';
 import { dhypot } from '@space-game/common';
 
 export interface TargetHost {
-  /** A target ship at its spot: its entity (-1: couldn't) */
+  /** A target ship (or, `def.mob`, a mob) at its spot: its entity (-1: couldn't) */
   spawn(def: GunRangeTargetDef): number;
-  /** Is this target ship still there (not destroyed) */
+  /** Is this target still there (not destroyed, burst or timed out) */
   alive(eid: number): boolean;
   /** Take it away (the range is empty) */
   remove(eid: number): void;
@@ -64,7 +66,7 @@ export class RangeTarget {
       this.deadAt = this.eid >= 0 ? -1 : now;
       return this.eid >= 0;
     }
-    if (now % KEEP_EVERY === 0) this.keep();
+    if (now % KEEP_EVERY === 0 && !this.def.mob) this.keep();
     return false;
   }
 

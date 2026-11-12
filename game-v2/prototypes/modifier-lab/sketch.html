@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modifier lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Modifier lab</h1>
+  <p>Parts in the power line feeding a gun change what it fires. A sketch of the idea, separate from the game. Every number is a guess.</p>
+</header>
+
+<main class="cols">
+  <section class="pane" id="bin">
+    <h2>Parts</h2>
+    <div id="tools"></div>
+    <p class="hint">Click a cell to place. Right-click removes. Click a gun to select it. Two modifiers that touch may fuse.</p>
+    <button id="undo" type="button" style="margin-top:8px;width:100%">Undo (Ctrl+Z)</button>
+    <h2>Examples</h2>
+    <div id="presets"></div>
+  </section>
+
+  <section class="mid">
+    <div class="pane gridwrap">
+      <canvas id="grid" aria-label="Ship grid"></canvas>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="pane rangewrap">
+      <div class="rangehead"><h2>Firing range</h2><span id="rangeinfo" class="mono"></span></div>
+      <canvas id="range" aria-label="Firing range"></canvas>
+      <p class="hint">Move the pointer over the range to aim. The block is five cells deep. Shots die on the walls and the grey baffle unless they bounce. A blast is full at the hit and fades to its edge. Destroyed cells come back.</p>
+    </div>
+  </section>
+
+  <section class="pane" id="side">
+    <h2>Ship</h2>
+    <div id="summary"></div>
+    <h2>Guns</h2>
+    <div id="guns"></div>
+  </section>
+</main>
+
+<section class="below">
+  <details class="pane" open>
+    <summary>The rules as built</summary>
+    <ol class="rules">
+      <li>Power runs from reactors through conduits and modifiers to guns. A modifier counts for a gun only if it sits on a path the power takes to that gun. One on a stub off the side does nothing.</li>
+      <li>A modifier treats a set amount of energy each second, by its tier. What matters is the share of the gun's draw that gets treated: 25%, 50%, 75% and 100% give levels 1 to 4.</li>
+      <li>A modifier feeding several guns divides what it treats among them by their draw. One Pip gets the full effect, four Pips get a quarter each.</li>
+      <li>A bigger gun draws more, so the same level needs a bigger or more modifiers. A tier 1 part fills a Pip and does nothing for a Longbarrel.</li>
+      <li>Four components give one property each: Coil gives Velocity, Resonator gives Rapid, Chamber gives Explosive, Prism gives Split.</li>
+      <li>Two components that touch each other fuse into a combination: Coil and Prism give Pierce, Prism and Resonator give Bounce, Chamber and Resonator give Wave. A fused pair treats as much as its smaller half and gives up its two single effects.</li>
+      <li>Most properties move damage rather than add it. Pierce spreads a shot through the cells behind the first. Explosive trades direct damage for a blast. Split and Rapid do add damage; Rapid also raises the draw, which thins every share on that gun.</li>
+      <li>Each modifier burns a little power just being on the line, and its price is counted against the guns it feeds. That total is what a death costs.</li>
+      <li>There is no cap on how many properties a gun can carry. Room on the grid and reactor supply are the limits.</li>
+    </ol>
+  </details>
+  <details class="pane">
+    <summary>Numbers</summary>
+    <label class="check"><input type="checkbox" id="keepSingles"> A fused pair also keeps its two single effects</label>
+    <p class="hint">Everything the rules use, as JSON. Edit and apply. Saved in this browser only.</p>
+    <textarea id="cfg" spellcheck="false" aria-label="Lab numbers as JSON"></textarea>
+    <div class="row">
+      <button id="cfgApply" type="button">Apply</button>
+      <button id="cfgReset" type="button">Reset to defaults</button>
+      <span id="cfgMsg" class="mono"></span>
+    </div>
+  </details>
+</section>
+
+<script src="config.js"></script>
+<script src="derive.js"></script>
+<script src="presets.js"></script>
+<script src="range.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

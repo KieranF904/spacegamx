@@ -11,6 +11,7 @@ import type { Comment, Post, SharedShip, Shout, Suggestion, SuggestionStatus } f
 import { SUGGESTION_STATUSES } from '../store/types.js';
 import { pilotShips } from './ships.js';
 import type { Guide } from '../guides.js';
+import { newsletterChoice, newsletterSetting } from './newsletter.js';
 import {
   csrfField, empty, fmtDate, fmtNum, layout, livePill, sectionHead, signInPrompt, STATUS_LABEL, statusBadge, tagChip, when,
   type PageCtx,
@@ -420,7 +421,7 @@ export function errorPage(ctx: PageCtx, title: string, text: string): SafeHtml {
 
 // ---------------------------------------------------------------- sign in, register
 
-export function signInPage(ctx: PageCtx, d: { mode: 'signin' | 'register'; next: string; error?: string; username?: string; email?: string }): SafeHtml {
+export function signInPage(ctx: PageCtx, d: { mode: 'signin' | 'register'; next: string; error?: string; username?: string; email?: string; newsletter?: boolean | null }): SafeHtml {
   const reg = d.mode === 'register';
   const nextQ = d.next !== '/' ? `?next=${encodeURIComponent(d.next)}` : '';
   const body = html`
@@ -441,6 +442,7 @@ export function signInPage(ctx: PageCtx, d: { mode: 'signin' | 'register'; next:
       <p class="hint">Not shown to anyone.</p>` : ''}
       <label for="p">Password</label>
       <input id="p" name="password" type="password" required autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="200"${reg ? raw(' minlength="8"') : ''}>
+      ${reg ? newsletterChoice(d.newsletter ?? null) : ''}
       ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
       <button class="btn btn-primary btn-wide" type="submit">${reg ? 'Create account' : 'Sign in'}</button>
     </form>
@@ -470,8 +472,13 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
       <a class="btn-play" href="/play">Play now</a>
       <span class="dim small">The game uses this sign-in.</span>
     </div>
+    <div class="panel-row">
+      <a class="btn btn-ghost" href="/account/inbox">Inbox</a>
+      <a class="btn btn-ghost" href="/account/donations">Your donations</a>
+    </div>
   </div>
   <div class="account-forms">
+    ${newsletterSetting(ctx, { newsletter: a.newsletter === true, asked: a.newsletterAsked !== false })}
     <section class="panel" aria-labelledby="em-h">
       <div class="panel-head"><h2 id="em-h">Email</h2></div>
       <p class="dim small">Current: <b class="mono">${a.email}</b></p>

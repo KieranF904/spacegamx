@@ -8,7 +8,9 @@
  *   1. the hazard chain: env hazard, then numb, then slowed, then EMP (here and nowhere else)
  *   2. a decided source's impulse (unless EMP'd)
  *   3. the motion (stepShipMotion): pilotJumpStep (range boost, fields' cooldown, stillstone priming) round
- *      stepShipPhysics (stepFlight, terrain, quantisation), steering on the one aim rule (input.ts simAim)
+ *      stepShipPhysics (stepFlight, terrain, quantisation), steering on the one aim rule (input.ts simAim); then a
+ *      pilot's landmark carry (world/landmarks.ts: in a moving landmark's zone it is moved with it, a displacement
+ *      only, its velocity untouched; not mid-burn, and not a clamped follower, who sits where its leader is put)
  *   4. guns (guns.ts, Stage 1B): fire events (skipped when the host runs the ship's guns itself, env.gunsByHost: the
  *      server's fireWeapons and the client's predictGuns, through gunsTick; never both)
  *   5. pulls (pulls.ts, Stage 1C): forces both ends derive, then the body is quantised again
@@ -30,8 +32,9 @@
  */
 
 import { stepShipPhysics, quantizeShipBody, SHIP_FLIGHT_CONSTANTS } from '../ships/physics.js';
-import { jumpTuning, withSlowed, stepDrift, CTL_NO_BOOST, CTL_POWER_MASK, CTL_SHARE_MASK, type FlightConstants } from '../ships/flight.js';
+import { jumpTuning, jumpBurning, withSlowed, stepDrift, CTL_NO_BOOST, CTL_POWER_MASK, CTL_SHARE_MASK, type FlightConstants } from '../ships/flight.js';
 import { pilotJumpStep } from '../ships/jumpFields.js';
+import { carryBody } from '../world/landmarks.js';
 import { withEmp } from '../ships/hazards.js';
 import { withNumb, warmthStage, type WarmthStage } from '../ships/warmth.js';
 import { FULL_CHARGE } from '../ships/energy.js';
@@ -142,22 +145,30 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
       const pilot = s.mode === ReplicaMode.Player;
       const accounted = pilot && s.accounted;
       const jt = jumpTuning(env.tuning);
+      // (Landmark tracking, world/landmarks.ts: where it stands now, as the last tick ended, says how much of its
+      // landmark's move this tick carries it. Pilots only; a burn flies clear of it; a follower rides its leader's)
+      const lm = pilot && !out.follow && !jumpBurning(body.jump ?? 0, jt) ? env.fields.landmarks : undefined;
+      const x0 = body.x, y0 = body.y;
       s.jumpPrime = pilotJumpStep(body, s.jumpPrime, env.fields, t, d.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
         const energy = accounted ? { charge: s.charge, drainRate: 1, tick: t }
           // (A replica: no stores, the engines' power replayed from the authority's bits; pilotless: full charge)
           : pilot ? { charge: FULL_CHARGE, drainRate: 0, replay: input.bits } : { charge: FULL_CHARGE, drainRate: 0 };
-        if (clamp && clamp.kind !== 'push') { stepClamped(clamp, s, controls, accounted, energy, input.bits, env, rangeBoost, hazard, out); return; }
+        if (clamp && clamp.kind !== 'push') { stepClamped(clamp, s, controls, accounted, energy, input.bits, env, rangeBoost, hazard, out); if (lm?.length) carryBody(lm, t, x0, y0, body); return; }
         const res = stepShipPhysics(body, controls, d, env.tuning, energy, env.gravity, rangeBoost, hazard, env.terrain);
         if (accounted) { s.charge = res.charge; out.ctlPower = res.ctlPower; } else if (pilot) out.ctlPower = input.bits & CTL_REPLAY_BITS;
         out.isBoosting = res.isBoosting;
         out.aimHeld = res.aimHeld;
+        if (lm?.length) carryBody(lm, t, x0, y0, body);
       });
       return out;
     }
-    case ReplicaMode.Drift:
-      // (Debris: the deterministic drift every side runs, ships/debris.ts)
+    case ReplicaMode.Drift: {
+      // (Debris: the deterministic drift every side runs, ships/debris.ts; carried in a landmark's zone, as its world step carries it)
+      const x0 = body.x, y0 = body.y, lm = env.fields.landmarks;
       stepDebrisBody(body, env.gravity ? { ...SHIP_FLIGHT_CONSTANTS, gravity: env.gravity } : SHIP_FLIGHT_CONSTANTS);
+      if (lm?.length) carryBody(lm, t, x0, y0, body);
       return out;
+    }
     case ReplicaMode.Anchored: {
       // (A wreck held in place: coasts and spins, no gravity)
       const spin = body.angVel;

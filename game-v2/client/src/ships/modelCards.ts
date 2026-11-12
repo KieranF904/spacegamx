@@ -18,6 +18,8 @@ export const FAMILY_LABEL: Record<string, string> = {
   reactor: 'Generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   // (Energy routing's Conduit and Diode: models.mjs)
   relay: 'Relays',
+  // (Weapon modifiers' mounts, modifiers and hoppers: models.mjs)
+  modifier: 'Modifiers',
   shield: 'Shields', shieldwall: 'Shield walls', shieldarc: 'Shield arcs', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
   // (Support weapons: common/src/ships/features/support/support.ts)
@@ -61,6 +63,7 @@ const TRADE_OFF: Record<string, string> = {
   cannon_twinlink: 'the only cannon turret: 8 heavy rounds, then a short reload',
   cannon_longbarrel: "a sniper's cannon: far, slow to fire",
   cannon_bastion: 'two huge dodgeable shells, then a long reload',
+  cannon_mauler: 'steady slow shells that burst where they hit',
   autocannon_rattler: 'a steady stream of shells',
   autocannon_chainsaw: 'a hose: hard to dodge, harder to power',
   autocannon_stinger: 'fast, accurate needles in short bursts',

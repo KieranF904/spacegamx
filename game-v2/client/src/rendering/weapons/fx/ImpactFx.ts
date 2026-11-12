@@ -1,7 +1,7 @@
 /**
  * @contract client.weapon-fx.impact
  * owns:       what a hit throws at (x, y): the throw direction, the group riding what was struck, the flat or layered
- *             (ImpactLayers) particles, a held beam's burn, and the hit's sound and screen shake
+ *             (ImpactLayers) particles, a held beam's burn, a modifier's blast told alone, and the hit's sound and screen shake
  * needs:      FxField (particle lists), ImpactHost (surfaceAt, sounds, state), weaponStyles, impactAim, impactAnchor, liquidSplash; npm: @space-game/common
  * invariants: a hit's throw follows the style's hitThrow, off the struck surface where one is known — client/src/rendering/weapons/impactAim.test.ts
  *             an impact's parts ride what it hit as one group — client/src/rendering/weapons/impactAnchor.test.ts
@@ -16,8 +16,9 @@ import { weaponStyle, type WeaponStyle, type ImpactLayers } from '../weaponStyle
 import { BURST, burstLife, burstSpeed, offSurface, throwAngle, type SurfaceNormal } from '../impactAim';
 import type { ImpactAnchor } from '../impactAnchor';
 import type { FxField } from './FxField';
-import { FRAG_CAP, HIT_CAP, impactScale, turnHue } from './particleTypes';
+import { FRAG_CAP, HIT_CAP, LINGER, impactScale, turnHue } from './particleTypes';
 import type { Shot } from './shotTypes';
+import { modBind, modBlast, modImpact, modMarkCount } from './mods';
 
 /** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
 /** `dx, dy`: the shot's (or beam's) direction, 0 0 when unknown (a liquid splash creeps the way it slid along the surface) */
@@ -59,6 +60,18 @@ export class ImpactFx {
 
 
   /**
+   * A weapon modifier's blast told by the server with no shell's hit of its own (fx/mods modBlast): an explosive beam's
+   * end, or a piercing shot's way out of a hull along `out` (radians). It rides the hull at that point as a hit does
+   */
+  blast(x: number, y: number, radius: number, out?: number): void {
+    const a = out ?? Math.random() * Math.PI * 2;
+    this.normalScratch.target = -1;
+    // (a way out: the hull is behind the point, so it is asked for back up the heading)
+    this.host.surfaceAt?.(x, y, out === undefined ? Math.cos(a) : -Math.cos(a), out === undefined ? Math.sin(a) : -Math.sin(a), -1, this.normalScratch);
+    this.grouped(this.normalScratch.target ?? -1, x, y, () => { modBlast(this.f, x, y, radius, out); });
+  }
+
+  /**
    * Which way a hit throws (the style's hitThrow, impactAim.ts): off the surface the shell struck where it's known (asked
    * of surfaceAt only when the style throws off one), else back up its line; a hit with no shell anywhere
    */
@@ -94,7 +107,11 @@ export class ImpactFx {
   at(shot: Shot | undefined, x: number, y: number): void {
     const style = shot?.style ?? weaponStyle(WeaponType.Cannon);
     const aim = this.aimOf(style, shot, x, y);
-    this.grouped(this.hitTarget, x, y, () => this.parts(style, shot, x, y, aim));
+    this.grouped(this.hitTarget, x, y, () => {
+      this.parts(style, shot, x, y, aim);
+      // Its gun's modifiers, each adding its own layer (fx/mods)
+      if (shot?.fx) modImpact(this.f, shot, x, y, aim.a, aim.surface, aim.dx, aim.dy, shot.size * shot.power);
+    });
     this.host.sounds?.impact({ shell: shot?.id ?? -1, owner: shot?.owner ?? -1, x, y });
   }
 
@@ -105,11 +122,12 @@ export class ImpactFx {
    */
   private grouped(target: number, x: number, y: number, spawn: () => void): void {
     const n0 = this.f.hitGlows.length, n1 = this.f.shocks.length, n2 = this.f.scorches.length, n3 = this.f.hitLights.length, n4 = this.f.flares.length, n5 = this.f.rings.length;
-    const n6 = this.f.sparks.length, n7 = this.f.smoke.length, f0 = this.f.fragsMade, l0 = this.f.liquid.n;
+    const n6 = this.f.sparks.length, n7 = this.f.smoke.length, f0 = this.f.fragsMade, l0 = this.f.liquid.n, m0 = modMarkCount(this.f);
     spawn();
     const anc = this.f.anchors.open(this.host.state?.entities, target, x, y);
     if (!anc) return;
     this.f.liquid.bind(l0, anc);
+    modBind(this.f, m0, anc);
     const bind = (arr: { anc?: ImpactAnchor; life: number; max: number }[], from: number): void => {
       for (let i = from; i < arr.length; i++) { arr[i].anc = anc; anc.hold(arr[i].max - arr[i].life + 2); }
     };
@@ -136,17 +154,17 @@ export class ImpactFx {
       for (let i = 0; i < 5; i++) {
         if (this.f.particleKeep < 1 && Math.random() > this.f.particleKeep) continue;
         const a = Math.random() * Math.PI * 2, v = 0.3 + Math.random() * 0.8;
-        this.f.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * (0.7 + Math.random() * 0.6), size: cloud.size * size * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
+        this.f.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * LINGER * (0.7 + Math.random() * 0.6), size: cloud.size * size * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
       }
     }
-    this.f.rings.push({ x, y, life: 0, max: 10, size: imp.flash * size, color: imp.color });
+    this.f.rings.push({ x, y, life: 0, max: 10 * LINGER, size: imp.flash * size, color: imp.color });
     // The heavier marks ring out wider and slower
     if (imp.ring !== undefined) this.f.rings.push({ x, y, life: 0, max: 16, size: imp.flash * size * 1.8, color: imp.ring });
     // A puff of vapourised hull
     for (let i = 0; i < 2; i++) {
       if (this.f.particleKeep < 1 && Math.random() > this.f.particleKeep) continue;
       const a = (aim.surface ? Math.atan2(aim.ny, aim.nx) : normal) + (Math.random() - 0.5) * 1.2;
-      this.f.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 6 * size });
+      this.f.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: (40 + Math.random() * 20) * LINGER, size: 6 * size });
     }
   }
 
@@ -167,8 +185,8 @@ export class ImpactFx {
       this.f.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
     }
     if (this.f.hitGlows.length < HIT_CAP) {
-      if (L.core) this.f.hitGlows.push({ x, y, life: 0, max: L.core.life, size: L.core.size * k, color: 0xffffff, core: true });
-      if (L.bloom) this.f.hitGlows.push({ x, y, life: 0, max: L.bloom.life, size: L.bloom.size * k, color: L.bloom.color ?? imp.color, core: false });
+      if (L.core) this.f.hitGlows.push({ x, y, life: 0, max: L.core.life * LINGER, size: L.core.size * k, color: 0xffffff, core: true });
+      if (L.bloom) this.f.hitGlows.push({ x, y, life: 0, max: L.bloom.life * LINGER, size: L.bloom.size * k, color: L.bloom.color ?? imp.color, core: false });
     }
     const sh = L.shock;
     if (sh) {
@@ -207,7 +225,7 @@ export class ImpactFx {
         for (let i = 0; i < n; i++) {
           const d = fb.size * k * (0.15 + (0.6 * i) / Math.max(1, n - 1)), side = (Math.random() - 0.5) * fb.size * k * 0.5, v = 0.5 + Math.random() * 0.9;
           this.f.hitGlows.push({
-            x: x + oc * d - os * side, y: y + os * d + oc * side, life: -i, max: fb.life * (0.8 + Math.random() * 0.4), size: fb.size * k * (1 - 0.25 * i / n) * (0.85 + Math.random() * 0.3),
+            x: x + oc * d - os * side, y: y + os * d + oc * side, life: -i, max: fb.life * LINGER * (0.8 + Math.random() * 0.4), size: fb.size * k * (1 - 0.25 * i / n) * (0.85 + Math.random() * 0.3),
             color: fb.color ?? 0xffb050, cool: fb.cool ?? 0x5a1a08, core: false, vx: oc * v, vy: os * v,
           });
         }
@@ -249,11 +267,11 @@ export class ImpactFx {
     if (L.liquid) { this.f.liquid.keep = this.f.particleKeep; this.f.liquid.spawn(L.liquid, x, y, aim, k); }
     if (L.scorch && this.f.scorches.length < HIT_CAP) {
       // (on what it struck: it rides with it, its group's anchor)
-      this.f.scorches.push({ x, y, life: 0, max: L.scorch.life, size: L.scorch.size * k, color: L.scorch.color });
+      this.f.scorches.push({ x, y, life: 0, max: L.scorch.life * LINGER, size: L.scorch.size * k, color: L.scorch.color });
     }
     if (this.f.hitLights.length < 64) {
       const lt = L.light, glowR = (L.bloom?.size ?? L.core?.size ?? imp.flash * 0.5) * k;
-      this.f.hitLights.push({ x, y, life: 0, max: Math.max(L.bloom?.life ?? 0, L.core?.life ?? 0, 8), radius: lt ? lt.radius * k : 60 + glowR * 4, power: lt?.power ?? 1, color: L.bloom?.color ?? imp.color });
+      this.f.hitLights.push({ x, y, life: 0, max: Math.max(L.bloom?.life ?? 0, L.core?.life ?? 0, 8) * LINGER, radius: lt ? lt.radius * k : 60 + glowR * 4, power: lt?.power ?? 1, color: L.bloom?.color ?? imp.color });
     }
     // A cloud left where it landed, and a puff of vapourised hull (at the layered scale)
     const cloud = style.smokeCloud;
@@ -261,12 +279,12 @@ export class ImpactFx {
       for (let i = 0; i < 5; i++) {
         if (this.f.particleKeep < 1 && Math.random() > this.f.particleKeep) continue;
         const a = Math.random() * Math.PI * 2, v = 0.3 + Math.random() * 0.8;
-        this.f.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * (0.7 + Math.random() * 0.6), size: cloud.size * k * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
+        this.f.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * LINGER * (0.7 + Math.random() * 0.6), size: cloud.size * k * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
       }
     }
     if (Math.random() < this.f.particleKeep) {
       const a = (aim.surface ? Math.atan2(aim.ny, aim.nx) : aim.a) + (Math.random() - 0.5) * 1.2;
-      this.f.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 5 * k });
+      this.f.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: (40 + Math.random() * 20) * LINGER, size: 5 * k });
     }
     const sk = L.shake, st = this.host.state, me = st?.entities.get(st.playerId);
     if (sk && st && me) {

@@ -76,8 +76,9 @@ export class ServerBrowserUI {
   }
 
   /**
-   * The look: panels are hull plates (gunmetal, a lit top bevel, a dark lower edge, rivets at the corners) over Sol's
-   * stars with the sun's limb glowing up from below, as on the sign-in screen. The Join button is the one hot thing on
+   * The look: panels are hull plates (gunmetal, a lit top bevel, a dark lower edge, rivets at the corners) over the
+   * sign-in screen's own sky, which carries on under this screen (LoginUI.showBackdropOnly: Sol's stars and nebula, drawn
+   * by the game's renderer; the sun and planets stay behind on the sign-in screen), dimmed here so the plates and the small print read. The Join button is the one hot thing on
    * screen: a sun-orange plate with a glowing core. Colours are custom properties here, used by the inbox's styles too.
    */
   private setupStyles(): void {
@@ -94,19 +95,9 @@ export class ServerBrowserUI {
         --ease: 160ms ease-out;
         position: absolute; inset: 0;
         display: flex; align-items: center; justify-content: center;
-        /* Sol's limb below the screen, a warm haze over it, and two layers of stars (the background stays put as the
-           page scrolls: it belongs to the scroller) */
-        background:
-          radial-gradient(ellipse 70% 30% at 50% 116%, rgba(255, 214, 150, 0.85) 0%, rgba(255, 150, 60, 0.6) 42%, rgba(240, 100, 25, 0.32) 60%, rgba(190, 60, 10, 0.1) 72%, transparent 84%),
-          radial-gradient(ellipse 120% 60% at 50% 120%, rgba(255, 110, 30, 0.14), transparent 70%),
-          radial-gradient(1px 1px at 23px 41px, rgba(255, 255, 255, 0.85), transparent),
-          radial-gradient(1px 1px at 141px 97px, rgba(200, 220, 255, 0.7), transparent),
-          radial-gradient(1.5px 1.5px at 211px 183px, rgba(255, 240, 220, 0.9), transparent),
-          radial-gradient(1px 1px at 77px 213px, rgba(255, 255, 255, 0.55), transparent),
-          radial-gradient(1px 1px at 183px 19px, rgba(255, 255, 255, 0.5), transparent),
-          radial-gradient(1px 1px at 59px 139px, rgba(170, 200, 255, 0.45), transparent),
-          radial-gradient(ellipse at 50% 30%, #0a1222 0%, #04060c 70%);
-        background-size: 100% 100%, 100% 100%, 240px 240px, 240px 240px, 240px 240px, 240px 240px, 240px 240px, 240px 240px, 100% 100%;
+        /* A scrim over the sky behind (the sign-in screen's, still running): darkest behind the plates, lighter at
+           the edges where the stars and nebula show (it stays put as the page scrolls: it belongs to the scroller) */
+        background: radial-gradient(ellipse 80% 90% at 50% 45%, rgba(2, 4, 10, 0.6) 0%, rgba(2, 4, 10, 0.34) 65%, rgba(2, 4, 10, 0.14) 100%);
         z-index: 1900; overflow-y: auto; padding: 28px 16px; box-sizing: border-box;
         color: var(--ink-2);
       }
@@ -199,7 +190,8 @@ export class ServerBrowserUI {
       .join-main-btn:disabled small { color: var(--ink-3); }
 
       .join-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 4px; }
-      .join-stats { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--ink-2); }
+      .join-stats { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--ink-2);
+        text-shadow: 0 1px 2px #000, 0 0 8px rgba(0, 0, 0, 0.9); }
       .join-stats b { color: var(--ink); font-weight: 600; }
       .join-online::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px;
         vertical-align: 1px; background: #7dff9a; box-shadow: 0 0 6px rgba(110, 255, 150, 0.7); }
@@ -226,6 +218,9 @@ export class ServerBrowserUI {
         #server-browser-panel *, #server-browser-panel *::before { transition: none !important; animation: none !important; }
         .join-main-btn:active { transform: none; }
       }
+      /* Flight HUD pieces that sit on the page itself (above the game's own container, so above this screen too):
+         put away while the join screen is up (back from a lost connection, they were left showing over it) */
+      body.sg-join-open .ctb-fab, body.sg-join-open .sg-jump-hud { display: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -405,6 +400,7 @@ export class ServerBrowserUI {
   show(account: InboxAccount | null = null): void {
     this.visible = true;
     this.panel.style.display = 'flex';
+    document.body.classList.add('sg-join-open');
     this.inbox.setAccount(account);
     void this.inbox.refresh();
     this.refresh();
@@ -413,6 +409,7 @@ export class ServerBrowserUI {
   hide(): void {
     this.visible = false;
     this.panel.style.display = 'none';
+    document.body.classList.remove('sg-join-open');
   }
 
   isVisible(): boolean {

@@ -24,7 +24,7 @@ describe('message dispatch', () => {
     const server = makeEmptyServer({ clock: () => 1_000_000 });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));
     expect(server.handledMessageTypes().sort()).toEqual(pinned);
-    expect(server.handledMessageTypes().length).toBe(109); // (+5: the pickup panel and auto-pickup, docs/design/loot-pickup-2026-11.md; +1: fieldOrder, the fabricator's priority and hold lists)
+    expect(server.handledMessageTypes().length).toBe(110); // (+5: the pickup panel and auto-pickup, docs/design/loot-pickup-2026-11.md; +1: fieldOrder, the fabricator's priority and hold lists; +1: the gun range's library ships)
   }, 120_000);
 
   it('drops non-messages, pre-join messages and limited ones; unknown types fall through silently', () => {

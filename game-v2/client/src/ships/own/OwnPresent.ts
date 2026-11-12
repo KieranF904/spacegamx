@@ -7,7 +7,7 @@
  * extend:     a new own-ship gun event kind is one more branch in presentOwn
  */
 
-import { cloneCharge, GUN_ARRAYS, gunScalarsOntoRecord, gunControls, GUN_FX, ammoCodeOfMods, fireVolley, firesStraight, partWeaponDef, WEAPON_KIND_TYPE, jumpPhase, type SimShipState, type ShipState, type ShipTuning, type JumpTuning, type WeaponMods, type LaneRec, type FlightBody, type ShipReplicaSet } from '@space-game/common';
+import { cloneCharge, GUN_ARRAYS, gunScalarsOntoRecord, gunControls, GUN_FX, ammoCodeOfMods, fireVolley, firesStraight, aimReach, lifeToReach, partWeaponDef, shipGunDef, shipGunFx, fxMarks, gunCode, WEAPON_KIND_TYPE, jumpPhase, type SimShipState, type ShipState, type ShipTuning, type JumpTuning, type WeaponMods, type LaneRec, type FlightBody, type ShipReplicaSet } from '@space-game/common';
 import type { GameState, OwnStepped } from '../../state/GameState';
 import type { Renderer } from '../../rendering/Renderer';
 import type { ShipStore } from '../ShipStore';
@@ -85,8 +85,9 @@ export class OwnPresent {
     const pose = { x: state.body.x, y: state.body.y, angle: state.body.angle };
     for (const ev of events) {
       if (ev.k === 'fx') {
-        if (ev.fx === GUN_FX.beam) this.ownBeams.add(ev.part);
-        else if (ev.fx === GUN_FX.pulse) this.h.beamFx()?.startPulse(ship.id, ev.part, tick);
+        // (`mask`: its live weapon modifier effects, which the beam is drawn with)
+        if (ev.fx === GUN_FX.beam) { this.ownBeams.add(ev.part); this.h.beamFx()?.beamMask(ship.id, ev.part, ev.mask ?? 0); }
+        else if (ev.fx === GUN_FX.pulse) this.h.beamFx()?.startPulse(ship.id, ev.part, tick, ev.mask ?? 0);
         continue;
       }
       // (a volley: its first barrel's event builds it)
@@ -94,18 +95,23 @@ export class OwnPresent {
       const w = ship.derived.weapons.find((x) => x.part === ev.slot);
       if (!w) continue;
       // (Homing missiles change course: those the server sends as they fly)
-      const pdef = partWeaponDef(this.h.tuning, w.kind, ship.blueprint.parts[w.part], w);
-      if (!firesStraight(pdef)) continue;
+      // (with the shot's weapon modifier effects on it: `fx`, its mask)
+      const fx = ev.fx, pdef = fx ? shipGunDef(this.h.tuning, ship, w, undefined, fx) : partWeaponDef(this.h.tuning, w.kind, ship.blueprint.parts[w.part], w);
+      // (nor a shell lobbed, guided or walked to the aim. One that flies straight to burst at the aim is drawn as it leaves
+      // the gun, with the fuse the aim distance its guns stepped on gives: the server's row takes it over, WeaponFx.claim)
+      const fused = !firesStraight(pdef) && !!pdef.endAtAim && !pdef.homing && !pdef.guided && !pdef.salvo && !pdef.walk && !pdef.lob && !pdef.hold;
+      if (!firesStraight(pdef) && !fused) continue;
       const aug = (ev as { aug?: 1 }).aug, ammo = ammoCodeOfMods(this.h.ownAmmo()?.(w.kind));
-      const fire = { owner: ship.id, tick, part: w.part, aimQ: ev.aimQ, ammo, aug };
+      const fire = { owner: ship.id, tick, part: w.part, aimQ: ev.aimQ, ammo, aug, fx };
+      const mods = fxMarks(shipGunFx(ship, w.part), fx);
       // (the ammunition it fired, for your own shells on the tick layer, built when a snapshot confirms the tick: confirmOwnFires)
-      this.ownAmmoAt.set(tick * 256 + w.part, ammo);
+      if (!fused) this.ownAmmoAt.set(tick * 256 + w.part, ammo);
       while (this.ownAmmoAt.size > 256) this.ownAmmoAt.delete(this.ownAmmoAt.keys().next().value!);
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       const v = fireVolley(fire, ship, { ...pose, vx: state.body.vx, vy: state.body.vy }, this.h.tuning);
       if (!v) continue;
       for (const sh of v.shells) {
-        scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose });
+        scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), fuse: fused ? lifeToReach(sh.life, Math.hypot(sh.vx - state.body.vx * 0.3, sh.vy - state.body.vy * 0.3), aimReach(state.guns.heldDist ?? input.aimDist, pdef)) : undefined, arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose, fx: mods });
       }
     }
   }
@@ -120,11 +126,12 @@ export class OwnPresent {
     if (!ship || ship.kind !== 'ship' || !scene) return [];
     const w = ship.derived.weapons.find((x) => x.part === rec.part);
     if (!w) return [];
-    const v = fireVolley({ owner, tick: t, part: rec.part, aimQ: rec.aimQ, ammo: 0, aug: rec.aug ? 1 : undefined }, ship, pose, this.h.tuning);
+    const v = fireVolley({ owner, tick: t, part: rec.part, aimQ: rec.aimQ, ammo: 0, aug: rec.aug ? 1 : undefined, fx: rec.fx || undefined }, ship, pose, this.h.tuning);
     if (!v) return [];
-    const pdef = partWeaponDef(this.h.tuning, w.kind, ship.blueprint.parts[w.part], w), at = { x: pose.x, y: pose.y, angle: pose.angle };
+    const pdef = rec.fx ? shipGunDef(this.h.tuning, ship, w, undefined, rec.fx) : partWeaponDef(this.h.tuning, w.kind, ship.blueprint.parts[w.part], w), at = { x: pose.x, y: pose.y, angle: pose.angle };
+    const mods = fxMarks(shipGunFx(ship, w.part), rec.fx);
     const model = (ship.blueprint.parts[w.part]?.fn ?? '') + (rec.aug ? AUG : '');
-    return v.shells.map((sh) => scene.predictShot({ owner, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model, damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: pilot ? t - 1 : t, vx: sh.vx, vy: sh.vy, size: sh.size, pose: at }));
+    return v.shells.map((sh) => scene.predictShot({ owner, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model, damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: pilot ? t - 1 : t, vx: sh.vx, vy: sh.vy, size: sh.size, pose: at, fx: mods }));
   }
 
   /** Take back a shell drawn ahead that never was */
@@ -145,7 +152,7 @@ export class OwnPresent {
         const aug = (ev as { aug?: 1 }).aug, w = ship.derived.weapons.find((x) => x.part === ev.slot);
         if (!w) continue;
         const ammo = this.ownAmmoAt.get(t * 256 + w.part) ?? ammoCodeOfMods(this.h.ownAmmo()?.(w.kind));
-        if (this.h.ownShells.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.h.ownShells.fired({ tick: t, part: w.part, aimQ: ev.aimQ, ammo, aug });
+        if (this.h.ownShells.derivable(ship, gunCode(w.part, ammo, !!aug, ev.fx))) this.h.ownShells.fired({ tick: t, part: w.part, aimQ: ev.aimQ, ammo, aug, fx: ev.fx });
       }
     }
   }

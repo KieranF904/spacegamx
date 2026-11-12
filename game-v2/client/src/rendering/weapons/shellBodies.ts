@@ -5,6 +5,7 @@
  *
  *   dart       a slim finned body with a red nose band, a flickering exhaust flame at its tail (missiles)
  *   canister   a banded shell with a fuse ring that runs down to its burst and a nose lamp that blinks faster as it goes (flak)
+ *   slug       a stubby glowing cannon shell with a driving band, on a long straight tracer of one width (the Mauler)
  *
  * Each part is a pooled particle (no Graphics, nothing allocated per frame). Solid parts go in the body pool, light in the
  * glow pool (which the bloom takes).
@@ -45,7 +46,20 @@ export interface CanisterShell {
   timer: number;
 }
 
-export type ShellBody = DartShell | CanisterShell;
+/** A stubby cannon shell, glowing hot, on a long straight tracer with the air it cuts either side: no fins, no flame */
+export interface SlugShell {
+  kind: 'slug';
+  len: number;
+  width: number;
+  /** The hot metal of its body, the white heat down its middle, and the dark driving band round its base */
+  body: number;
+  core: number;
+  band: number;
+  /** The faint lines of cut air either side of its tracer */
+  wake: number;
+}
+
+export type ShellBody = DartShell | CanisterShell | SlugShell;
 
 export const DART_SHELL: DartShell = {
   kind: 'dart', len: 14, width: 3.6, fin: 3.6, flame: 11,
@@ -56,6 +70,12 @@ export const CANISTER_SHELL: CanisterShell = {
   kind: 'canister', len: 11, width: 7, ring: 10,
   body: 0x5d6352, cap: 0x3d4237, band: 0xff8a3c, lamp: 0xff5a2a, timer: 0xffc080,
 };
+
+export const SLUG_SHELL: SlugShell = {
+  kind: 'slug', len: 15, width: 9.5, body: 0xff9a38, core: 0xfff6d8, band: 0x7a3410, wake: 0xd8dce4,
+};
+/** A slug's tracer, tail to head: the share of its length each covers back from the shell, and its light (they add up towards the shell) */
+const SLUG_TRACER = [{ len: 1, lit: 0.34 }, { len: 0.6, lit: 0.3 }, { len: 0.28, lit: 0.36 }];
 
 /** How far through its fuse a canister is, 0 at the muzzle to 1 at its burst: its endTick, else the tick it is known to end on (0 when neither is known) */
 export function fuseFraction(tick: number, spawnTick: number, endTick: number, endAt: number): number {
@@ -105,6 +125,7 @@ export class ShellBodies {
    */
   draw(shell: ShellBody, hx: number, hy: number, tx: number, ty: number, ux: number, uy: number, z: number, alpha: number, glow: number, clock: number, phase: number, fuse: number, keep: number): void {
     if (shell.kind === 'dart') this.dart(shell, hx, hy, ux, uy, z, alpha, glow, clock, phase, keep);
+    else if (shell.kind === 'slug') this.slug(shell, hx, hy, tx, ty, ux, uy, z, alpha, glow, clock, phase, keep);
     else this.canister(shell, hx, hy, tx, ty, ux, uy, z, alpha, glow, clock, fuse, keep);
   }
 
@@ -130,6 +151,43 @@ export class ShellBodies {
     // (the body pool holds four textures, streak, disc, ring and the world's puff: the nose is discs, not a tongue)
     this.dot(this.body, disc(), cx + ux * L * 0.22, cy + uy * L * 0.22, W * 0.5, s.body, alpha);
     this.dot(this.body, disc(), cx + ux * L * 0.3, cy + uy * L * 0.3, W * 0.3, s.nose, alpha);
+  }
+
+  private slug(s: SlugShell, hx: number, hy: number, tx: number, ty: number, ux: number, uy: number, z: number, alpha: number, glow: number, clock: number, phase: number, keep: number): void {
+    const m = Math.pow(z, 0.7), L = s.len * m, W = s.width * m;
+    const nx = -uy, ny = ux;
+    const cx = hx - ux * L * 0.5, cy = hy - uy * L * 0.5;
+    const tailX = hx - ux * L, tailY = hy - uy * L, noseX = hx - ux * W * 0.5, noseY = hy - uy * W * 0.5;
+    const lx = tx - tailX, ly = ty - tailY, beat = clock * 0.45 + phase * 6.283;
+    // Its tracer, back to where its tracer begins: dead straight and one width all the way, fading along its length (laid as
+    // lengths over one another, each shorter: a thin white-hot line in a narrow glow, never a flame that fattens)
+    for (const t of SLUG_TRACER) {
+      const x0 = tailX + lx * t.len, y0 = tailY + ly * t.len;
+      this.line(this.light, x0, y0, cx, cy, W * 0.8, glow, 0.7 * t.lit * alpha);
+      this.line(this.light, x0, y0, cx, cy, W * 0.26, s.core, t.lit * alpha);
+    }
+    // The air it cuts: a faint thin line either side of the tracer, the same length
+    if (keep >= FULL_DETAIL) {
+      for (let side = -1; side <= 1; side += 2) {
+        const ox = nx * side * W * 0.85, oy = ny * side * W * 0.85, w = Math.max(1, W * 0.1);
+        this.line(this.light, tx + ox, ty + oy, tailX + ox, tailY + oy, w, s.wake, 0.24 * alpha);
+        this.line(this.light, tailX + lx * 0.45 + ox, tailY + ly * 0.45 + oy, cx + ox, cy + oy, w, s.wake, 0.3 * alpha);
+      }
+    }
+    // Its light: a glow round it, and a bow of hot air across its nose (a soft dot squashed along its line)
+    this.dot(this.light, softDot(0.5, 0.1), cx, cy, W * 2.4, glow, 0.55 * alpha);
+    this.light.take(softDot(0.5, 0.1), hx + ux * W * 0.1, hy + uy * W * 0.1, 0.5, 0.5, s.core, 0.55 * alpha, Math.atan2(uy, ux), (W * 1.3) / DOT_SIZE, (W * 3.8) / DOT_SIZE);
+    // The shell: a blunt body with a rounded nose, the driving band across its base, white-hot down its middle (pulsing a little)
+    this.line(this.body, tailX, tailY, noseX, noseY, W, s.body, alpha);
+    this.dot(this.body, disc(), noseX, noseY, W * 0.5, s.body, alpha);
+    const bx = tailX + ux * L * 0.2, by = tailY + uy * L * 0.2;
+    this.line(this.body, bx - nx * W * 0.5, by - ny * W * 0.5, bx + nx * W * 0.5, by + ny * W * 0.5, L * 0.13, s.band, alpha);
+    this.line(this.body, tailX + ux * L * 0.34, tailY + uy * L * 0.34, noseX, noseY, W * 0.5, s.core, alpha);
+    this.dot(this.body, disc(), noseX, noseY, W * 0.25, s.core, alpha);
+    this.dot(this.light, softDot(0.5, 0.1), noseX, noseY, W * (0.9 + 0.25 * Math.sin(beat)), s.core, 0.6 * alpha);
+    // (it spins: a glint crossing its body)
+    const g = Math.sin(beat * 0.8) * W * 0.32;
+    this.dot(this.body, disc(), cx + nx * g, cy + ny * g, W * 0.13, 0xffffff, 0.85 * alpha);
   }
 
   private canister(s: CanisterShell, hx: number, hy: number, tx: number, ty: number, ux: number, uy: number, z: number, alpha: number, glow: number, clock: number, fuse: number, keep: number): void {

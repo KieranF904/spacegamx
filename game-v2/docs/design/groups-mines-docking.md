@@ -14,21 +14,21 @@ coalesced or batched to save bytes. Kieran dropped the "delay both pilots' input
 
 ### 1.1 Rules
 
-1. Every weapon is in any of **four groups**, several at once if wanted. A part's groups are a 4-bit mask on the
+1. Every weapon is in any of **five groups** (four until 2026-11-12, section 1.5), several at once if wanted. A part's groups are a 5-bit mask on the
    blueprint part, `wg` (bit 0 is group 1). **No `wg` means group 1 only**, so every existing design has all its
    weapons in group 1.
 2. The pilot has two **selections**: the group the **left button** fires and the group the **right button** fires.
-   Each is `all` (0) or a group 1-4. **Both start at `all`**, which fires exactly as the game does today: left fires
+   Each is `all` (0) or a group 1-5. **Both start at `all`**, which fires exactly as the game does today: left fires
    every weapon; right fires every weapon, or the mining lasers on a ship that has them.
 3. With the right selection on a group, the right button fires that group (a mining ship then does not mine on the
    right button until it is set back to `all`; the HUD says so).
 4. Groups are edited in the **hangar** (saved with the design) and in the **field build overlay** on the live ship (a
    `weaponGroups` message, no plan save, free).
 5. **Keys** (all rebindable, in `input/keybindings.ts` ACTIONS): `Comma` / `Period` cycle the left selection back /
-   forward (all, 1, 2, 3, 4, all ...); `Slash` cycles the right selection forward. A Gameplay setting, off by default,
+   forward (all, 1, 2, 3, 4, 5, all ...); `Slash` cycles the right selection forward. Since 2026-11-12 the number keys
+   pick a group directly (section 1.5). A Gameplay setting, off by default,
    lets the **mouse wheel** cycle the left selection (the wheel zooms today; with the setting on, zoom stays on the keys
-   and `Home`). A second setting, off by default, makes **number keys 1-4** pick the left group and **5** pick `all`
-   instead of the quick bar. (Wheel and digits are taken today, which is why both are opt-in.)
+   and `Home`). (The second opt-in setting, number keys instead of the quick bar, is gone: section 1.5.)
 6. The **HUD** shows the two selections ("L: 2  R: all") and, for the left group's weapons, each one's state:
    **ready**, **reloading** (clip, charge, cooldown) or **short of power**, from the gun state the client already steps
    (`client/src/ships/gunHud.ts`, the weapon ring). A weapon outside both selected groups is drawn dim.
@@ -81,6 +81,50 @@ blueprint everyone has).
 No fire delay, no batching: the selection never waits for anything; a click fires on the tick it did before.
 
 ---
+
+### 1.5 Five groups, keys and the HUD row (2026-11-12)
+
+- **Five groups.** `WEAPON_GROUPS` is 5: a part's `wg` is a 5-bit mask (0..31), a selection is `all` (0) or 1-5 in its
+  nibble of the same input byte. No message or input layout changed; the values only range wider. `clickMasks` is a
+  bitmap over every possible group mask, so it is now 32 bits wide: it is kept unsigned (`>>> 0`), and "every gun's"
+  is `EVERY_MASK` (2^32 - 1). It rides `gunSync` and the hashes as a plain number, as before.
+- **Keys.** `1`-`5` (actions `group1`..`group5`, rebindable) set the group the **left** button fires; with **Shift**
+  held, the **right** button's. The number of the group that button is already on puts it back on `all`. Untouched,
+  both stay on `all` and the ship fires as it always did. Shift is read from the key event (`InputManager.shiftDown`),
+  it is not a binding of its own (bindings have no modifier keys); a pilot boosting on Shift who presses a number sets
+  the right button's group. `Comma` / `Period` / `Slash` still cycle. The build overlay and the hangar keep 1-5 for
+  putting the weapon under the mouse in a group.
+- **The quick bar is on C V B N M** (`quick1`..`quick5`, rebindable; each slot shows its bound key). The five
+  actions that were on those letters moved: the component guide C to `[`, the helm switch V to `'`, the ping B to
+  `]`, the nav markers N to `\`, the map M to `;`. The action menu (Z) and interact (X) are where they always were.
+  A quick bar key does nothing on the map (C centres it there, and M must not use an item where it used to shut the
+  map: the key that opens the map shuts it) or with Ctrl / Cmd held (Ctrl+C copies). The opt-in "number keys pick
+  weapon group" setting is removed. How it got here, all on 2026-11-12 and only the first ever on production: 1-5
+  (bindings version 1), `[ ] ; ' \` (version 2), Z X C V B with the action menu on `\` and interact on `;`
+  (version 3), then Kieran: "Just use cvbnm" (version 4).
+- **Handlers name actions, not letters.** The key tables (`app/keys.ts`), the helm switch (`ShipClient`), the menu
+  modifier (`app/windows.ts`) and the gun range's refused keys (`rangeKeys.ts`) take these actions' codes from
+  `keybindings.ts` `actionKey(id)`, so a default can move again in one place. `InputManager` keeps every bound key
+  from the page (no scrolling on Space, no quick find on `'` or `/`), except with Ctrl / Cmd held.
+- **Saved bindings** (`Settings.ts` `migrateBindings`, once, `bindingsVersion` 4; the defaults of each older version are
+  `keybindings.ts` `OLD_DEFAULT_KEYS`): an action still on the default it had when the save was made (a quick slot on
+  1-5 in a version 1 save, on `[ ] ; ' \` in a version 2 save, on Z X C V B in a version 3 save; one of the five on
+  its letter; interact on `;` or the action menu on `\` in a version 3 save, which go back to X and Z) moves to
+  today's key; one the pilot had moved stays. Where a pilot's own key sits on a new default, the pilot's choice keeps the key and the
+  other action is left unbound (blank on the Controls page) rather than shared.
+- **The HUD row** (`client/src/ui/hud/GroupRow.ts`, pure model `groupRowModel.ts`): five cells directly above the quick
+  bar, one a group: its number, icons of the ship's weapons in it (the part items' icons; an empty group is dim), and
+  an **L** / **R** badge on each group that button fires now. On `all` every armed group carries the badge (quieter);
+  a picked group is lit. Click a cell: the left button fires it; right-click: the right button; again: back to `all`.
+  It follows the ship (rebuilds, a new ship) and hides on a ship with no weapons.
+- **Example ships** (`data/ships/blueprints/dev`: mod-showcase-1, beam-split-1, beam-pierce-1, beam-ends-1,
+  beam-stack-1): each weapon is in its own group, left to right from 1, and each ship accelerates a little harder than the Wren. Each has the power
+  for what it shows (2026-11-12, second pass): every engine sits under its own generator (a Cell Reactor an Ion Drive;
+  beam-split-1 also has Plasma Drives under Overclock Reactors), a Cutter is on a Fusion Plant (both its lines at 94 E/s or
+  more: it has a floor of 145 E/s while it fills) and the Lance on two (a Joiner Bank III a column, 143 E/s each), so any
+  group, any two and all of them fire at full rate for as long as they are held, boosting.
+  `common/src/ships/devExampleShips.test.ts` pins the groups, each gun's modifier effects, the thrust and that power (the
+  hangar's load test, a group at a time).
 
 ## 2. The Mine Bay
 

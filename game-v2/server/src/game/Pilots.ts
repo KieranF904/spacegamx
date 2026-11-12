@@ -81,6 +81,10 @@ export interface PilotHost {
   safeAt?(systemNum: number, x: number, y: number): boolean;
   /** A system no pilot is ever saved in, or put back in at login (the gun range): capture keeps the position it had */
   transient?(systemNum: number): boolean;
+  /** In a moving landmark's tracking zone there now (common world/landmarks.ts): the landmark and the offset from it, to save. Null: open space */
+  landmarkOffset?(systemNum: number, x: number, y: number): { id: string; dx: number; dy: number } | null;
+  /** Where a saved landmark offset is now (the landmark's spot at the system's tick, plus the offset). Null: no such landmark */
+  landmarkPoint?(systemNum: number, at: { id: string; dx: number; dy: number }): { x: number; y: number } | null;
   /** The pilot's ship record changed what their hangar view shows (a part the bank built in): send the hangar again */
   hangarChanged?(conn: PilotConn): void;
 }
@@ -469,6 +473,14 @@ export class Pilots {
     s.dirty = true;
     persist.mirror(this, s);
     this.sendItems(conn);
+  }
+
+  /** Admin: the XP that takes them to their next level (0 at the cap, or no pilot); the new level */
+  levelUp(conn: PilotConn): number {
+    const p = this.sessions.get(conn)?.profile;
+    if (!p || p.level >= LEVEL_CAP) return 0;
+    this.addXp(conn, xpToReach(p.level + 1) - p.xp);
+    return p.level;
   }
 
   /** Award XP; levels up (with a skill point each, to the cap) as thresholds pass */

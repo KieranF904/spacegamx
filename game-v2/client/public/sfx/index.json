@@ -259,6 +259,10 @@
     "variants": 2,
     "loop": false
   },
+  "mauler_shot": {
+    "variants": 2,
+    "loop": false
+  },
   "twinlink_shot": {
     "variants": 2,
     "loop": false

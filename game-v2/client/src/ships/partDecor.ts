@@ -30,6 +30,7 @@ import { SIDE_NORMAL, mountOf, mountingOf, partMount, weaponSides, type Catalog,
 import { SHIP_FUNCTIONS } from './shipFunctionData';
 import { functionColor, hexToNum, mix } from './shipColors';
 import { fixedGun, gunId, housingOf, turretBaseOf, turretHead, type GunShape, type Housing } from './gunDecor';
+import { modDecor } from './modDecor';
 
 /** `bevel` (cells): a raised, lit rim; `sunk`: set into the hull (its rim lit on the far side) */
 export interface DecorPoly { pts: number[]; color: number; glow?: number; bevel?: number; sunk?: boolean }
@@ -123,7 +124,9 @@ export function partDecor(geom: PlacedGeom, part: PlacedPart = geom.part): PartD
   const kind = DECOR_SHAPES[decor];
   if (part.fn === 'plating_reactive_armour' || part.fn === 'plating_spaced_plating') { plating(out, geom, part.fn === 'plating_reactive_armour'); return out; }
   /** Batteries' charge cells: green for general, blue for drive, red for weapon */
-  if (kind === 'battery') { battery(out, geom, glow ?? 0x4ade80); return out; }
+  if (kind === 'battery') { battery(out, geom, glow ?? 0x4ade80); modDecor(out, geom, part, glow, true); return out; }
+  // Weapon modifier parts and the heavier line tiers: by what the part is, not a decor key (modDecor.ts)
+  if (kind === 'none' && modDecor(out, geom, part, glow)) return out;
   const f = frameOf(part === geom.part ? geom : { ...geom, part });
   if (!f) return out;
   const W = f.hi - f.lo, D = f.depth, mid = (f.lo + f.hi) / 2;

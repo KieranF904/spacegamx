@@ -4,7 +4,7 @@ Mk IV · Large · Block · 4 cells
 Hull · mass503 hp · 6.7
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage44/s · reach 8,008
+Damage52/s · reach 8,008
 Hits withExplosive · penetration 3.5
 Fire rate0.3/s · shells · Missiles (no energy)
 Modelammo: Fires rounds from your cargo on a fixed beat and costs no power. With none left it fires weak plain rounds (40% damage).
@@ -32,7 +32,7 @@ Large · Block
 a huge slow warhead · ammo
 
 == keyStats ==
-44 dmg/s · reach 8,008 · ammo
+52 dmg/s · reach 8,008 · ammo
 
 == mountBadge ==
 FIXED
@@ -49,4 +49,4 @@ Needs 2 clear cells ahead
 {"open":true,"badge":"Lv 33","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":503.03999999999996,"mass":6.72,"firepower":44.09090909090909,"toughness":503.03999999999996,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":44.09090909090909,"range":8007.999999999999,"damageType":"explosive","pen":3.5}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":503.03999999999996,"mass":6.72,"firepower":52.27272727272727,"toughness":503.03999999999996,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":52.27272727272727,"range":8007.999999999999,"damageType":"explosive","pen":3.5}

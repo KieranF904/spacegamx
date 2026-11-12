@@ -4,7 +4,7 @@ Mk III · Small · Square · 1 cell
 Hull · mass84 hp · 1.0
 Armour · build3 · 2.5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage33/s · reach 5,368
+Damage49/s · reach 5,330
 Hits withKinetic · penetration 2.5
 Clip6 rounds at 5.0/s · reloads in 1.0s from energy (20 a clip), when empty or a second after you let go
 Modelclip: Fires n rounds fast, then reloads from power when empty, or 1 s after you let go.
@@ -34,7 +34,7 @@ Small · Square
 fast, accurate needles in short bursts
 
 == keyStats ==
-33 dmg/s · reach 5,368 · clip 6 · 1.0s reload · draws 14
+49 dmg/s · reach 5,330 · clip 6 · 1.0s reload · draws 14
 
 == mountBadge ==
 TURRET 200°
@@ -50,4 +50,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 24","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Small","area":1,"hp":84,"mass":1,"firepower":32.72727272727273,"toughness":84,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":32.72727272727273,"range":5368,"damageType":"kinetic","pen":2.5,"draw":14.4}
+{"grade":3,"mark":"Mk III","size":"Small","area":1,"hp":84,"mass":1,"firepower":49.09090909090909,"toughness":84,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":49.09090909090909,"range":5330,"damageType":"kinetic","pen":2.5,"draw":14.4}

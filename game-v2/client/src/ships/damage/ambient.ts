@@ -1,7 +1,8 @@
 /**
  * @contract client.damage.ambient
  * owns:       effects that go on over time: burning parts, wrecked boss pieces smoking, a boss's charging glow, embers off
- *             crumbling debris and glints over ships being repaired
+ *             crumbling debris and glints over ships being repaired (a spreading fire, a Burn modifier's, is
+ *             damage/fires.ts's: here it is only handed on)
  * needs:      DamageCtx (particles, ships, sound, clock), common isRuined
  * invariants: a burn ends when its time is up or its part is gone — client/src/ships/damage/shieldsAmbient.test.ts
  * extend:     a new lingering effect is one member below, called from DamageFx.update
@@ -9,6 +10,7 @@
 
 import { EntityType, isRuined } from '@space-game/common';
 import type { DamageCtx } from './context';
+import { PartFires } from './fires';
 
 export class AmbientFx {
   /** Burning parts (incendiary hits): flames until `until` (seconds on this clock) */
@@ -16,10 +18,13 @@ export class AmbientFx {
   /** Bosses charging a nova: a gathering glow until it fires */
   private charges: { body: number; kind: string; start: number; until: number }[] = [];
   private emberClock = 0;
+  /** Spreading fires (a Burn modifier's: an ignite with `gen`), drawn their own way */
+  readonly spread: PartFires;
 
-  constructor(private readonly c: DamageCtx) {}
+  constructor(private readonly c: DamageCtx) { this.spread = new PartFires(c); }
 
-  onIgnite(bodyId: number, part: number, ticks: number): void {
+  onIgnite(bodyId: number, part: number, ticks: number, gen?: number): void {
+    if (gen) { this.spread.onIgnite(bodyId, part, ticks, gen); return; }
     const until = this.c.time + ticks / 60;
     const cur = this.burns.find((b) => b.body === bodyId && b.part === part);
     if (cur) cur.until = Math.max(cur.until, until);
@@ -40,6 +45,7 @@ export class AmbientFx {
   /** Flames licking off burning parts, and smoke and fire pouring off wrecked ones (a boss's ruined pieces) */
   fires(frames: number): void {
     this.wrecks(frames);
+    this.spread.emit(frames);
     if (!this.burns.length) return;
     this.burns = this.burns.filter((b) => b.until > this.c.time && this.c.source.get(b.body)?.derived.alive[b.part] !== false);
     for (const b of this.burns) {
@@ -55,6 +61,9 @@ export class AmbientFx {
         life: 0, max: 26 + Math.random() * 20, size: 1.3, grow: 0, color: 0xffa04a, alpha: 1, drag: 0.97, rot: 0, vr: 0 });
     }
   }
+
+  /** The spreading fires' glows and chars, where their parts are this frame (the pools open) */
+  drawFires(): void { this.spread.draw(); }
 
   wrecks(frames: number): void {
     const catalog = this.c.source.catalog;

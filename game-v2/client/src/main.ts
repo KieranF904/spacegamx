@@ -6,6 +6,7 @@
 // page's Content-Security-Policy (deploy/vps/nginx-spacegame-game.conf) needs no 'unsafe-eval'. Loads before Pixi starts.
 import 'pixi.js/unsafe-eval';
 import { Game } from './Game';
+import { mountTopBanner } from './ui/join/topBanner';
 
 // Wait for DOM
 document.addEventListener('DOMContentLoaded', async () => {
@@ -15,6 +16,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
+  // The narrow banner along the top (Support the game, Discord): there from the first screen on
+  mountTopBanner();
   const game = new Game(container);
   await game.init();
   game.start();

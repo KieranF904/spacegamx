@@ -1,0 +1,11 @@
+{
+  "prompt": "Single short autocannon round firing, bassy punchy thump",
+  "settings": {
+    "duration_seconds": 0.5,
+    "prompt_influence": 0.7,
+    "loop": false,
+    "output_format": "mp3_44100_128"
+  },
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "time": "2026-11-06T02:13:44.656Z"
+}

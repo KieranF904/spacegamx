@@ -55,7 +55,8 @@ import { MuzzleFx } from './fx/MuzzleFx';
 import { TracerFx } from './fx/TracerFx';
 import { FlakAimFx, type AimMark } from './fx/FlakAimFx';
 import { FADE_FRAMES } from './fx/particleTypes';
-import { shotFromPrediction, shotFromRow } from './fx/shotFactory';
+import { chainArc, isModBlast, modFrame } from './fx/mods';
+import { setFuse, shotFromPrediction, shotFromRow } from './fx/shotFactory';
 import type { DrawnHit, FirePoseXY, PredictedShell, ShellLook, Shot } from './fx/shotTypes';
 
 export type { DrawnHit, FirePoseXY, PredictedShell, ShellLook } from './fx/shotTypes';
@@ -297,6 +298,19 @@ export class WeaponFx {
     this.impact.beamBurn(x, y, dx, dy, owner, burn);
   }
 
+  /**
+   * A gun's detonation the server told: drawn as a weapon modifier's blast when it is one (fx/mods isModBlast: an
+   * explosive beam's end, a piercing shot's way out of a hull, `out` its heading in whole degrees), else nothing here
+   */
+  modBlast(kind: string, x: number, y: number, radius: number, out?: number): void {
+    if (isModBlast(kind, radius, out)) this.impact.blast(x, y, radius, out === undefined ? undefined : (out * Math.PI) / 180);
+  }
+
+  /** A chain modifier's arc leaping from one hull to the next (`k` its strength): the effect's own bolt, over the gun's arc */
+  chainArc(x0: number, y0: number, x1: number, y1: number, k: number): void {
+    chainArc(this.f, x0, y0, x1, y1, k, (x0 * 31 + y0 * 17 + x1 * 7 + y1) | 0);
+  }
+
   /** A damage message with a hit point: stop that tracer there and throw sparks. */
   onHit(projectileId: number | undefined, x: number, y: number): void {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
@@ -337,7 +351,11 @@ export class WeaponFx {
     if (shot.pending) this.landPending(shot, tt - shot.spawnTick, false);
     if (shot.fading === null && t >= shot.endAt) {
       if (shot.pending) this.landPending(shot, Infinity, true);
-      if (shot.fading === null) shot.fading = 0;
+      if (shot.fading === null) {
+        shot.fading = 0;
+        // (one that burst at the aim, its fuse run out: gone into its burst, as one that ended at a surface)
+        if (shot.endTick > 0 && shot.endAt === shot.endTick) { shot.ended = true; shot.endedAt = this.clock; }
+      }
     }
   }
 
@@ -488,6 +506,8 @@ export class WeaponFx {
     this.sounds?.renamed(best.id, e.id);
     best.id = e.id;
     best.predicted = false;
+    // (an aim burst's fuse: the server's, to the tick)
+    if (!best.ended && (e.data?.[9] ?? 0) > 0) setFuse(best, e.data![9]);
     return best;
   }
 
@@ -578,6 +598,7 @@ export class WeaponFx {
     this.ageShots(frames);
     this.tracer.drawAll(this.shots, this.clock, frames);
     this.flakAim.draw(this.clock);
+    modFrame(f, frames);
     f.drawParticles(frames);
     f.drawLayered(frames);
     f.end();

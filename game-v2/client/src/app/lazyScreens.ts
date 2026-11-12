@@ -10,7 +10,7 @@ import { fieldGuide } from '../ui/fieldGuideLazy';
 import { itemIcon } from '../ui/itemIcons';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
-import { chamberOf } from '../ui/gunRange/rangeState';
+import { chamberOf, roomName } from '../ui/gunRange/rangeState';
 import { onTutorial, resetTutorial } from '../ui/tutorial/tutorialStore';
 import { clearTrainingBodies } from '../state/trainingBodies';
 import { loadField } from '../ships/field/mount';
@@ -84,10 +84,12 @@ export function makeGunRangeHud(host: WindowHost, w: WindowSet): Lazy<GunRangeHu
       econ: host.pilot.econ,
       tuning: shipTuning as ShipTuning,
       chamber: () => chamberOf(host.state.systemId),
+      roomName: (id) => roomName(host.state.systemId, id),
       me: () => { const e = host.state.entities.get(host.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
       hull: (id) => {
         const ship = host.shipClient.store.get(id);
-        if (!ship) return null;
+        // (A mob target, a mine, is no ship: it is whole for as long as it is there)
+        if (!ship) { const e = host.state.entities.get(id); return e ? { hp: 1, max: 1, name: e.name || 'Target' } : null; }
         let hp = 0, max = 0;
         for (let i = 0; i < ship.hp.length; i++) { max += ship.maxHp[i]; if (ship.derived.alive[i]) hp += ship.hp[i]; }
         return { hp, max, name: host.state.entities.get(id)?.name || ship.blueprint.name || 'Target' };

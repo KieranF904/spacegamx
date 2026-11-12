@@ -57,7 +57,7 @@ describe('models', () => {
     for (const fn of ['core', 'hull', 'armor', 'cargo']) expect(FN(fn).legacy).toBeFalsy();
     expect(FN('conduit').legacy).toBe(true);
     // A family's models, in unlock order
-    expect(catalog.families.get('cannon')!.map((m) => m.name)).toEqual(['Pip', 'Hammer', 'Twinlink', 'Slurry Cannon', 'Longbarrel', 'Bastion']);
+    expect(catalog.families.get('cannon')!.map((m) => m.name)).toEqual(['Pip', 'Hammer', 'Twinlink', 'Mauler', 'Slurry Cannon', 'Longbarrel', 'Bastion']);
   });
 
   it('their material is only their HP, mass and resistances: their numbers are their own', () => {
@@ -346,6 +346,8 @@ describe('legacy parts stand for models', () => {
     expect(legacyModel(catalog, { fn: 'weapon', piece: 'sq' })!.id).toBe('cannon_pip');
     expect(legacyModel(catalog, { fn: 'weapon', piece: 'rect2' })!.id).toBe('cannon_hammer');
     expect(legacyModel(catalog, { fn: 'weapon', piece: 'block3' })!.id).toBe('cannon_bastion');
+    // (The Mauler, added beside the Bastion on its piece, takes no legacy part's place)
+    expect(legacyModel(catalog, { fn: 'weapon', piece: 'block2' })!.id).toBe('cannon_bastion');
     expect(legacyModel(catalog, { fn: 'thruster', piece: 'tri' })!.id).toBe('engine_vernier');
     // (An engine whose family has none its size: the engine of that size pushing nearest what it did)
     expect(legacyModel(catalog, { fn: 'thruster', piece: 'rect2' })!.id).toBe('engine_plasma_drive');

@@ -2,14 +2,19 @@
  * @contract client.gun-range.picker-model
  * owns:       the gun range weapon picker's rows: each weapon on offer with its name, role (the hangar palette's weapon
  *             classes: direct, burst, beam, guided, area, support), mount (fixed, turret, side), Mk grade and item icon id;
- *             the role filter (the classes present, in the palette's order) and the keyboard's next row
- * needs:      @space-game/common (Catalog, ShipTuning, mountingOf, partMount, partItemId), ships/paletteFilters (weaponRole, subsOf)
+ *             the role filter (the classes present, in the palette's order) and the keyboard's next row; the weapon
+ *             modifier chips (each effect on offer with its name, colour and one-line say) and what a click on one asks for;
+ *             an admin's library ships under their group headings
+ * needs:      @space-game/common (Catalog, ShipTuning, ModifierTuning, FX_MAX, mountingOf, partMount, partItemId),
+ *             ships/paletteFilters (weaponRole, subsOf)
  * invariants: every option the server sent is a row, in its order, and nothing else — client/src/ui/gunRange/pickerModel.test.ts
  *             the role filter offers only roles that have a row, in the palette's order — client/src/ui/gunRange/pickerModel.test.ts
+ *             a click on a chip asks for the effects on with that one turned, on offer only, never more than a gun carries — client/src/ui/gunRange/pickerModel.test.ts
+ *             every library ship the server sent is a row under its group, in the order sent, and nothing else — client/src/ui/gunRange/pickerModel.test.ts
  * extend:     a new thing shown on a row is a field of PickerRow, filled in pickerRows
  */
 
-import { mountingOf, partItemId, partMount, type Catalog, type ShipTuning } from '@space-game/common';
+import { FX_MAX, mountingOf, partItemId, partMount, type Catalog, type ModifierTuning, type ShipTuning } from '@space-game/common';
 import { subsOf, weaponRole, type SubDef, type WeaponRole } from '../../ships/paletteFilters';
 
 export interface PickerRow {
@@ -64,4 +69,45 @@ export function nextRow(code: string, at: number, n: number): number | null {
     case 'End': return n - 1;
     default: return null;
   }
+}
+
+/** One weapon modifier chip: an effect on offer, how the game names and colours it, and whether the ship carries it */
+export interface ModRow { effect: string; name: string; color: string; say: string; on: boolean }
+
+/** The chips for these effects on offer (ones the tuning doesn't know dropped), in the order given */
+export function modRows(mt: ModifierTuning | undefined, options: readonly string[], on: readonly string[]): ModRow[] {
+  if (!mt) return [];
+  return options.filter((e) => mt.effects.includes(e)).map((e) => {
+    const s = mt.say[e];
+    return { effect: e, name: s?.name ?? e, color: s?.color ?? '#c9d4e5', say: s?.say ?? '', on: on.includes(e) };
+  });
+}
+
+/** What a click on a chip asks for: the effects on with this one turned, in the options' order (null: not on offer, or a gun's fill already on) */
+export function toggleMod(options: readonly string[], on: readonly string[], effect: string): string[] | null {
+  if (!options.includes(effect)) return null;
+  const had = on.includes(effect);
+  if (!had && on.filter((e) => options.includes(e)).length >= FX_MAX) return null;
+  return options.filter((e) => (e === effect ? !had : on.includes(e)));
+}
+
+/** One library ship an admin may fly, and a heading's worth of them */
+export interface ShipRow { id: string; name: string; on: boolean }
+export interface ShipGroup { group: string; rows: ShipRow[] }
+
+/** The Ships tab's rows: every ship sent, under its group, groups and ships each in the order first sent */
+export function shipGroups(ships: readonly { id: string; name: string; group: string }[], flown: string): ShipGroup[] {
+  const out: ShipGroup[] = [];
+  for (const s of ships) {
+    let g = out.find((x) => x.group === s.group);
+    if (!g) out.push((g = { group: s.group, rows: [] }));
+    g.rows.push({ id: s.id, name: s.name || s.id, on: s.id === flown });
+  }
+  return out;
+}
+
+/** The picker's tabs: Weapons alone (no tab row at all) unless there are library ships to offer */
+export type PickerTab = 'weapons' | 'ships';
+export function pickerTabs(ships: readonly unknown[]): PickerTab[] {
+  return ships.length ? ['weapons', 'ships'] : [];
 }

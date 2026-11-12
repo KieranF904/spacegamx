@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FRAGMENT_FRAMES, fragmentCount, fragmentEnd, fragmentPlan, insideConvex, type Fragment } from './flakBurst';
+import { FRAGMENT_FRAMES, FRAGMENT_SHORT, fragmentCount, fragmentEnd, fragmentPlan, insideConvex, type Fragment } from './flakBurst';
 
 describe('flak fragments', () => {
   it('throws 10 to 16 by quality tier', () => {
@@ -10,17 +10,23 @@ describe('flak fragments', () => {
     expect(fragmentCount(0)).toBe(10);
   });
 
-  it.each([[10, 170], [13, 250], [16, 170], [16, 250]])('%i fragments all end exactly on a %i radius', (count, radius) => {
+  it.each([[10, 170], [13, 250], [16, 170], [16, 250]])('%i fragments of uneven length, none past a %i radius', (count, radius) => {
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
     const plan = fragmentPlan(count, radius, rnd);
     expect(plan).toHaveLength(count);
     const end = { x: 0, y: 0 };
-    for (const f of plan) {
-      expect(f.speed * FRAGMENT_FRAMES).toBeCloseTo(radius, 9);
+    const reaches = plan.map((f) => f.speed * FRAGMENT_FRAMES);
+    for (const [i, f] of plan.entries()) {
+      expect(reaches[i]).toBeLessThanOrEqual(radius + 1e-9);
+      expect(reaches[i]).toBeGreaterThanOrEqual(radius * FRAGMENT_SHORT - 1e-9);
       fragmentEnd(40, -20, f, end);
-      expect(Math.hypot(end.x - 40, end.y + 20)).toBeCloseTo(radius, 6);
+      expect(Math.hypot(end.x - 40, end.y + 20)).toBeCloseTo(reaches[i], 6);
     }
+    // (the longest shows the damage radius; the rest are well spread short of it)
+    expect(Math.max(...reaches)).toBeCloseTo(radius, 9);
+    expect(Math.min(...reaches)).toBeLessThan(radius * 0.75);
+    expect(new Set(reaches.map((r) => Math.round(r))).size).toBeGreaterThan(count / 3);
   });
 
   it('spreads the fragments round the whole circle', () => {

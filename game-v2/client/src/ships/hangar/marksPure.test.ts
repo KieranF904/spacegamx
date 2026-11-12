@@ -4,14 +4,18 @@
  * design would throw (these modules are strict).
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
 import { join } from 'path';
-import { blueprintGeometry, createShipState, type PlacedGeom } from '@space-game/common';
+import { blueprintGeometry, createShipState, parseBlueprint, type PlacedGeom } from '@space-game/common';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import { drawFacingMark, drawShieldCover, facingMark, shieldCover, coverPolyline } from '../build/buildMarks';
 import { portMarks, drawPortMarks } from '../build/portMarks';
 import { drawPlacedMarks, drawHandMarks } from './hangarMarks';
 import { drawMounting, drawFacing, drawWindow } from './hangarOverlays';
+import { drawModMarks, drawHandModMarks } from './hangarModMarks';
+import { modsOf } from '../build/modExplain';
+import { modMarks, socketMarks } from '../build/modMarks';
 import { sink } from '../../fakeDom.testkit';
 import type { HangarHost } from './host';
 
@@ -55,4 +59,21 @@ describe('marks only draw, never change a design', () => {
       expect(JSON.stringify([ship.blueprint, geoms])).toBe(before);
     });
   }
+
+  it('mod-showcase-1: the weapon modifier marks over a frozen design draw without touching it', () => {
+    const bp = parseBlueprint(readFileSync(join(__dirname, '../../../../data/ships/blueprints/dev/mod-showcase-1.json'), 'utf-8'));
+    const ship = createShipState(bridge.catalog, bridge.tuning, 1, bp, 0);
+    const geoms = blueprintGeometry(bridge.catalog, ship.blueprint) as PlacedGeom[];
+    const mods = JSON.stringify(ship.derived.ports!.mod), before = JSON.stringify([ship.blueprint, geoms]);
+    deepFreeze(ship.blueprint); deepFreeze(geoms);
+    const ctx = sink();
+    const host = { geoms, ctx, bp: ship.blueprint, derived: ship.derived, deps: { catalog: bridge.catalog, tuning: bridge.tuning } } as unknown as HangarHost;
+    const sx = (x: number) => x * 20;
+    drawModMarks(host, sx, sx);
+    for (const geom of geoms) { drawHandModMarks(host, geom.part, geom, sx, sx); socketMarks(geom.part, geom); }
+    const ex = modsOf(bridge.catalog, bridge.tuning, ship.blueprint.parts, ship.derived);
+    expect(modMarks(ex, ship.derived.ports!, geoms, bridge.tuning.modifiers!).length).toBeGreaterThan(0);
+    expect(JSON.stringify([ship.blueprint, geoms])).toBe(before);
+    expect(JSON.stringify(ship.derived.ports!.mod)).toBe(mods);
+  });
 });

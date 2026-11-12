@@ -1,15 +1,17 @@
 /**
  * @contract common.gun-range.cheat-ship
  * owns:       the gun range's cheat ship: a plain alloy bar of a ship carrying one chosen weapon model, fitted by its own
- *             mounting rules, with reactors to spare and the range flag (Blueprint.range: its guns always fully powered,
+ *             mounting rules, with reactors to spare and the range flag (Blueprint.range: its guns never want for power: a beam still burns in pieces and rests,
  *             no jump drive)
- * needs:      ships/{catalog, types, mounting, grid, gunFacing}
- * invariants: every weapon model makes a valid ship (mounting rules kept) whose one gun is fully powered —
+ * needs:      ships/{catalog, types, mounting, grid, gunFacing}, ./mods (the deck of weapon modifiers behind the gun)
+ * invariants: every weapon model makes a valid ship (mounting rules kept) whose one gun never wants for power, with
+ *             any of the weapon modifiers or none; one with none is the ship it always was —
  *             common/src/gunRange/cheatShip.test.ts
  * extend:     a new kind of mount is a case in fit() (the turn that puts its barrel north, the side it bolts on at)
  *
  * Layout (north is up; the gun fires north):
  *   row -h..-1  the gun, on the spine's middle (a side-mount gun gets a hull column on the side it bolts on at)
+ *               (with weapon modifiers: the gun lifted, and their deck between it and the spine, hull around it: mods.ts)
  *   row 0       the spine: hull, with the core in the middle
  *   rows 1..    reactors (enough for the gun and the drives, with room to spare), then the drives facing south
  * A fixed gun points out of the nose; a turret sits on the nose and turns within its arc; a right-angle (side) mount
@@ -21,6 +23,7 @@ import type { Blueprint, PlacedPart, Rot, Side } from '../ships/types.js';
 import { attachSide, mountingOf, partMountingProblems } from '../ships/mounting.js';
 import { facingEdges, placeGeometry } from '../ships/grid.js';
 import { gunFacing } from '../ships/gunFacing.js';
+import { buildModDeck, type RangeMods } from './mods.js';
 
 const HULL = 'hull', CORE = 'core', REACTOR = 'power_overclock_reactor', DRIVE = 'engine_ion_drive';
 /** The name every cheat ship goes by, before its gun's */
@@ -57,8 +60,10 @@ export function isRangeWeapon(catalog: Catalog, fn: string): boolean {
 /**
  * The cheat ship for one weapon model (null: not a weapon model it can carry). Reactors for 1.6x everything's demand plus
  * a full drive set, so it flies at full power too; its guns never want for power anyway (Blueprint.range).
+ * `mods`: the weapon modifiers to carry behind the gun (each at full strength on a range ship); none, or a gun that
+ * can't take them, is the plain ship.
  */
-export function buildCheatShip(catalog: Catalog, model: string): Blueprint | null {
+export function buildCheatShip(catalog: Catalog, model: string, mods?: RangeMods): Blueprint | null {
   const fp = fit(catalog, model);
   if (!fp) return null;
   const f = catalog.functions.get(model)!;
@@ -70,16 +75,29 @@ export function buildCheatShip(catalog: Catalog, model: string): Blueprint | nul
   const hullMat = catalog.functions.get(HULL)?.material ?? 'alloy';
 
   // The gun's columns (a side mount keeps a hull column on the side it bolts on at), centred on the spine
-  const west = fp.attach === 'W' ? 1 : 0, east = fp.attach === 'E' ? 1 : 0;
+  let west = fp.attach === 'W' ? 1 : 0, east = fp.attach === 'E' ? 1 : 0;
+  // The modifier deck, worked out with the gun's corner at the origin: it widens the ship and lifts the gun off the spine
+  const gun: PlacedPart = { uid: 0, piece: fp.piece, fn: model, material: f.material ?? hullMat, x: fp.ox, y: fp.oy, rot: fp.rot, flip: fp.flip, facing: 'N' as Side, ...(f.mount ? { mount: f.mount } : {}) };
+  const deck = mods?.effects.length ? buildModDeck(catalog, gun, mods) ?? [] : [];
+  const taken = new Set<string>();
+  let lift = 0;
+  const hullW = west, hullE = east;
+  for (const q of deck) for (const c of placeGeometry(catalog, q).cells) {
+    taken.add(`${c[0]},${c[1]}`);
+    west = Math.max(west, -c[0]); east = Math.max(east, c[0] - fp.w + 1); lift = Math.max(lift, c[1] - fp.h + 1);
+  }
   const span = west + fp.w + east;
   const width = Math.max(4, span + (span % 2));
-  const gx = Math.floor((width - span) / 2) + west;
+  const gx = Math.floor((width - span) / 2) + west, gy = -fp.h - lift;
 
-  add(fp.piece, model, f.material ?? hullMat, gx + fp.ox, -fp.h + fp.oy, { rot: fp.rot, flip: fp.flip, facing: 'N' as Side, ...(f.mount ? { mount: f.mount } : {}) });
+  add(gun.piece, model, gun.material, gx + gun.x, gy + gun.y, { rot: gun.rot, flip: gun.flip, facing: gun.facing, ...(gun.mount ? { mount: gun.mount } : {}) });
   for (let r = 0; r < fp.h; r++) {
-    if (west) add('sq', HULL, hullMat, gx - 1, -fp.h + r);
-    if (east) add('sq', HULL, hullMat, gx + fp.w, -fp.h + r);
+    if (hullW && !taken.has(`-1,${r}`)) add('sq', HULL, hullMat, gx - 1, gy + r);
+    if (hullE && !taken.has(`${fp.w},${r}`)) add('sq', HULL, hullMat, gx + fp.w, gy + r);
   }
+  for (const q of deck) { const { uid: _u, piece, fn, material, x, y, ...rest } = q; add(piece, fn, material, gx + x, gy + y, rest); }
+  // (hull around the deck, down to the spine)
+  for (let r = fp.h; r < fp.h + lift; r++) for (let c = -west; c < fp.w + east; c++) if (!taken.has(`${c},${r}`)) add('sq', HULL, hullMat, gx + c, gy + r);
   let demand = (f.demand ?? 0) * fp.w * fp.h;
   // The spine, with the core in the middle (two cells of it)
   const coreAt = Math.floor((width - 2) / 2);

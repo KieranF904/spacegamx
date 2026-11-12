@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Arc Lattice
+Mk III · Square · 1 cell
+Hull · mass40 hp · 1.2
+Armour · build3 · 2.5 pts
+Effectagainst a mount's socket: Arcs from the target to others nearby
+Usesuses 0.05 Arc Salt for each E of a shot, from a hopper touching it or piped to it; with none left its effect stops
+
+== partStats (stats rows) ==
+GradeMk III
+Hull · mass40 hp · 1.2
+Armour · build3 · 2.5 pts
+Rating scoretoughness 40
+
+== familyLabel ==
+Modifiers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Special: arcs between targets
+
+== keyStats ==
+chain · uses 0.05 Arc Salt for each E of a shot, from a hopper touching it or piped to it; with none left its effect stops
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":39.75,"mass":1.2,"firepower":0,"toughness":39.75,"armour":3}

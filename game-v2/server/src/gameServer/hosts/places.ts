@@ -179,6 +179,7 @@ export function createPodHost(gs: GameServer): PodHost {
   return {
     world: gs.world,
     tick: () => gs.currentTick,
+    landmarks: (num) => gs.replicaEnv(num).landmarks,
     keyOf: (eid) => {
       const pc = gs.pilots.connOf(eid);
       return pc ? gs.pilots.keyOf(pc) : undefined;

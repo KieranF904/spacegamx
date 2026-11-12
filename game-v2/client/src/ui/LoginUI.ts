@@ -10,7 +10,7 @@
  * - Sleek modern login form
  */
 
-import { Application, Container, Graphics, type GlProgram } from 'pixi.js';
+import { AlphaFilter, Application, Container, Graphics, type GlProgram } from 'pixi.js';
 import { SunRenderer } from '../rendering/sun/SunRenderer';
 import { batchProgram, shaderReady } from '../rendering/shaderWarmup';
 import type { StarSystemData } from '@space-game/common';
@@ -20,11 +20,35 @@ import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
 import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
 import { attachVolumeUploads } from '../rendering/planetView/planetTextures';
 import { esc } from './escape';
+import { LEGAL_LINK_CSS, privacyLinkHtml } from './join/legalLinks';
+import { GLIDE_FADE_S, GLIDE_S, glideCamera, glideEase, glideFade, glidePlace, glideStep, skyPan, skyZoom, type GlideBody, type GlideCam } from './join/bodyGlide';
+import { SKY_LAYERS } from '../rendering/sky/skySprites';
+import { NEWSLETTER_CHOICE_CSS, NEWSLETTER_MISSING, NEWSLETTER_FIELD, newsletterChoiceHtml, readNewsletterChoice } from './join/newsletterChoice';
+
+/** The star's box for the camera move (join/bodyGlide.ts), in radii: its disc and bright limb (its plasma beyond is left to the fade) */
+const STAR_BOX = 1.15;
+/** The sky's camera on this screen: its zoom, and so the scale its nearest stars show at (SkyRenderer's depth rule) */
+const SKY_ZOOM = 0.35, SKY_NEAR_SCALE = 1 / (1 / SKY_ZOOM + SKY_LAYERS[0].depth);
+
+const reducedMotion = (): boolean => {
+  try { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+};
 
 export class LoginUI {
   private container: HTMLElement;
   private panel: HTMLElement;
   private visible = true;
+  /** Up without its form, as the join screen's backdrop (showBackdropOnly): the same sky carries on under that screen */
+  private backdropOnly = false;
+  /** The star and the planets (the sign-in screen's alone: the join screen has just the sky), and how far they have
+   *  glided out of the frame for it (join/bodyGlide.ts: 0 in place, 1 gone, and then not updated or drawn at all) */
+  private bodies: Container | null = null;
+  private glide = 0;
+  /** The camera move they leave by (join/bodyGlide.ts), worked out from where they are as they start to go, and again
+   *  for a resized view; none while they are in place */
+  private glideCam: (GlideCam & { w: number; h: number }) | null = null;
+  /** The planets' fade (their shader has no alpha of its own): on them only while they are part faded */
+  private bodyFade: AlphaFilter | null = null;
   private startTime = Date.now();
   
   // The backdrop: drawn by the game's renderer in the world's place while the screen is up (one WebGL context, so its
@@ -50,7 +74,9 @@ export class LoginUI {
   
   // Callbacks
   public onLogin: ((username: string, password: string) => void) | null = null;
-  public onRegister: ((username: string, password: string, email: string) => void) | null = null;
+  public onRegister: ((username: string, password: string, email: string, newsletter: boolean) => void) | null = null;
+  /** The newsletter answer picked on the Create Account form (null: not yet), kept while the form is drawn again */
+  private newsletter: boolean | null = null;
   public onPlayAsGuest: (() => void) | null = null;
   /** After it's shown or hidden (the game renders at the screen's density while it's up) */
   public onVisibility: (() => void) | null = null;
@@ -77,7 +103,7 @@ export class LoginUI {
   
   /** The sign-in screen's scene while it's up (the game draws it instead of the world), else null */
   backdrop(): Container | null {
-    return this.visible ? this.worldContainer : null;
+    return this.visible || this.backdropOnly ? this.worldContainer : null;
   }
 
   private buildBackdrop(): void {
@@ -111,12 +137,17 @@ export class LoginUI {
     // The star goes in first, under the planets: it is the farthest thing in the scene, so the central body (its disc, haze
     // and rings) and the small one cover it wherever it passes behind them. It is one container (the star's own pass drawn
     // to a target and stretched over the screen: disc, plasma, corona, glow, flares), so one place in the order does it.
-    this.worldContainer.addChild(this.sunRenderer.container);
+    // (the bodies in one group: it fades out for the join screen, which has the sky alone, and back in for this one)
+    this.bodies = new Container();
+    this.worldContainer.addChild(this.bodies);
+    this.bodies.addChild(this.sunRenderer.container);
     if (id !== 'sun') {
       attachVolumeUploads(this.app.renderer);
       this.body = new LoginBody(id, sol);
-      this.worldContainer.addChild(this.body.container);
+      this.bodies.addChild(this.body.container);
     }
+    this.glide = this.backdropOnly ? 1 : 0;
+    this.bodies.visible = !this.backdropOnly;
   }
 
   /** Show the backdrop: the game's canvas into the panel, under the form, and animated */
@@ -140,7 +171,7 @@ export class LoginUI {
   }
   
   private updateAnimation = (): void => {
-    if (!this.visible || !this.sunRenderer) return;
+    if ((!this.visible && !this.backdropOnly) || !this.sunRenderer) return;
     for (const [part, programs] of this.parts) part.visible = programs.every(shaderReady);
     
     const time = (Date.now() - this.startTime) / 1000;
@@ -155,19 +186,65 @@ export class LoginUI {
     const visibleFraction = 0.25;
     const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
     const cy = h + (1 - 2 * visibleFraction) * renderedRadius;
+    // The bodies: the sign-in screen's alone. Under the join screen one camera move takes them all out of the frame
+    // (join/bodyGlide.ts): it tilts, so everything moves down with the big body, and pushes in, so everything grows and
+    // the ones at the sides edge off them; how far is worked out from where they are, so that all of each (rings too)
+    // is out at the end. The star's plasma that may still be in frame fades over the last part. After that nothing of
+    // them is updated or drawn (the star's own pass included) till the form is back, when it all runs the other way.
+    // Turned round mid-glide they go back the way they came. Reduced motion: no move, a quick fade.
+    const still = reducedMotion();
+    this.glide = glideStep(this.glide, this.backdropOnly, Math.min(delta, 0.1), still ? GLIDE_FADE_S : GLIDE_S);
+    const g = still ? 0 : this.glide;
     // (a slow drift through the sky: its near stars slide past the far ones; not drawn, its haze not even into its
-    // texture, till its programs are compiled ahead: a compile here would hold up the sign-in screen's first frames)
-    if (this.sky?.container.visible) this.sky.update(delta * 1000, time * 40, time * 12, 0.35);
-    if (this.body) {
+    // texture, till its programs are compiled ahead: a compile here would hold up the sign-in screen's first frames.
+    // With the glide the sky follows the same camera move from farther off: it pans down the screen (its camera moves
+    // up, over the drift) and pushes in a little)
+    if (this.sky?.container.visible) this.sky.update(delta * 1000, time * 40, time * 12 - skyPan(h, g) / SKY_NEAR_SCALE, SKY_ZOOM * skyZoom(g));
+    if (this.bodies) {
+      this.bodies.visible = this.glide < 1;
+      // The star: all of it shows till its disc is off the frame; then the rest of the glide fades what is still in it.
+      // Its whole drawing (disc, plasma, corona, glow, flares) is one sprite, so its alpha fades it, its plasma running
+      // on as it does. The planets never fade: the motion takes them out whole (but for reduced motion's quick fade,
+      // which is a filter, on only while it fades: their quads take no alpha)
+      const show = still ? 1 - glideEase(this.glide) : glideFade(this.glide);
+      this.sunRenderer.container.alpha = show;
+      if (this.body) {
+        const fading = still && show < 1 && this.glide < 1;
+        if (fading) (this.bodyFade ??= new AlphaFilter()).alpha = show;
+        const on = !!this.body.container.filters && (this.body.container.filters as unknown[]).length > 0;
+        if (fading !== on) this.body.container.filters = fading ? [this.bodyFade!] : [];
+      }
+    }
+    if (this.glide >= 1) { /* the sky alone */ }
+    else if (this.body) {
       // (the star and the small body orbit the big one, slowly: the body says where the star is)
       const sun = this.body.update(delta, w / 2, cy, renderedRadius, w, h);
-      this.sunRenderer.drawAt(delta, sun.x, sun.y, sun.r);
-    } else this.sunRenderer.drawAt(delta, w / 2, cy, renderedRadius);
+      const boxes = this.body.boxes();
+      const cam = g > 0 ? this.camera([...boxes, { x: sun.x, y: sun.y, half: sun.r * STAR_BOX, star: true }], w, h, boxes.length > 0) : null;
+      if (cam) this.body.shift((box) => glidePlace(box.x, box.y, cam, w, h, g));
+      const o = cam ? glidePlace(sun.x, sun.y, cam, w, h, g) : { dx: 0, dy: 0, scale: 1 };
+      this.sunRenderer.drawAt(delta, sun.x + o.dx, sun.y + o.dy, sun.r * o.scale);
+    } else {
+      const cam = g > 0 ? this.camera([{ x: w / 2, y: cy, half: renderedRadius * STAR_BOX, star: true }], w, h, true) : null;
+      const o = cam ? glidePlace(w / 2, cy, cam, w, h, g) : { dx: 0, dy: 0, scale: 1 };
+      this.sunRenderer.drawAt(delta, w / 2 + o.dx, cy + o.dy, renderedRadius * o.scale);
+    }
+    if (this.glide <= 0) this.glideCam = null;
 
     // Draw stars
     this.drawStars(time);
   };
   
+  /** The camera move for the bodies as they are (kept for the length of the move, so it is one move; worked out again
+   *  for a resized view). `keep`: all of them are on screen to be counted (not while a planet is still loading) */
+  private camera(bodies: GlideBody[], w: number, h: number, keep: boolean): GlideCam {
+    const had = this.glideCam;
+    if (had && had.w === w && had.h === h) return had;
+    const cam = { ...glideCamera(bodies, w, h), w, h };
+    if (keep) this.glideCam = cam;
+    return cam;
+  }
+
   private drawStars(time: number): void {
     if (!this.starsGraphics) return;
     
@@ -232,6 +309,10 @@ export class LoginUI {
         overflow: hidden;
       }
       
+      /* The join screen's backdrop (showBackdropOnly): just the scene, under that screen (ServerBrowserUI, z-index 1900) */
+      #login-panel.backdrop-only { z-index: 1890; pointer-events: none; }
+      #login-panel.backdrop-only > :not(canvas) { display: none; }
+
       #login-canvas {
         position: absolute;
         top: 0;
@@ -298,6 +379,15 @@ export class LoginUI {
         font-family: 'Rajdhani', 'Arial', sans-serif;
       }
       
+      /* The panel with its strip of links above it (join/supportLinks.ts) */
+      .login-panel-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 380px;
+        max-width: 100%;
+      }
+
       .login-container {
         width: 380px;
         background: rgba(0, 0, 0, 0.7);
@@ -346,6 +436,9 @@ export class LoginUI {
         gap: 18px;
       }
       
+      ${NEWSLETTER_CHOICE_CSS}
+      ${LEGAL_LINK_CSS}
+
       .form-group {
         display: flex;
         flex-direction: column;
@@ -531,7 +624,8 @@ export class LoginUI {
       
       
       /* Import Google Font */
-      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600&display=swap');
+      /* Orbitron and Rajdhani, served from this site (client/public/fonts: the files, their @font-face rules and licences) */
+      @import url('/fonts/fonts.css');
     `;
     document.head.appendChild(style);
   }
@@ -550,6 +644,7 @@ export class LoginUI {
           <div class="login-subtitle">Working Title</div>
         </div>
         
+        <div class="login-panel-stack">
         <div class="login-container">
           <div class="login-tabs">
             <div class="login-tab ${isLogin ? 'active' : ''}" data-mode="login">Sign In</div>
@@ -583,6 +678,8 @@ export class LoginUI {
             </div>
             ` : ''}
             
+            ${!isLogin ? `${newsletterChoiceHtml(this.newsletter)}<div>${privacyLinkHtml()}</div>` : ''}
+
             <button type="submit" class="login-button" ${this.loading ? 'disabled' : ''}>
               ${this.loading ? '<span class="spinner"></span>Please wait...' : (isLogin ? 'Launch' : 'Create Account')}
             </button>
@@ -591,6 +688,7 @@ export class LoginUI {
           <div class="login-divider">or</div>
           
           <button class="guest-button" ${this.loading ? 'disabled' : ''}>Quick Play as Guest</button>
+        </div>
         </div>
       </div>
       
@@ -642,13 +740,20 @@ export class LoginUI {
     } else {
       const email = formData.get('email') as string;
       const confirmPassword = formData.get('confirmPassword') as string;
+      // (Their own yes or no: the account isn't asked for without one)
+      this.newsletter = readNewsletterChoice(formData.get(NEWSLETTER_FIELD));
       
       if (password !== confirmPassword) {
         this.showError('Passwords do not match');
         return;
       }
       
-      this.onRegister?.(username, password, email);
+      if (this.newsletter === null) {
+        this.showError(NEWSLETTER_MISSING);
+        return;
+      }
+
+      this.onRegister?.(username, password, email, this.newsletter);
     }
   }
 
@@ -665,14 +770,31 @@ export class LoginUI {
 
   show(): void {
     this.visible = true;
+    this.backdropOnly = false;
+    this.panel.classList.remove('backdrop-only');
     this.panel.style.display = 'flex';
     // The backdrop: running again, or rebuilt if it was released
     this.attachBackdrop();
     this.onVisibility?.();
   }
 
+  /**
+   * The scene without the form, for the join screen to sit over: the sign-in screen counts as hidden (isVisible), its
+   * backdrop is still the thing drawn (backdrop()). hide() ends it (the game starts), show() brings the form back.
+   */
+  showBackdropOnly(): void {
+    this.visible = false;
+    this.backdropOnly = true;
+    this.panel.classList.add('backdrop-only');
+    this.panel.style.display = 'flex';
+    this.attachBackdrop();
+    this.onVisibility?.();
+  }
+
   hide(): void {
     this.visible = false;
+    this.backdropOnly = false;
+    this.panel.classList.remove('backdrop-only');
     this.panel.style.display = 'none';
     // The world is drawn again, on its canvas back in the game's container
     this.detachBackdrop();
@@ -681,7 +803,7 @@ export class LoginUI {
 
   /** Free the backdrop (the game is up); show() builds it again */
   releaseBackdrop(): void {
-    if (this.visible) return;
+    if (this.visible || this.backdropOnly) return;
     this.disposePixi();
   }
 
@@ -701,6 +823,9 @@ export class LoginUI {
       this.sunRenderer = null;
     }
     this.body = null;
+    this.glideCam = null;
+    this.bodyFade = null;
+    this.bodies = null;
     this.sky = null;
     this.worldContainer?.destroy({ children: true });
     this.worldContainer = null;

@@ -29,7 +29,7 @@ import { hasComponent, type IWorld } from 'bitecs';
 import {
   Position, InSystem, Player, DEBRIS_STATUS, fartherThan, derivedRow, type BlockStore,
   CROWD_BASE_WINDOW, FOCUS_RANGE, type EntityState, type ClientSocket, type ServerMessage, type AsteroidSpawnData,
-  headWord, HEAD_HASH_ROW, packOwnSync, packOwnHazards, jumpPhase, jumpTuning, SEARCH_WINDOW_MAX,
+  headWord, HEAD_HASH_ROW, packOwnSync, packOwnHazards, jumpPhase, jumpTuning, SEARCH_WINDOW_MAX, type LandmarkSet,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import { SyncedShips, type ClientConnection } from './ClientConnection.js';
@@ -98,6 +98,8 @@ export interface SnapshotHost {
   asteroidSpawnData(eid: number): AsteroidSpawnData;
   /** A pilot's part-worked mining chunks on a system's rocks, packed (Mining.partWorked): told once, on entering it */
   mineState?(miner: number, systemNum: number): number[];
+  /** A system's moving landmarks (GameServer.replicaEnv's): systemInfo carries them */
+  landmarks?(systemNum: number): LandmarkSet | undefined;
   readonly replication: Replication;
   readonly mobs: Mobs;
   readonly pods: LootPods;
@@ -220,6 +222,7 @@ export class SnapshotBuilder {
       focus: this.focus, away: this.away, asteroidIdsBySystem: host.asteroidIdsBySystem, asteroidSeedTickBySystem: host.asteroidSeedTickBySystem,
       asteroidIndexById: host.asteroidIndexById, respawnedAsteroids: host.respawnedAsteroids, send: host.send,
       asteroidSpawnData: host.asteroidSpawnData, mineState: host.mineState ? (m, s) => host.mineState!(m, s) : undefined, ticks,
+      landmarks: host.landmarks,
     };
     this.structure = new ShipStructure({ ships: host.ships, send: host.send, hits: this.hits, ticks });
     this.own = new OwnRows({

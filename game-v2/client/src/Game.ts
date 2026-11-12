@@ -22,7 +22,7 @@ import { FrameGate } from './app/frameGate';
 import { terrainHold } from './rendering/terrainData';
 import { tickInput, sendNeutralInput, newInputSendState, forgetSession, type InputSendCtx } from './app/inputSend';
 import { guestKey, guestName } from './network/guestId';
-import { lobbyAuth, LobbyAuthResult } from './network/lobby';
+import { lobbyAuth, LobbyAuthResult, lobbyRegister } from './network/lobby';
 import { lobbyInbox } from './network/inbox';
 import { initGuestBanner, hideGuestBanner } from './ui/guest/guestBanner';
 import { setText, setStyle } from './ui/domWrite';
@@ -395,12 +395,12 @@ this.xpHudEl = document.getElementById('xpHud');
     
     // Setup login callbacks - show server browser after login
     this.loginUI.onLogin = (username, password) => this.handleLogin(username, password);
-    this.loginUI.onRegister = (username, password, email) => this.handleRegister(username, password, email);
+    this.loginUI.onRegister = (username, password, email, newsletter) => this.handleRegister(username, password, email, newsletter);
     this.loginUI.onPlayAsGuest = () => this.handleGuestPlay();
     // (A guest registering from the game: the lobby makes the account, the server moves the pilot; ui/guest/guestBanner.ts)
     initGuestBanner({
       send: (m) => this.network.send(m),
-      register: (username, email, password) => lobbyAuth('register', { username, email, password }),
+      register: (username, email, password, newsletter) => lobbyRegister(username, email, password, newsletter),
       registered: (token, username) => {
         this.authToken = token;
         this.state.playerName = username;
@@ -456,10 +456,10 @@ this.xpHudEl = document.getElementById('xpHud');
     this.signedIn(await lobbyAuth('login', { username, password }));
   }
 
-  private async handleRegister(username: string, password: string, email: string): Promise<void> {
+  private async handleRegister(username: string, password: string, email: string, newsletter: boolean): Promise<void> {
     this.loginUI.setLoading(true);
     this.loginUI.showError('');
-    this.signedIn(await lobbyAuth('register', { username, password, email }));
+    this.signedIn(await lobbyRegister(username, email, password, newsletter));
   }
 
   /** The screens split out of the main chunk were asked for (prefetchScreens) */
@@ -484,7 +484,7 @@ this.xpHudEl = document.getElementById('xpHud');
     this.state.playerName = r.username ?? '';
     this.pendingAuth = null;
     this.loginUI.setLoading(false);
-    this.loginUI.hide();
+    this.loginUI.showBackdropOnly();
     this.serverBrowserUI.show({ token: r.token, username: r.username ?? '', isAdmin: !!r.isAdmin });
     this.prefetchScreens();
   }
@@ -509,7 +509,7 @@ this.xpHudEl = document.getElementById('xpHud');
     const name = guestName();
     this.state.playerName = name;
     this.pendingAuth = { type: 'guest', username: name };
-    this.loginUI.hide();
+    this.loginUI.showBackdropOnly();
     this.serverBrowserUI.show();
     this.prefetchScreens();
   }
@@ -517,6 +517,8 @@ this.xpHudEl = document.getElementById('xpHud');
   private handleServerSelect(server: ServerInfo): void {
     this.authFailed = false;
     this.serverBrowserUI.hide();
+    // (the join screen's backdrop, the sign-in screen's scene, goes with it: the world is drawn again)
+    this.loginUI.hide();
     this.serverName = server.name;
     this.serverAddress = `${server.host}:${server.port}`;
     this.clearLoadingClick();
@@ -985,7 +987,7 @@ this.xpHudEl = document.getElementById('xpHud');
     this.hud.update();
   }
 
-  /** The Ship window, the footer, the power readout and the status icons (ui/ship, ui/hud), once a frame */
+  /** The Ship window, the footer, the power readout, the status icons and the weapon group row (ui/ship, ui/hud), once a frame */
   private updateShipHud(now: number, blocked: boolean): void {
     const w = this.w;
     w.shipWindow.update(now, !this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || w.systemMapUI.isOpen);
@@ -997,7 +999,8 @@ this.xpHudEl = document.getElementById('xpHud');
     w.powerMargin.update(ship?.derived, this.state.charge, {
       thrust: !!(sent.forward || sent.backward || sent.left || sent.right), boost: !!sent.boost, firing: !!(sent.fireLeft || sent.fireRight),
     });
-    w.statusTray.update(me ? { tick: this.state.serverTick, empUntil: me.empUntil, slowUntil: me.slowUntil, markUntil: me.markUntil, warmth: me.warmth } : null);
+    w.statusTray.update(me ? { tick: this.state.serverTick, empUntil: me.empUntil, slowUntil: me.slowUntil, markUntil: me.markUntil, warmth: me.warmth, held: this.shipClient.heldBy() } : null);
+    w.groupRow.update(flying, ship);
   }
 
   /** What app/inputSend.ts (tickInput, sendNeutralInput) reads (getters, so windows built late resolve at use) plus its last-sent state; made once */
@@ -1203,6 +1206,7 @@ if (this.xpHudEl) this.xpHudEl.style.display = 'flex';
         this.network.disconnect();
         // Show server browser to pick a new server (keep username)
         if (this.state.playerName) {
+          this.loginUI.showBackdropOnly();
           this.serverBrowserUI.show();
         } else {
           this.loginUI.show();
@@ -1318,7 +1322,8 @@ if (this.xpHudEl) this.xpHudEl.style.display = 'none';
    */
   private renderResolution(): number {
     // (the sign-in screen: one body on an idle screen, at the screen's own density whatever the tier)
-    if (this.loginUI?.isVisible()) return Math.min(2, window.devicePixelRatio || 1);
+    // (and the join screen over the same scene)
+    if (this.loginUI?.backdrop()) return Math.min(2, window.devicePixelRatio || 1);
     return Math.min(PROFILES[this.qualityTier()].maxDpr, window.devicePixelRatio || 1) * Math.max(0.5, Math.min(1, settings.data.display.renderScale));
   }
 

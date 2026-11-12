@@ -260,7 +260,7 @@ let moveEid = 0, moveB: BridgeCtx | undefined;
 const moveHazard = (d: ShipDerived, x: number, y: number) => moveB!.host.hazardFlight?.(moveEid, d, x, y);
 function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
   const f = b.host.jumpFields?.(eid) ?? NO_FIELDS;
-  MOVE_FIELDS.central = f.central; MOVE_FIELDS.lodestones = f.lodestones;
+  MOVE_FIELDS.central = f.central; MOVE_FIELDS.lodestones = f.lodestones; MOVE_FIELDS.landmarks = f.landmarks;
   moveB = b; moveEid = eid;
   MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
   MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;

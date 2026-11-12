@@ -186,11 +186,12 @@ export function collisionSystem(gs: GameServer): void {
     }
     // Single-body enemies: only pilots' shots hit them (their own side's pass through)
     if (hasComponent(gs.world, Player, ownerId)) {
-      const mob = gs.mobs.rayHit(systemId, px, py, endX, endY, pr);
+      // (a weapon modifier's shell that goes on through a mob strikes it once: Weapons.onMobHit adds it to the shot's exclusions)
+      const mob = gs.mobs.rayHit(systemId, px, py, endX, endY, pr, gs.weapons.exclusions(proj));
       if (mob) {
         const hx = px + (endX - px) * mob.t, hy = py + (endY - py) * mob.t;
         gs.mobs.hurt(mob.eid, Projectile.damage[proj]);
-        if (gs.weapons.onMobHit(proj, hx, hy)) {
+        if (gs.weapons.onMobHit(proj, hx, hy, mob.eid)) {
           addComponent(gs.world, Dead, proj);
           gs.pendingRemovedEntities.add(proj);
         }

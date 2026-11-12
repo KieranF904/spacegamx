@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as bitecs from 'bitecs';
-import { InSystem, Position, Velocity, Player, Dead, Rotation, buildCheatShip, insideChamber } from '@space-game/common';
+import { InSystem, Position, Velocity, Player, Dead, Rotation, buildCheatShip, exitDoor, insideChamber } from '@space-game/common';
 import { boot, signIn, join, dock, run, lastState, fireAt, toDoor, kill, heavyOf, settle, S } from './gunRange.testkit.js';
 import { RANGE_GATE, passesInRange } from './messageGate.js';
 import { RangeTarget } from './target.js';
@@ -34,7 +34,7 @@ describe('gun range: in and out', () => {
     const s = lastState(a);
     expect(s).toMatchObject({ in: true, station: expect.any(String) });
     expect(s.options).toContain(s.weapon);
-    expect(s.door.reach).toBe(def.door.reach);
+    expect(s.door.reach).toBe(exitDoor(def).reach);
     // (Its own ship is untouched, set aside in the real profile)
     expect(S(server).pilots.realProfile(a.conn).ship.blueprint).toEqual(own);
     // A second pilot sees the first: one shared instance
@@ -235,10 +235,19 @@ describe('gun range: the weapon picker and the guns', () => {
     expect(def.targets.map((t) => t.label)).toEqual(expect.arrayContaining(['Drone · weak', 'Hulk · weak hull', 'Mammoth · heavy']));
     expect(new Set(ts.map((t) => t.id)).size).toBe(ts.length);
     const p = S(server).pilots.realProfile(a.conn), xp = p.xp, credits = p.credits;
+    // (A mob target is no ship: it is laid at its spot, a live mob of its kind)
+    const mobs = S(server).mobs, isShip = (i: number) => !def.targets[i].mob;
+    expect(def.targets.some((t) => t.mob)).toBe(true);
     ts.forEach((t, i) => {
       const d = def.targets[i];
       expect(t.id, d.label).toBeGreaterThanOrEqual(0);
       expect(InSystem.systemId[t.id]).toBe(num);
+      if (d.mob) {
+        expect(mobs.has(t.id), d.label).toBe(true);
+        expect(Math.hypot(Position.x[t.id] - d.x, Position.y[t.id] - d.y), d.label).toBeLessThan(2);
+        expect(insideChamber(def, d.x, d.y, 200), d.label).toBe(true);
+        return;
+      }
       expect(S(server).ships.isPinned(t.id)).toBe(false);
       expect(S(server).ships.get(t.id).blueprint.range).toBeUndefined();
       // (It fits the chamber, clear of the walls, and stands well off the door)
@@ -251,11 +260,13 @@ describe('gun range: the weapon picker and the guns', () => {
     // Standing: still where they were put after a long while, and nobody has fired a shot
     run(server, 1200);
     ts.forEach((t, i) => {
+      if (!isShip(i)) return;
       expect(Math.hypot(Position.x[t.id] - def.targets[i].x, Position.y[t.id] - def.targets[i].y), def.targets[i].label).toBeLessThan(def.targets[i].keepRadius + 5);
       expect(S(server).ships.lastFiredTick(t.id)).toBe(-Infinity);
     });
     // They keep clear of each other while standing
     for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+      if (!isShip(i) || !isShip(j)) continue;
       const r = S(server).ships.get(ts[i].id).derived.radius + S(server).ships.get(ts[j].id).derived.radius;
       expect(Math.hypot(Position.x[ts[i].id] - Position.x[ts[j].id], Position.y[ts[i].id] - Position.y[ts[j].id])).toBeGreaterThan(r + 50);
     }
@@ -266,8 +277,11 @@ describe('gun range: the weapon picker and the guns', () => {
     expect(parts(by('Hulk · weak hull'))).toBeGreaterThan(parts(by('Drone · weak')) * 5);
     expect(hull(by('Hulk · weak hull'))).toBeLessThan(hull(by('Mammoth · heavy')) / 2);
     // Destroyed (as a kill would be): nothing paid, each comes back whole after its pause, the others undisturbed
-    const gone = ts.map((t) => t.id);
-    ts.forEach((t) => S(server).ships.removeShip(t.id));
+    // (A mine has timed out and been laid again meanwhile, as its kind does: the ids as they stand now)
+    const up: { id: number }[] = lastState(a).targets;
+    expect(up.every((t, i) => (isShip(i) ? t.id === ts[i].id : mobs.has(t.id)))).toBe(true);
+    const gone = up.map((t) => t.id);
+    up.forEach((t, i) => (isShip(i) ? S(server).ships.removeShip(t.id) : mobs.hurt(t.id, 1e9)));
     run(server, 2);
     expect(lastState(a).targets.map((t: any) => t.id)).toEqual(ts.map(() => -1));
     run(server, Math.max(...def.targets.map((t) => t.respawnSeconds)) * 60 + 10);

@@ -335,6 +335,19 @@ export interface FunctionDef {
   pipe?: boolean;
   combiner?: boolean;
   pipeThrough?: boolean;
+  // Weapon modifiers (power/portsMods.ts; docs/design/weapon-modifiers-2026-11.md)
+  /**
+   * A mount: a line part with sockets (in its own frame). A modifier block against a socket works; each working one treats
+   * `treat` E a second of the power passing and burns `upkeep` E a second from the mount's own reserve (`hold` E a socket,
+   * topped up from the line)
+   */
+  modMount?: { treat: number; upkeep: number; hold: number; sockets: { side: Side; cell?: number }[] };
+  /** A modifier block of this kind (tuning.json modifiers.kinds): it works against a mount's socket, on any of its sides */
+  plug?: string;
+  /** A hopper of a special modifier's material, `holds` units per cell. Not power and not a feed: it only pays its specials' shots, and fills at a station */
+  hopper?: { mat: string; holds: number };
+  /** A line part's tier (1..3; tuning.json modifiers.lines): how many effects and how much treated power it carries. A part without one (a store, the core) carries none; a mount carries all */
+  lineTier?: number;
   /** Feed layer, guns and engines: the materials it takes (its feed buffer holds one at a time), units a shot or a second, its buffer in units (absent: 10 uses), and its own multipliers over the material's */
   takes?: string[];
   feedUse?: number;
@@ -370,6 +383,8 @@ export interface FunctionDef {
   blast?: { radius: number; damage: number; delayTicks: number[] };
   /** The old material-graded functions: enemies' ships and migration only, never shown, fabricated or an item */
   legacy?: boolean;
+  /** Legacy parts never become this model (migrate.ts): a model added beside the one its size's legacy parts already stand for */
+  noStandIn?: boolean;
 
   // Presentation (how the part is named, shown and heard; none of it changes what it does)
   /** Display name ("Pulse Laser"); item names are "<Material> <name> · <size>" */
@@ -483,7 +498,7 @@ export interface PlacedPart {
    */
   group?: number;
   /**
-   * weapons: the weapon groups it is in (ships/weaponGroups.ts), a mask: bit 0 group 1 .. bit 3 group 4. Absent: group 1
+   * weapons: the weapon groups it is in (ships/weaponGroups.ts), a mask: bit 0 group 1 .. bit 4 group 5. Absent: group 1
    * only. The pilot's own choice, from the hangar or the field build overlay
    */
   wg?: number;

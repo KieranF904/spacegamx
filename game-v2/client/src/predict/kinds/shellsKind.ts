@@ -67,7 +67,7 @@ const SIM_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tunin
 const RECS: LaneRec[] = [];
 /** What a tick's drawing was of: its records, and the pose they fired from (a shell's spawn) */
 const keyOf = (recs: readonly LaneRec[], pose: { x: number; y: number; angle: number } | null | undefined) =>
-  recs.some((r) => r.n > 0) ? `${pose ? `${pose.x},${pose.y},${pose.angle}` : '-'}/${recs.map((r) => `${r.part}:${r.code}:${r.aimQ}:${r.aug}:${r.n}`).join('|')}` : '';
+  recs.some((r) => r.n > 0) ? `${pose ? `${pose.x},${pose.y},${pose.angle}` : '-'}/${recs.map((r) => `${r.part}:${r.code}:${r.aimQ}:${r.aug}:${r.n}:${r.fx}`).join('|')}` : '';
 
 export class ShellsKind implements PtKind {
   readonly name = 'shells';

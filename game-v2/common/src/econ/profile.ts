@@ -208,7 +208,12 @@ export interface PlayerProfile {
   reputation: Record<string, number>;
   /** Jump gate licences (gate ids or system ids) */
   licences: string[];
-  position: { system: string; x: number; y: number };
+  /**
+   * Where they were last (saved at logout, a dropped link, autosave, shutdown). `at`: inside a moving landmark's
+   * tracking zone then (world/landmarks.ts), the landmark and their offset from it: they come back by it, wherever it
+   * has got to. Absent (open space, an older save): the absolute spot, as before
+   */
+  position: { system: string; x: number; y: number; at?: { id: string; dx: number; dy: number } };
   /** Respawn station (the last station docked at) */
   home: string;
   stats: Record<string, number>;
@@ -343,6 +348,14 @@ export interface MigrateOptions {
   now?: number;
 }
 
+/** A saved position's landmark offset (PlayerProfile.position.at), or nothing where it is absent or broken */
+function cleanPositionAt(v: unknown): { at?: { id: string; dx: number; dy: number } } {
+  if (!v || typeof v !== 'object') return {};
+  const a = v as Record<string, unknown>;
+  if (typeof a.id !== 'string' || !a.id || typeof a.dx !== 'number' || typeof a.dy !== 'number' || !Number.isFinite(a.dx) || !Number.isFinite(a.dy)) return {};
+  return { at: { id: a.id, dx: a.dx, dy: a.dy } };
+}
+
 /**
  * Bring any saved profile up to the current version, filling anything missing
  * from a fresh profile. Unknown or broken fields fall back to defaults rather
@@ -382,7 +395,7 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     quests: { active: rec<QuestProgress>(quests.active), done: strs(quests.done), known: strs(quests.known), flags: strs(quests.flags), ...(strs(quests.fresh).length ? { fresh: strs(quests.fresh) } : {}), ...(strs(quests.rumours).length ? { rumours: strs(quests.rumours) } : {}), ...(Object.keys(rec<number>(quests.rumourDay)).length ? { rumourDay: rec<number>(quests.rumourDay) } : {}) },
     reputation: rec<number>(r.reputation),
     licences: strs(r.licences),
-    position: typeof pos.system === 'string' ? { system: pos.system, x: num(pos.x, base.position.x), y: num(pos.y, base.position.y) } : base.position,
+    position: typeof pos.system === 'string' ? { system: pos.system, x: num(pos.x, base.position.x), y: num(pos.y, base.position.y), ...cleanPositionAt((pos as Record<string, unknown>).at) } : base.position,
     home: typeof r.home === 'string' ? r.home : base.home,
     stats: rec<number>(r.stats),
     ...cleanTraces(r.traces),

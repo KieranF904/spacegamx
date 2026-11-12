@@ -5,6 +5,8 @@
  * invariants: a guest profile is never saved with the accounts (one with a key is kept by it: pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  *             a saved ship that fails the rules is kept as saved; a loaner flies meanwhile and is never written — server/src/game/pilots/loaner.test.ts
  *             a save the lease refuses tells the pilot, retries with backoff and never kicks — server/src/game/pilots/lease.test.ts
+ *             a pilot saved in a moving landmark's zone comes back at the same offset from it, wherever it is then; open space,
+ *             an older save and a landmark that is gone load at the saved spot — server/src/game/pilots/landmarkLogin.test.ts
  * extend:     a new profile field that mirrors onto the ship goes in applyProfile/capture
  */
 
@@ -99,7 +101,12 @@ export function capture(self: Pilots, s: Session): void {
   }
   const system = self.host.systemId(InSystem.systemId[eid]);
   // (Nor is a place no pilot is ever saved in: the gun range. The profile keeps where it was)
-  if (system && !self.host.transient?.(InSystem.systemId[eid])) s.profile.position ={ system, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]) };
+  if (system && !self.host.transient?.(InSystem.systemId[eid])) {
+    // (In a moving landmark's tracking zone: the landmark and their offset from it too, so they come back by it wherever
+    // it has got to, a restart's tick included: common world/landmarks.ts. Open space: the spot alone, as ever)
+    const at = self.host.landmarkOffset?.(InSystem.systemId[eid], Position.x[eid], Position.y[eid]);
+    s.profile.position = { system, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), ...(at ? { at } : {}) };
+  }
 }
 
 /** Put the profile into the world: stats, ship, position */
@@ -112,10 +119,14 @@ export function applyProfile(self: Pilots, s: Session, placeShip: boolean): void
     applyShip(self, s);
     const sys = self.host.systemNum(profile.position.system);
     const yard = self.tutorialSpawn?.(conn, true);
+    // (Saved by a moving landmark: where that is now, plus their offset from it; no such landmark any more, or a save
+    // without one: the saved spot itself)
+    const by = profile.position.at && sys >= 0 ? self.host.landmarkPoint?.(sys, profile.position.at) : null;
+    const px = by ? by.x : profile.position.x, py = by ? by.y : profile.position.y;
     if (yard) {
       self.host.place(conn, yard.system, yard.x, yard.y);
-    } else if (!self.opts.spawn && sys >= 0 && self.host.safeToAppear(sys, profile.position.x, profile.position.y)) {
-      self.host.place(conn, sys, profile.position.x, profile.position.y);
+    } else if (!self.opts.spawn && sys >= 0 && self.host.safeToAppear(sys, px, py)) {
+      self.host.place(conn, sys, px, py);
     } else {
       const at = self.homePoint(s);
       if (at) self.host.place(conn, at.system, at.x, at.y);

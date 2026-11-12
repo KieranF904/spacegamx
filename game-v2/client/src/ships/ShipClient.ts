@@ -79,6 +79,10 @@ import { wireRendererHooks } from './wiring/rendererHooks';
 import { makeHangar } from './wiring/hangarFactory';
 import { makeFeatures, mountFieldFor, type FeatureWiringHost } from './wiring/featuresWiring';
 import { inGunRange } from '../ui/gunRange/rangeState';
+import { actionKey } from '../input/keybindings';
+
+/** The helm switch, as the key handlers see it (its action's default code) */
+const HELM_KEY = actionKey('helm');
 import type { StatusInput } from '../ui/shipStatus/source';
 
 export interface ShipClientOptions {
@@ -228,7 +232,7 @@ export class ShipClient {
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.bodies = new BodyRunner((this.bodyHost = { reps: this.replicas, radius: (id) => this.store.get(id)?.derived.radius }));
     // (Other ships' guns stepped here from their inputs: ships/guns/OtherGuns.ts)
-    this.otherGuns = new OtherGuns({ reps: this.replicas, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, self: () => opts.state.playerId });
+    this.otherGuns = new OtherGuns({ reps: this.replicas, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, self: () => opts.state.playerId, beamLit: (id, part, mask) => this.fx.beamFx?.beamMask(id, part, mask) });
     // (Their moves worked out here: ships/bodies/MoveRunner.ts)
     this.moves = new MoveRunner({
       reps: this.replicas, bodies: this.bodies, store: this.store, tuning: opts.tuning, terrain: () => this.jc.terrain,
@@ -601,6 +605,8 @@ export class ShipClient {
   jumpHeld(): boolean { return this.jc.jumpHeld(); }
   /** How hard the well is pulling compared with what the ship can push back: 0..1 */
   horizonDanger(): number { return this.jc.horizonDanger(); }
+  /** The moving landmark carrying the local ship now, and how much (landmark tracking: JumpControl.heldBy); null in open space */
+  heldBy(): { name: string; weight: number } | null { return this.jc.heldBy(); }
 
   // ---- Readouts (hud/ShipReadouts.ts)
   /** The ship you fly (null between ships) */
@@ -708,7 +714,7 @@ export class ShipClient {
   onKey(code: string): boolean {
     if (this.hangarOpen) return this.hangar.value!.handleKey(code);
     if (this.features.onKey(code)) return true;
-    if (code === 'KeyV') {
+    if (code === HELM_KEY) {
       this.helm = !this.helm;
       return true;
     }

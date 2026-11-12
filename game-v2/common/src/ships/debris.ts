@@ -18,6 +18,7 @@ import type { Blueprint, Vec2 } from './types.js';
 import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import type { FlightBody, GravityWell } from './flight.js';
+import { carryBody, type LandmarkSet } from '../world/landmarks.js';
 
 /** A debris body's status row data (snapshot ShipBody row: no kind, no faction, nothing): a client makes it itself */
 export const DEBRIS_STATUS: readonly number[] = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0];
@@ -263,10 +264,17 @@ function worldPiecesOf(d: DebrisBody, cs: number): WorldPiece[] {
  * One tick (`tick`'s step) of every piece of debris in a system: each drifts (stepDebrisBody), then overlapping pieces
  * are pushed apart and bounce, push only, pairs in id order (`list` must be sorted by id); a piece in its grace
  * (debrisYoung) takes no part in the knocks. The same on the server and in every client's replicas. Returns the pairs
- * that touched (the server keyframes a piece whose partner some client lacks).
+ * that touched (the server keyframes a piece whose partner some client lacks). `landmarks` (with `tick`): the system's
+ * moving landmarks; a piece in one's zone is carried with it after its drift, as a pilot's ship is (world/landmarks.ts).
  */
-export function stepDebrisWorld(list: readonly DebrisBody[], k: DriftConstants, cellSize: number, restitution: number, tick?: number): [number, number][] {
-  for (const d of list) if (!d.fixed) stepDebrisBody(d.body, k);
+export function stepDebrisWorld(list: readonly DebrisBody[], k: DriftConstants, cellSize: number, restitution: number, tick?: number, landmarks?: LandmarkSet): [number, number][] {
+  const carry = tick !== undefined && landmarks?.length ? landmarks : undefined;
+  for (const d of list) {
+    if (d.fixed) continue;
+    const x0 = d.body.x, y0 = d.body.y;
+    stepDebrisBody(d.body, k);
+    if (carry) carryBody(carry, tick!, x0, y0, d.body);
+  }
   const touched: [number, number][] = [];
   const n = list.length;
   if (n < 2) return touched;

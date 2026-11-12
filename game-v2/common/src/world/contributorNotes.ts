@@ -8,7 +8,8 @@
  * The server keeps them (server/src/game/ContributorNotes.ts, saved to
  * data/contributor/notes.json); only contributors and admins with the overlay
  * on are sent them. scripts/contributor-notes.mjs prints them for the
- * terminal with formatNotes() below (docs/contributor-notes.md).
+ * terminal with formatNotes() below (docs/contributor-notes.md). Comments,
+ * votes and who may do what are contributorFeedback.ts.
  *
  * Angles are degrees here (people type them); 0° is east and angles grow
  * clockwise on screen (y points down), as the planets' do.
@@ -20,6 +21,7 @@ import { nestPosition } from './nests.js';
 import { calcAsteroidPosition, scaledOrbitTick, stationOrbitTimeScale } from '../asteroid/orbit.js';
 import { TICK_RATE } from '../constants.js';
 import { datan2, dhypot } from '../math/detTrig.js';
+import { noteComments, noteTally, type NoteComment, type NoteVote, type NoteVotes } from './contributorFeedback.js';
 
 export type NoteStatus = 'open' | 'done' | 'wontdo';
 export const NOTE_STATUSES: readonly NoteStatus[] = ['open', 'done', 'wontdo'];
@@ -82,6 +84,15 @@ export interface ContributorNote {
   anchor: NoteAnchor;
   /** What the shape's size means for the request ("match circle size") */
   sizeHint?: string;
+  /** When what it says or where it is was last changed, and by whom (absent: never edited) */
+  editedAt?: string;
+  editedBy?: string;
+  /** Oldest first (absent on a note stored before there were comments: none) */
+  comments?: NoteComment[];
+  /** The server's copy only, never sent: each voter's thumbs up or down, by voterKey (contributorFeedback.ts) */
+  voters?: Record<string, NoteVote>;
+  /** As a client is sent it (noteForViewer): the counts and the viewer's own vote */
+  votes?: NoteVotes;
 }
 
 /** What a client sends to make or change a note */
@@ -472,7 +483,17 @@ export function formatNotes(notes: readonly ContributorNote[], opts: { bodiesOf:
       ? `  Position now: (${n0(pos.x)}, ${n0(pos.y)}) world units, ${n0(dhypot(pos.x, pos.y))} u from the system centre`
       : '  Position now: unknown (the body it goes with is missing)');
     out.push(`  Status: ${n.status}${n.resolution ? ` · resolution: ${n.resolution}` : ''}${n.statusBy ? ` (by ${n.statusBy})` : ''}`);
-    out.push(`  Created ${fmtDate(n.createdAt)} · updated ${fmtDate(n.updatedAt)}`);
+    out.push(`  Created ${fmtDate(n.createdAt)} · updated ${fmtDate(n.updatedAt)}${n.editedAt ? ` · edited ${fmtDate(n.editedAt)}${n.editedBy ? ` by ${n.editedBy}` : ''}` : ''}`);
+    const votes = noteTally(n), comments = noteComments(n);
+    out.push(`  Votes: ${votes.up} up, ${votes.down} down (score ${votes.up - votes.down >= 0 ? '+' : ''}${votes.up - votes.down})`);
+    if (comments.length) {
+      out.push(`  Comments (${comments.length}):`);
+      for (const c of comments) {
+        const lines = c.text.split('\n');
+        out.push(`    ${c.author} (${fmtDate(c.at)}): ${lines[0]}`);
+        for (const l of lines.slice(1)) out.push(`      ${l}`);
+      }
+    }
     out.push('');
   }
   return out.join('\n').trimEnd() + '\n';

@@ -14,7 +14,7 @@
 import type { IWorld } from 'bitecs';
 import {
   Position, Radius, InSystem, Lifetime, Station, Portal, STATION_DESIGNS, STATION_WEAPONS, EntityType, otherShotWire, TELL_PD,
-  type EntityState,
+  gunCode, type EntityState,
 } from '@space-game/common';
 import type { GameData } from '../../data/GameData.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -66,9 +66,9 @@ export function collectFire(h: FireHost, conn: ClientConnection, playerSystemId:
     if (f.owner === conn.playerId) { if (keyed.has(f.owner) || !conn.repKnown.has(f.owner) || !ownVolleyExact(h.ships, f) || (ownRebuild !== undefined && f.tick <= ownRebuild)) continue; }
     else if (!conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
     if (InSystem.systemId[f.owner] !== playerSystemId) continue;
-    // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
+    // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, its weapon modifier effects' mask above: launch.ts gunCode)
     let row = h.fireRows.get(f);
-    if (!row) { row = [f.owner, currentTick - f.tick, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]; h.fireRows.set(f, row); }
+    if (!row) { row = [f.owner, currentTick - f.tick, gunCode(f.part, f.ammo ?? 0, !!f.aug, f.fx), f.aimQ, ...f.ids]; h.fireRows.set(f, row); }
     fire.push(row);
     for (const id of f.ids) covered.add(id);
   }

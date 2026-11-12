@@ -17,7 +17,7 @@ import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import { inertBody } from '../state/trainingBodies';
 import {
-  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, pulseProfile, pulseCutOver, MINING_PULSE, MINE_TAIL, mineFalloff,
+  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, shipGunDef, shipGunFx, fxMarks, MAX_RAYS, pulseIntensity, type FxMark, pulseProfile, pulseCutOver, MINING_PULSE, MINE_TAIL, mineFalloff,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState, type PulseProfile,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -38,8 +38,9 @@ import { JumpFx } from './JumpFx';
 import { canHurt, canHeal } from './sides';
 import { beamLook, type BeamLook } from '../rendering/weapons/weaponStyles';
 import './energyLooks';
-import { drawCone, drawStrands } from './beamLookFx';
+import { drawBeamBody, drawCone, drawEmitter, drawShaft, drawStrands, fanWidth, ignition, softGlow } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
+import { modBeam } from '../rendering/weapons/fx/mods';
 import { LanceFx } from './LanceFx';
 import { PieceStarts, ownPiecePhase, pieceLook } from './beamPieces';
 import { MinePulses } from './minePulses';
@@ -52,7 +53,7 @@ import { rockMaterial } from '../rendering/rocks/RockMaterials';
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; heal?: boolean }
 
 /** A held beam lit this frame (for its sound: Game.updateSounds): whose, which gun, and where its ship is */
-export interface LitBeam { owner: number; part: number; kind: string; model: string | undefined; x: number; y: number; own: boolean }
+export interface LitBeam { owner: number; part: number; kind: string; model: string | undefined; x: number; y: number; own: boolean; /** Its live weapon modifier effects (ids and strengths: common fxMarks), if any */ fx?: readonly FxMark[] }
 
 /** A mining laser's pulse (ticks): fades in, flares, trails off to nothing; the next one starts the moment it's gone (no cooldown) */
 const MINING_EVERY = 54;
@@ -207,7 +208,7 @@ export class MiningBeamFx {
     this.sparks.length = Math.min(w, 400);
   }
 
-  /** How long each held beam (by ship × 256 + part) has been on, and burning the same spot (`burn`: it starts over if the spot jumps or is lost for a moment) */
+  /** How long each held beam (by (ship × 256 + part) × MAX_RAYS + its beam of a fan) has been on, and burning the same spot (`burn`: it starts over if the spot jumps or is lost for a moment) */
   private holds = new Map<number, { on: number; burn: number; lx: number; ly: number; miss: number; seen: number; next?: number }>();
   /** A held beam's burn throws an impact off what it lights (BeamLook.burn): where, the beam's direction, whose, and the look's burn */
   onBurn: ((x: number, y: number, dx: number, dy: number, owner: number, burn: NonNullable<BeamLook['burn']>) => void) | null = null;
@@ -246,6 +247,7 @@ export class MiningBeamFx {
       const on = own ? own.size > 0
         : !!e.data?.length && (e.type === EntityType.Player ? unpackCursorWeaponState(e.data[0]).leftActive : e.type === EntityType.ShipBody && e.data[6] === 1);
       // (A Lance is drawn lit or not: it charges, burns and goes out; a beam in pieces is drawn from its piece's clock)
+      // (A gun range cheat ship's beams burn their pieces and rest as any ship's do: guns.ts feeds them)
       const L = ship.derived.ports;
       if (!on && !beams.some((w) => w.kind === 'lance' || (L && L.pieces[w.part]))) continue;
       const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
@@ -257,61 +259,70 @@ export class MiningBeamFx {
         if (pl && (phase >= 0 || own)) lit = phase >= 0;
         const pw = pl && lit && phase >= 0 ? pl.width : 1, pg = pl && lit && phase >= 0 ? pl.gain : 1;
         // (Heard as it's seen: each lit beam's loop, every ship's, Game.updateSounds)
-        if (lit) this.litBeams.push({ owner: id, part: w.part, kind: w.kind, model: ship.blueprint.parts[w.part]?.fn, x: pose.x, y: pose.y, own: id === this.state.playerId });
-        // Its own tuning: its grade's reach and width too (launch.ts gunDef)
-        const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
+        // (Its live weapon modifier effects: `mask` over its gun's own, `mods` the effects themselves, for its modifier layers)
+        const mask = lit && L?.mod ? this.masks.get(id * 256 + w.part) ?? 0 : 0, mods = mask ? fxMarks(shipGunFx(ship, w.part), mask) : undefined;
+        if (lit) this.litBeams.push(mods ? { owner: id, part: w.part, kind: w.kind, model: ship.blueprint.parts[w.part]?.fn, x: pose.x, y: pose.y, own: id === this.state.playerId, fx: mods } : { owner: id, part: w.part, kind: w.kind, model: ship.blueprint.parts[w.part]?.fn, x: pose.x, y: pose.y, own: id === this.state.playerId });
+        // Its own tuning: its grade's reach and width too (launch.ts gunDef), and its live effects' (as the server burns it)
+        const def = mask ? shipGunDef(this.tuning, ship, w, undefined, mask) : partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
         if (w.kind === 'lance') { this.lance(g, id, ship, w, pose, def, lit, own !== null, pw, pg); continue; }
         if (!lit) continue;
         // A Repair Beam: a soft teal beam to the friendly hull it mends, sparkling where it lands (support.ts)
         if (def.heal) { this.repairBeam(g, id, ship, w, pose, def); continue; }
-        const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 800, (def.width ?? 0) / 2);
-        const look = beamLook(ship.blueprint.parts[w.part]?.fn);
-        let [outer, mid, core] = w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
-        const flick = 0.85 + 0.15 * Math.sin(this.t * 53 + id);
-        // A wider beam (a better grade's) draws wider, and each mark up a little hotter
-        // (A model's own look, if it has one: BEAM_LOOKS)
-        if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
-        const wid = (w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw;
-        const gain = pg;
-        const bl = Math.hypot(hx - x, hy - y) || 1, bux = (hx - x) / bl, buy = (hy - y) / bl;
-        const hold = this.held(id * 256 + w.part, hx, hy, t < 0.999, this.dt);
-        // How far up its ramp a beam that gets hotter the longer it burns one spot has come (the Cutter's: 0 to 1)
-        const ramp = def.ramp ? Math.min(1, hold.burn * 60 / Math.max(1, def.ramp.ticks)) : 0;
-        if (look?.cone) drawCone(g, x, y, bux, buy, Math.min(bl, look.coneLen ?? bl), look.cone, mid, 0.22 * gain);
-        if (look?.zap) {
-          // Lightning: a jagged polyline, different every frame, with a fainter twin
-          for (let pass = 0; pass < 2; pass++) {
-            const n = Math.max(5, Math.min(26, Math.round(bl / 30)));
-            g.moveTo(x, y);
-            for (let i = 1; i <= n; i++) {
-              const f = i / n, o = i === n && t < 0.999 ? 0 : (Math.random() - 0.5) * 2 * look.zap * (pass ? 0.6 : 1) * Math.sin(Math.min(1, f * 6) * Math.PI / 2);
-              g.lineTo(x + (hx - x) * f - buy * o, y + (hy - y) * f + bux * o);
+        // (A split beam's fan, tuning.ts beamFan: each of its beams found and drawn as the server burns it, as wide as its share)
+        const fan = def.beamFan, rays = fan ? fan.off.length : 1, midRay = (rays - 1) >> 1;
+        for (let r = 0; r < rays; r++) {
+          const rk = fan ? fanWidth(fan.share, r) : 1, seed = id + w.part + r * 1.7;
+          const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 800, (def.width ?? 0) / 2, false, fan ? fan.off[r] : 0);
+          const look = beamLook(ship.blueprint.parts[w.part]?.fn);
+          let [outer, mid, core] = w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
+          const flick = 0.85 + 0.15 * Math.sin(this.t * 53 + id);
+          // A wider beam (a better grade's) draws wider, and each mark up a little hotter
+          // (A model's own look, if it has one: BEAM_LOOKS)
+          if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
+          const wid = (w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw * rk;
+          const gain = pg;
+          const bl = Math.hypot(hx - x, hy - y) || 1, bux = (hx - x) / bl, buy = (hy - y) / bl;
+          const hold = this.held((id * 256 + w.part) * MAX_RAYS + r, hx, hy, t < 0.999, this.dt);
+          // How far up its ramp a beam that gets hotter the longer it burns one spot has come (the Cutter's: 0 to 1)
+          const ramp = def.ramp ? Math.min(1, hold.burn * 60 / Math.max(1, def.ramp.ticks)) : 0;
+          if (look?.cone) drawCone(g, x, y, bux, buy, Math.min(bl, look.coneLen ?? bl), look.cone, mid, 0.22 * gain);
+          if (look?.shaft) drawShaft(g, x, y, bux, buy, bl, wid, look.shaft.spread, look.shaft.color, gain, this.t, seed, look.shaft.dust, t < 0.999);
+          if (look?.zap) {
+            // Lightning: a jagged polyline, different every frame, with a fainter twin
+            for (let pass = 0; pass < 2; pass++) {
+              const n = Math.max(5, Math.min(26, Math.round(bl / 30)));
+              g.moveTo(x, y);
+              for (let i = 1; i <= n; i++) {
+                const f = i / n, o = i === n && t < 0.999 ? 0 : (Math.random() - 0.5) * 2 * look.zap * (pass ? 0.6 : 1) * Math.sin(Math.min(1, f * 6) * Math.PI / 2);
+                g.lineTo(x + (hx - x) * f - buy * o, y + (hy - y) * f + bux * o);
+              }
+              g.stroke(pass === 0 ? { color: mid, width: wid * 2.4, alpha: 0.28 * flick } : { color: core, width: Math.max(1.2, wid * 0.4), alpha: 0.95 * flick });
             }
-            g.stroke(pass === 0 ? { color: mid, width: wid * 2.4, alpha: 0.28 * flick } : { color: core, width: Math.max(1.2, wid * 0.4), alpha: 0.95 * flick });
+          } else {
+            drawBeamBody(g, x, y, hx, hy, wid, outer, mid, core, gain);
           }
-        } else {
-          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: outer, width: wid * 3, alpha: 0.13 * gain });
-          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: mid, width: wid * 1.4, alpha: 0.45 * gain });
-          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
-        }
-        if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, id + w.part);
-        g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 * gain });
-        if (look?.frost) this.frostFx(g, x, y, bux, buy, bl, wid, t < 0.999, hx, hy, id + w.part, look.frost, mid);
-        if (t < 0.999) {
-          g.circle(hx, hy, wid * 2.6).fill({ color: mid, alpha: 0.3 });
-          g.circle(hx, hy, wid * 1.1).fill({ color: core, alpha: 0.85 });
-          // The Cutter's molten pool: it spreads and brightens as the ramp climbs, and the spray thickens
-          if (look?.pool !== undefined) {
-            const r = wid * (1.6 + 3.2 * ramp);
-            g.circle(hx, hy, r * 1.6).fill({ color: look.pool, alpha: 0.12 + 0.12 * ramp });
-            g.circle(hx, hy, r).fill({ color: look.pool, alpha: 0.28 + 0.3 * ramp });
-            g.circle(hx, hy, r * 0.5).fill({ color: 0xfff1c9, alpha: 0.4 + 0.5 * ramp });
-          }
-          if (Math.random() < 0.6 + (look?.pool !== undefined ? 1.6 * ramp : 0)) this.sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.5) * (7 + 6 * ramp), vy: (Math.random() - 0.5) * (7 + 6 * ramp), life: 0, max: 8 + Math.random() * 10 });
-          // Its burn throws an impact off the surface every few frames, sized as its data says (BeamLook.burn)
-          if (look?.burn && this.onBurn) {
-            hold.next = (hold.next ?? 0) - this.dt * 60;
-            if (hold.next <= 0) { hold.next = look.burn.every; this.onBurn(hx, hy, bux, buy, id, look.burn); }
+          if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, seed);
+          // (one emitter at the muzzle, the middle beam's)
+          if (r === midRay) drawEmitter(g, x, y, bux, buy, wid, mid, core, gain, this.t, seed, ignition(hold.on));
+          // Its weapon modifiers, each adding its own layer along the beam and at its end (fx/mods)
+          if (mods) modBeam(g, mods, x, y, hx, hy, wid, gain, this.t, seed, t < 0.999);
+          if (look?.frost) this.frostFx(g, x, y, bux, buy, bl, wid, t < 0.999, hx, hy, seed, look.frost, mid);
+          if (t < 0.999) {
+            softGlow(g, hx, hy, wid * 3, mid, 0.9);
+            g.circle(hx, hy, wid * 1.1).fill({ color: core, alpha: 0.85 });
+            // The Cutter's molten pool: it spreads and brightens as the ramp climbs, and the spray thickens
+            if (look?.pool !== undefined) {
+              const r = wid * (1.6 + 3.2 * ramp);
+              g.circle(hx, hy, r * 1.6).fill({ color: look.pool, alpha: 0.12 + 0.12 * ramp });
+              g.circle(hx, hy, r).fill({ color: look.pool, alpha: 0.28 + 0.3 * ramp });
+              g.circle(hx, hy, r * 0.5).fill({ color: 0xfff1c9, alpha: 0.4 + 0.5 * ramp });
+            }
+            if (Math.random() < 0.6 + (look?.pool !== undefined ? 1.6 * ramp : 0)) this.sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.5) * (7 + 6 * ramp), vy: (Math.random() - 0.5) * (7 + 6 * ramp), life: 0, max: 8 + Math.random() * 10 });
+            // Its burn throws an impact off the surface every few frames, sized as its data says (BeamLook.burn)
+            if (look?.burn && this.onBurn) {
+              hold.next = (hold.next ?? 0) - this.dt * 60;
+              if (hold.next <= 0) { hold.next = look.burn.every; this.onBurn(hx, hy, bux, buy, id, look.burn); }
+            }
           }
         }
       }
@@ -331,7 +342,6 @@ export class MiningBeamFx {
    * beam lights only when full); another ship's guessed from when it went out (it rests, then fills at its rate)
    */
   private lance(g: Graphics, id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, def: WeaponTuning, lit: boolean, own: boolean, pw = 1, pg = 1): void {
-    const { x, y, hx, hy, t, ship: target } = this.beamLine(id, ship, w, pose, def.range ?? 500, (def.width ?? 0) / 2);
     const look = beamLook(ship.blueprint.parts[w.part]?.fn);
     const colors = { outer: look?.outer ?? 0x7c3aed, mid: look?.mid ?? 0xc084fc, core: look?.core ?? 0xf5e8ff, braid: look?.braid };
     const L = ship.derived.ports, p = w.part;
@@ -340,14 +350,19 @@ export class MiningBeamFx {
     if (L && pe && pe.held.length === L.n && L.cap[p] > 0) {
       charge = pe.closed[p] > 0 || (pe.flags[p] & PF_LIT) ? 0 : Math.min(1, pe.held[p] / L.cap[p]);
     } else if (L && L.cap[p] > 0 && L.rate[p] > 0) charge = this.lanceGuess(id * 256 + p, lit, L.rest[p], L.cap[p] / L.rate[p]);
-    const len = Math.hypot(hx - x, hy - y) || 1;
     const base = this.tuning.weapons?.lance?.width ?? 1;
-    this.lanceFx.draw(g, id * 256 + p, {
-      // (a burn rides a ship it lands on; wreckage and rock only flare)
-      lit, charge, x, y, ux: (hx - x) / len, uy: (hy - y) / len, len, hit: t < 0.999, target: this.source.bodies.get(target)?.kind === 'ship' ? target : -1,
-      wid: 11 * ((def.width ?? base) / base) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw,
-      colors, gain: pg,
-    }, this.dt, Math.min(4, this.dt * 60), this.poseOf);
+    // (A split Lance's fan, tuning.ts beamFan: each of its beams a Lance of its own to LanceFx; the muzzle charges once, on the middle one)
+    const fan = def.beamFan, rays = fan ? fan.off.length : 1, midRay = (rays - 1) >> 1;
+    for (let r = 0; r < rays; r++) {
+      const { x, y, hx, hy, t, ship: target } = this.beamLine(id, ship, w, pose, def.range ?? 500, (def.width ?? 0) / 2, false, fan ? fan.off[r] : 0);
+      const len = Math.hypot(hx - x, hy - y) || 1;
+      this.lanceFx.draw(g, (id * 256 + p) * MAX_RAYS + r, {
+        // (a burn rides a ship it lands on; wreckage and rock only flare)
+        lit, charge: r === midRay ? charge : -1, x, y, ux: (hx - x) / len, uy: (hy - y) / len, len, hit: t < 0.999, target: this.source.bodies.get(target)?.kind === 'ship' ? target : -1,
+        wid: 11 * ((def.width ?? base) / base) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw * (fan ? fanWidth(fan.share, r) : 1),
+        colors, gain: pg,
+      }, this.dt, Math.min(4, this.dt * 60), this.poseOf);
+    }
   }
 
   /** Another ship's Lance: ticks since it went out (it rests `rest` ticks, then fills in `fill`), as a buffer 0..1 */
@@ -405,9 +420,10 @@ export class MiningBeamFx {
       const u = ((this.t * 0.9 + k / 4 + id * 0.13) % 1), s = Math.sin(u * Math.PI), r = 2.6 + 1.6 * s, mx = x + (hx - x) * u, my = y + (hy - y) * u;
       g.moveTo(mx - r, my).lineTo(mx + r, my).moveTo(mx, my - r).lineTo(mx, my + r).stroke({ color: 0xa7f3d0, width: 1.6, alpha: 0.85 * s });
     }
-    g.circle(x, y, wid * 1.1).fill({ color: 0x5eead4, alpha: 0.45 });
+    // (a calm emitter: it mends)
+    drawEmitter(g, x, y, ux, uy, wid * 0.8, 0x5eead4, 0xecfdf5, 0.7, this.t * 0.4, id + w.part);
     if (t < 0.999 && len > 1) {
-      g.circle(hx, hy, wid * 2.8).fill({ color: 0x2dd4bf, alpha: 0.22 });
+      softGlow(g, hx, hy, wid * 3, 0x2dd4bf, 0.7);
       g.circle(hx, hy, wid * 1.0).fill({ color: 0xecfdf5, alpha: 0.8 });
       if (Math.random() < 0.7) {
         const a = Math.random() * Math.PI * 2, s = 0.4 + Math.random() * 1.2;
@@ -419,7 +435,8 @@ export class MiningBeamFx {
   /** Where a beam weapon points now and what it meets: muzzle, hit point, and how far along (1: nothing) */
   /** (`half`: the beam's half-width, as the server burns it: a hull its edge touches stops it; `heal`: a Repair Beam's, stopped by friends only) */
   /** (`ship`: the ship it meets, -1 none. A fixed gun's beam is drawn from the tip of its barrel, which turns on its gimbal: ShipRenderer) */
-  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0, heal = false): { x: number; y: number; hx: number; hy: number; t: number; ship: number } {
+  /** (`off`: a split beam's fan, radians off its aim: tuning.ts beamFan) */
+  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0, heal = false, off = 0): { x: number; y: number; hx: number; hy: number; t: number; ship: number } {
     let muzzle = w.muzzle, dir = w.dir, tip = 0;
     if (w.mount === 'turret' && w.window) {
       const a = w.window.center + (ship.aim[w.part] ?? 0);
@@ -435,7 +452,7 @@ export class MiningBeamFx {
       tip = part ? fixedReach(part.fn, Math.max(1, this.source.geometry(ship)[w.part]?.area ?? 1)) * this.tuning.cellSize : 0;
     }
     const [x, y] = shipPointToWorld(ship, pose, muzzle, this.tuning.cellSize);
-    const a = pose.angle + Math.PI / 2 + Math.atan2(dir[1], dir[0]);
+    const a = pose.angle + Math.PI / 2 + Math.atan2(dir[1], dir[0]) + off;
     const x1 = x + Math.cos(a) * range, y1 = y + Math.sin(a) * range;
     // (A Repair Beam passes over rock as the server's does: only terrain and friends stop it)
     this.shipHit = -1;
@@ -494,7 +511,25 @@ export class MiningBeamFx {
 
   /** Other ships' beams in pieces: the tick each last spent a piece (ShipClient, from TELL_BEAM_PIECE fire events) */
   private pieces = new PieceStarts();
-  startPiece(owner: number, part: number, tick: number): void { this.pieces.start(owner, part, tick); }
+  startPiece(owner: number, part: number, tick: number, fx = 0): void { this.pieces.start(owner, part, tick); this.beamMask(owner, part, fx); }
+  /**
+   * Held beams' live weapon modifier effects, by owner * 256 + part (a mask over the gun's own, common fxDef): yours
+   * from your own gun step each tick it burns (OwnPresent), another ship's from the piece it last spent. A pulse's is its own (pulseMasks)
+   */
+  private masks = new Map<number, number>();
+  private pulseMasks = new WeakMap<PulseRun, number>();
+  /** A split pulse's other beams (tuning.ts beamFan), by the run fired: each is drawn as a pulse of its own */
+  private pulseFans = new WeakMap<PulseRun, PulseRun[]>();
+  beamMask(owner: number, part: number, fx: number): void {
+    if (fx) this.masks.set(owner * 256 + part, fx);
+    else this.masks.delete(owner * 256 + part);
+    while (this.masks.size > 256) this.masks.delete(this.masks.keys().next().value!);
+  }
+  /** A drawn pulse's live weapon modifier effects (ids and strengths), if any */
+  pulseMods(p: PulseRun): readonly FxMark[] | undefined {
+    const mask = this.pulseMasks.get(p), ship = mask ? this.source.bodies.get(p.owner) : undefined;
+    return ship?.kind === 'ship' ? fxMarks(shipGunFx(ship, p.part), mask) : undefined;
+  }
   /** Ticks into a beam's piece now (-1: none burning): yours from your predicted ports state, another's from when it spent it, on the timeline it's drawn on */
   private piecePhase(id: number, part: number, L: PortsLayout, own: boolean): number {
     if (own) return ownPiecePhase(L, this.state.charge?.e as PortsState | undefined, part, 0);
@@ -503,10 +538,12 @@ export class MiningBeamFx {
   }
 
   /** A pulse laser fired on `start` (pulse.ts) */
-  startPulse(owner: number, part: number, start: number): void {
+  startPulse(owner: number, part: number, start: number, fx = 0): void {
     // (The server's word for one your client already fired is the same pulse)
     if (this.pulses.some((p) => p.owner === owner && p.part === part && Math.abs(p.start - start) <= 2)) return;
-    this.pulses.push({ owner, part, start, sounded: false, flared: false, arrived: false, impact: -1, mx: 0, my: 0 });
+    const run: PulseRun = { owner, part, start, sounded: false, flared: false, arrived: false, impact: -1, mx: 0, my: 0 };
+    if (fx) this.pulseMasks.set(run, fx);
+    this.pulses.push(run);
     if (this.pulses.length > 64) this.pulses.shift();
   }
 
@@ -523,7 +560,9 @@ export class MiningBeamFx {
         const p = this.pulses[i];
         const ship = this.source.bodies.get(p.owner), e = this.state.entities.get(p.owner);
         const w = ship?.kind === 'ship' ? ship.derived.weapons.find((x) => x.part === p.part) : undefined;
-        const def = w && ship && partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
+        // (with the weapon modifier effects it was fired with: its reach and width as the server burns it; pulseMods(p) for its layers)
+        const mask = this.pulseMasks.get(p);
+        const def = w && ship && (mask ? shipGunDef(this.tuning, ship, w, undefined, mask) : partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w));
         if (!ship || !e || !w || !def?.pulse) { this.pulses.splice(i, 1); continue; }
         const prof = pulseProfile(def.pulse);
         const own = p.owner === this.state.playerId;
@@ -533,9 +572,18 @@ export class MiningBeamFx {
         const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
         // (As wide as the server burns this tick of the pulse: pulse.ts profile)
         const wk = prof.width[Math.max(0, Math.min(prof.ticks - 1, Math.floor(age)))] ?? 1;
-        const { x, y, hx, hy, t } = this.beamLine(p.owner, ship, w, pose, def.range ?? 800, ((def.width ?? 0) * wk) / 2);
-        if (!p.sounded) { p.sounded = true; this.onPulse?.(x, y, w.grade ?? 1, own); }
-        this.pulseFx.draw(g, p, prof, age, x, y, hx, hy, t < 0.999, def, w.grade ?? 1, frames, ship.blueprint.parts[w.part]?.fn);
+        const pm = this.pulseMods(p);
+        // (A split pulse's fan: the run fired is its middle beam, the others runs of their own beside it, each as wide as its share)
+        const fan = def.beamFan, rays = fan ? fan.off.length : 1, midRay = (rays - 1) >> 1;
+        let sides = fan ? this.pulseFans.get(p) : undefined;
+        if (fan && !sides) this.pulseFans.set(p, (sides = fan.off.map(() => ({ ...p, sounded: true }))));
+        for (let r = 0; r < rays; r++) {
+          const run = r === midRay || !sides ? p : sides[r], rk = fan ? fanWidth(fan.share, r) : 1;
+          const { x, y, hx, hy, t } = this.beamLine(p.owner, ship, w, pose, def.range ?? 800, ((def.width ?? 0) * wk) / 2, false, fan ? fan.off[r] : 0);
+          if (!p.sounded) { p.sounded = true; this.onPulse?.(x, y, w.grade ?? 1, own); }
+          this.pulseFx.draw(g, run, prof, age, x, y, hx, hy, t < 0.999, rk === 1 ? def : { ...def, width: (def.width ?? 16) * rk }, w.grade ?? 1, frames, ship.blueprint.parts[w.part]?.fn);
+          if (pm) modBeam(g, pm, x, y, hx, hy, (def.width ?? 16) * 0.5 * wk * rk, pulseIntensity(prof, age), this.t, p.owner + p.part + r * 1.7, t < 0.999);
+        }
       }
     }
     if (this.stationRuns.length) {

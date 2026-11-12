@@ -7,7 +7,7 @@
  * extend:     a new kind of moving entity is one more branch in the entity loop of interpolateFrame()
  */
 
-import { EntityType, podDrift, calcAsteroidPosition, asteroidSpin, scaledOrbitTick, INTERP_MAX_DELAY_MS, INTERP_MIN_DELAY_MS, INTERP_SLEW_MS_PER_SEC } from '@space-game/common';
+import { EntityType, podDrift, podHold, podCarry, type PodHold, type LandmarkSet, calcAsteroidPosition, asteroidSpin, scaledOrbitTick, INTERP_MAX_DELAY_MS, INTERP_MIN_DELAY_MS, INTERP_SLEW_MS_PER_SEC } from '@space-game/common';
 import type { GameState, BufferedSnapshot } from './GameState';
 
 /** Render lerp rate for local player (1.0 = no smoothing, instant) */
@@ -87,6 +87,9 @@ export function interpolateFrame(gs: GameState, delta: number): void {
     if (entity.type === EntityType.DroppedItem && entity.data && entity.data.length >= 4 && entity.hist?.length) {
       const b = entity.hist[entity.hist.length - 1];
       const at = podDrift(b, renderTick - entity.data[3]);
+      // (Anchored in a moving landmark's zone: carried with it, as the server carries it: common world/landmarks.ts podHold)
+      const hold = gs.landmarks.length ? podHoldOf(entity, gs.landmarks, b.x, b.y, entity.data[3]) : null;
+      if (hold) { podCarry(gs.landmarks, hold, renderTick, POD_CARRY); at.x += POD_CARRY.x; at.y += POD_CARRY.y; }
       entity.x = at.x; entity.y = at.y; entity.vx = at.vx; entity.vy = at.vy;
       entity.renderX += (entity.x - entity.renderX) * RENDER_SMOOTH_OTHER;
       entity.renderY += (entity.y - entity.renderY) * RENDER_SMOOTH_OTHER;
@@ -233,4 +236,13 @@ function lerpAngle(a: number, b: number, t: number): number {
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
   return a + diff * t;
+}
+
+/** A pod's hold on a landmark, worked out once an anchor (podHold: the zone its anchor was laid in) */
+const POD_CARRY = { x: 0, y: 0 };
+const POD_HOLDS = new WeakMap<object, { set: LandmarkSet; x: number; y: number; t: number; hold: PodHold | null }>();
+function podHoldOf(entity: object, set: LandmarkSet, x: number, y: number, t: number): PodHold | null {
+  let m = POD_HOLDS.get(entity);
+  if (!m || m.set !== set || m.x !== x || m.y !== y || m.t !== t) POD_HOLDS.set(entity, (m = { set, x, y, t, hold: podHold(set, x, y, t) }));
+  return m.hold;
 }

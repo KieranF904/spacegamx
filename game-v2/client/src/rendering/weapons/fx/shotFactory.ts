@@ -43,30 +43,44 @@ export function shotFromRow(e: InterpolatedEntity, look: ShellLook | undefined, 
     model: look?.model, grade: e.data?.[1] ?? 1, turret: e.data?.[8] === 1,
     predicted: false,
     pose,
-    endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
+    endTick: 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
     fading: null, pierceLeft: look?.pierce ?? 0,
     endAt: look?.life ? (e.spawnTick ?? 0) + look.life : Infinity, gone: false, pending: null,
     head: null,
     tail: null, ctX: NaN, ctY: NaN,
-    ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: look?.arm ?? 0,
+    ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: look?.arm ?? 0, fx: look?.fx,
   };
-  if (shot.endTick > 0) {
-    const o = { x: 0, y: 0 };
-    landingPoint(shot.spawnX, shot.spawnY, shot.vx, shot.vy, shot.spawnTick, shot.endTick, o);
-    shot.landX = o.x; shot.landY = o.y;
-  }
+  setFuse(shot, e.data?.[9] ?? 0);
   return shot;
+}
+
+/**
+ * A shell that ends at the aim on `endTick` (its row's data[9], or its gun's fuse): where it does, and no flight past
+ * it for one that bursts there (a lobbed shell lands by its own rule, WeaponFx.landed; a held orb sits on there)
+ */
+export function setFuse(shot: Shot, endTick: number): void {
+  // (a fuse guessed before the server's is replaced by it, not kept if shorter)
+  const guessed = shot.endTick > 0 && shot.endAt === shot.endTick;
+  shot.endTick = endTick;
+  if (endTick <= 0) return;
+  const o = { x: 0, y: 0 };
+  landingPoint(shot.spawnX, shot.spawnY, shot.vx, shot.vy, shot.spawnTick, endTick, o);
+  shot.landX = o.x; shot.landY = o.y;
+  const st = shot.style;
+  if (!st.landBurst && !st.lob && !st.pull) shot.endAt = guessed ? endTick : Math.min(shot.endAt, endTick);
 }
 
 /** A shell your client fired ahead of the server, under the negative id `id` */
 export function shotFromPrediction(id: number, p: PredictedShell): Shot {
   const style = weaponStyle(p.type, p.grade, p.model);
-  return {
+  const shot: Shot = {
     id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
     glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
     spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
     hit: null, flashed: false, model: p.model, grade: p.grade ?? 1, turret: p.turret ?? false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0,
     endAt: p.life ? p.spawnTick + p.life : Infinity, gone: false, pending: null, head: null, tail: null, ctX: NaN, ctY: NaN,
-    ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: p.arm ?? 0,
+    ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: p.arm ?? 0, fx: p.fx,
   };
+  if (p.fuse) setFuse(shot, p.spawnTick + p.fuse);
+  return shot;
 }

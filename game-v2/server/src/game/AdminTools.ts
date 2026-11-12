@@ -52,6 +52,8 @@ export interface AdminHost {
   destroy(c: AdminConn): void;
   addCredits(c: AdminConn, n: number): void;
   addXp(c: AdminConn, n: number): void;
+  /** The XP their next level needs: the level it made them (0: at the cap) */
+  levelUp(c: AdminConn): number;
   /** Into their hold, what won't fit into their station storage: how many went to storage */
   give(c: AdminConn, items: Bag): number;
   skillPoints(c: AdminConn, n: number): void;
@@ -118,7 +120,7 @@ const onOff = (v: unknown, was: boolean) => (v === undefined || v === '' ? !was 
 const HELP = [
   '/tp x y [system] · /tp name (go to them) · /tp name x y [system] · /goto station-or-player · /bring name',
   '/god [on|off] [name] · /hide [on|off] (hostiles ignore you) · /heal [name] · /kill name · /boot name [reason] (kick from the server)',
-  '/credits n [name] · /xp n [name] · /give item [n] [name] · /skillpoints n [name] · /codex [name] id|all|clear (records)',
+  '/credits n [name] · /xp n [name] · /levelup [name] · /give item [n] [name] · /skillpoints n [name] · /codex [name] id|all|clear (records)',
   '/spawn [faction] [ship ...] [xN] (near you) · /boss id · /clear [radius] (destroy hostiles) · /clearpods · /event raid|salvage|siege',
   '/announce text · /who · F2: admin panel · F3: teleport to the cursor · /tutorial (training yard: reset, step id, leave)',
   '/update minutes|cancel (schedule a server restart for an update: warnings at 15/5/1 min; none: the schedule)',
@@ -389,6 +391,12 @@ export class AdminTools {
         else if (cmd === 'xp') { if (n < 0) return { ok: false, text: 'XP only goes up' }; this.host.addXp(t, n); }
         else this.host.skillPoints(t, n);
         return { ok: true, text: `${n > 0 ? '+' : ''}${n} ${cmd === 'skillpoints' ? 'skill points' : cmd} to ${t.username}` };
+      }
+
+      case 'levelup': {
+        const t = target();
+        const level = this.host.levelUp(t);
+        return level ? { ok: true, text: `${t.username} is level ${level}` } : { ok: false, text: `${t.username} is at the level cap` };
       }
 
       case 'give': {
@@ -671,6 +679,7 @@ export class AdminTools {
       case 'bank': return { cmd, args: { what: a[0], item: a[1], n: a[2] } };
       case 'hits': return { cmd, args: {} };
       case 'credits': case 'xp': case 'skillpoints': return { cmd, args: { n: a[0], player: a[1] } };
+      case 'levelup': return { cmd, args: { player: a[0] } };
       case 'codex': return { cmd, args: a.length > 1 ? { player: a[0], what: a[1] } : { what: a[0] } };
       case 'give': {
         const n = isNum(a[1]) ? a[1] : undefined;

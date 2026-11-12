@@ -17,7 +17,8 @@ import { LiquidFx, type LiquidSink } from '../liquidSplash';
 import type { Lighting } from '../../lighting/Lighting';
 import type { GameState } from '../../../state/GameState';
 import { drawHits } from './hitDraw';
-import { mixColor, TEX, TEX2, type Flash, type Frag, type HitGlow, type HitLight, type Flare, type Ring, type Scorch, type Shock, type Smoke, type Spark } from './particleTypes';
+import { drawFlash } from './flashDraw';
+import { mixColor, TEX, TEX2, TEX3, type Flash, type Frag, type HitGlow, type HitLight, type Flare, type Ring, type Scorch, type Shock, type Smoke, type Spark } from './particleTypes';
 
 export class FxField {
   /** Light (additive) and smoke (normal blending) */
@@ -70,6 +71,11 @@ export class FxField {
     this.glow.take(TEX.streak, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha, Math.atan2(y1 - y0, x1 - x0), (len + width) / 128, width / 32);
   }
 
+  /** A square-ended length of a trail from (x0, y0) to (x1, y1): lengths laid end to end join evenly (fxTextures band) */
+  band(x0: number, y0: number, x1: number, y1: number, width: number, color: number, alpha: number): void {
+    this.glow.take(TEX.band, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha, Math.atan2(y1 - y0, x1 - x0), Math.hypot(x1 - x0, y1 - y0) / 32, width / 32);
+  }
+
   /** A filled circle (smooth-edged) */
   circle(pool: ParticlePool, tex: Texture, x: number, y: number, r: number, color: number, alpha: number): void {
     const k = (r * 2) / DOT_SIZE;
@@ -113,7 +119,7 @@ export class FxField {
 
   /** Flashes, rings and layered hits light what's near them (see rendering/lighting) */
   collectLights(L: Lighting): void {
-    for (const f of this.flashes) L.point(f.x, f.y, f.color, 70 + f.size * 7, 1.4 * (1 - f.life / f.max));
+    for (const f of this.flashes) { const k = 1 - f.life / f.max; L.point(f.x, f.y, f.color, 65 + f.size * 6, 1.4 * Math.pow(k, 1.5)); }
     for (const r of this.rings) L.point(r.x, r.y, r.color, 80 + r.size * 6, 1.1 * (1 - r.life / r.max));
     for (const h of this.hitLights) { const f = 1 - h.life / h.max; L.point(h.x, h.y, h.color, h.radius, h.power * f * f); }
   }
@@ -142,23 +148,7 @@ export class FxField {
       const f = this.flashes[i];
       f.life += frames;
       if (f.life >= f.max) { this.flashes.splice(i, 1); continue; }
-      const n = f.life / f.max, fade = 1 - n;
-      // Soft bloom, then the flash shape: a long tongue forward and two short petals to the sides
-      this.circle(g, TEX.dot, f.x, f.y, f.size * (0.7 + 0.5 * n) * 1.4 * f.girth, f.color, 0.3 * fade);
-      const petal = (dir: number, len: number, wid: number, color: number, alpha: number) => {
-        const k = petalScale(f.size * len * (0.7 + 0.5 * n), f.size * wid * fade * f.girth);
-        g.take(TEX.petal, f.x, f.y, 0, 0.5, color, alpha, f.angle + dir, k.x, k.y);
-      };
-      petal(0, f.petals[0], 0.32, f.color, 0.75 * fade);
-      petal(0, f.petals[0] * 0.6, 0.16, 0xffffff, 0.9 * fade);
-      petal(Math.PI / 2.4, f.petals[1], 0.18, f.color, 0.55 * fade);
-      petal(-Math.PI / 2.4, f.petals[2], 0.18, f.color, 0.55 * fade);
-      this.circle(g, TEX.disc, f.x, f.y, f.size * 0.3 * fade * f.girth + 0.5, 0xffffff, 0.95 * fade);
-      for (const sp of f.sparks) {
-        const a = f.angle + sp.a;
-        const l = sp.l * (0.5 + n);
-        this.line(f.x + Math.cos(a) * l * 0.4, f.y + Math.sin(a) * l * 0.4, f.x + Math.cos(a) * l, f.y + Math.sin(a) * l, 1.4, f.color, 0.8 * fade);
-      }
+      drawFlash(this, f);
     }
 
     for (let i = this.sparks.length - 1; i >= 0; i--) {
@@ -181,6 +171,7 @@ export class FxField {
       const s = this.smoke[i];
       s.life += frames;
       if (s.life >= s.max) { this.smoke.splice(i, 1); continue; }
+      if (s.life < 0) continue;
       rideStep(s, s.anc, 0.95, frames);
       const k = s.life / s.max;
       this.circle(this.smokeG, TEX.dot, s.x, s.y, s.size * (1 + 1.8 * k) * 1.3, s.color ?? 0xb4aea6, (s.alpha ?? 0.16) * (1 - k) * Math.min(1, k * 8));

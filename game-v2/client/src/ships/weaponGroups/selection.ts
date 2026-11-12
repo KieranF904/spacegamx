@@ -1,6 +1,6 @@
 /**
  * The pilot's weapon group selection (docs/design/groups-mines-docking.md, "Weapon groups"): the group the left button
- * fires and the group the right button fires, each "all" (0) or 1-4. Both start on "all", which fires as before groups.
+ * fires and the group the right button fires, each "all" (0) or 1-5. Both start on "all", which fires as before groups.
  *
  * Client state only: it rides inputs (app/inputSend.ts sends it on the input it changes on, and on the first input after
  * a welcome or a respawn), and the server, your own prediction and everyone's gun lanes read it at that input's tick.
@@ -23,8 +23,20 @@ export class GroupSelection {
 
   cycleLeft(dir: 1 | -1 = 1): void { this.set(cycleSel(this.left, dir), this.right); }
   cycleRight(dir: 1 | -1 = 1): void { this.set(this.left, cycleSel(this.right, dir)); }
-  /** The left button's group (0 all, 1-4); anything else is ignored */
-  pickLeft(g: number): void { if (Number.isInteger(g) && g >= 0 && g <= WEAPON_GROUPS) this.set(g, this.right); }
+  /** The left button's group (0 all, 1-5); anything else is ignored */
+  pickLeft(g: number): void { if (validSel(g)) this.set(g, this.right); }
+  /** The right button's group, the same */
+  pickRight(g: number): void { if (validSel(g)) this.set(this.left, g); }
+  /**
+   * A group's key or its HUD icon (ui/hud/GroupRow.ts): that button fires group g; on the group it already fires, back to
+   * "all". Returns true when it was a group (1-5)
+   */
+  press(button: 'left' | 'right', g: number): boolean {
+    if (!validSel(g) || g === 0) return false;
+    if (button === 'left') this.set(pressedSel(this.left, g), this.right);
+    else this.set(this.left, pressedSel(this.right, g));
+    return true;
+  }
 
   // What the server was last told (a new connection starts it on all/all; undefined: since a welcome or a respawn, which start it afresh)
   private told: number | undefined = 0;
@@ -53,6 +65,11 @@ export class GroupSelection {
     for (const f of this.listeners) f();
   }
 }
+
+const validSel = (g: number): boolean => Number.isInteger(g) && g >= 0 && g <= WEAPON_GROUPS;
+
+/** A button's selection after group g's key: g, or "all" when it was on g already */
+export const pressedSel = (now: number, g: number): number => (now === g ? 0 : g);
 
 export const groupSelection = new GroupSelection();
 

@@ -141,14 +141,16 @@ export function projectileBody(io: PackedIO, row: readonly unknown[] | undefined
 /**
  * A fire event's block body after the owner's wid ([owner, ticksAgo, part, aimQ, ...shell ids], all absolute). The part
  * field's augmented flag (+ 65536: a ports ship's augmented shot, nearly every shot a Gale fires) goes as a bit of its
- * own, ahead of the rest: as a number it took three more varint chunks than the part (about 2 B a record)
+ * own, ahead of the rest: as a number it took three more varint chunks than the part (about 2 B a record). A shot's
+ * weapon modifier effects (+ 131072 × their mask, launch.ts gunCode) close up over that bit, so a shot without any
+ * packs as it always did
  */
 export function fireBody(io: PackedIO, row: readonly number[] | undefined): unknown[] {
   const ago = io.num(row?.[1], 0, 2);
   const p = row?.[2];
-  const aug = io.bit(typeof p === 'number' && p >= 65536 && p < 131072);
-  const part = io.num(row ? (aug ? p! - 65536 : p) : undefined, 0, 5);
-  const o: unknown[] = [0, ago, aug ? (part as number) + 65536 : part, io.num(row?.[3], 0, 6)];
+  const aug = io.bit(typeof p === 'number' && Math.floor(p / 65536) % 2 === 1);
+  const rest = io.num(row ? p! % 65536 + Math.floor(p! / 131072) * 65536 : undefined, 0, 5) as number;
+  const o: unknown[] = [0, ago, rest % 65536 + (aug ? 65536 : 0) + Math.floor(rest / 65536) * 131072, io.num(row?.[3], 0, 6)];
   const k = io.vu(row ? row.length - 4 : 0, 1);
   let id = 0;
   for (let i = 0; i < k; i++) {

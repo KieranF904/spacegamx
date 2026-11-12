@@ -22,7 +22,7 @@
 
 // ============================================ client -> server
 
-/** Set weapons' groups on the live ship: blueprint uid to a 4-bit mask (ships/weaponGroups.ts). Weapons only; others ignored */
+/** Set weapons' groups on the live ship: blueprint uid to a 5-bit mask (ships/weaponGroups.ts). Weapons only; others ignored */
 export interface ClientWeaponGroupsMessage { type: 'weaponGroups'; groups: Record<number, number> }
 
 export type WeaponGroupsClientMessage = ClientWeaponGroupsMessage;

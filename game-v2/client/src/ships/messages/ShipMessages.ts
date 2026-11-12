@@ -6,7 +6,7 @@
  * extend:     a new ship server message is one more case below
  */
 
-import type { ServerMessage } from '@space-game/common';
+import { arcStrength, type ServerMessage } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import type { Renderer } from '../../rendering/Renderer';
 import { clearBossLives } from '../bossLife';
@@ -81,6 +81,13 @@ export function handleShipMessage(h: ShipMessageHost, msg: ServerMessage): boole
       return true;
     case 'detonation':
       h.damageFx()?.onDetonation(msg.kind, msg.x, msg.y, msg.radius, msg.from);
+      // (a weapon modifier's blast no shell's own hit draws, an explosive beam's end or a piercing shot's way out of a hull, `out` its heading: WeaponFx.modBlast tells which)
+      if (!msg.from) h.scene()?.modBlast(msg.kind, msg.x, msg.y, msg.radius, (msg as { out?: number }).out);
+      // (an arc a chain modifier threw: its own bolt over the gun's, by the strength its radius carries; a Tesla's own arcs carry none)
+      if (msg.from && (msg.kind === 'arc' || msg.kind === 'tesla_arc')) {
+        const k = arcStrength(msg.radius);
+        if (k > 0) h.scene()?.chainArc(msg.from[0], msg.from[1], msg.x, msg.y, k);
+      }
       return true;
     case 'intercept':
       // Point defence fired (support.ts): its tracer and the shot popping; the shell's own tracer stops there; the turret turns to it
@@ -96,7 +103,7 @@ export function handleShipMessage(h: ShipMessageHost, msg: ServerMessage): boole
       else if (shot) h.damageFx()?.onStationFire(shot, msg.target);
       return true;
     case 'ignite':
-      h.damageFx()?.onIgnite(msg.bodyId, msg.part, msg.ticks);
+      h.damageFx()?.onIgnite(msg.bodyId, msg.part, msg.ticks, msg.gen);
       return true;
     case 'bossCharge':
       h.damageFx()?.onBossCharge(msg.bodyId, msg.kind, msg.ticks);

@@ -71,7 +71,7 @@ export function loginBodyForVisit(sol: StarSystemData | undefined): LoginBodyId 
   return id;
 }
 
-interface Shown { quad: ShaderQuad; container: Container }
+interface Shown { quad: ShaderQuad; container: Container; extent: number }
 
 /** The star as the sign-in screen draws it: a spot and radius in screen px (the game's SunRenderer draws it there) */
 export interface SunSpot { x: number; y: number; r: number }
@@ -149,7 +149,7 @@ export class LoginBody {
     light[1] = -1;
     // (drawn from the start, parked: its buffers are up before its turn)
     container.position.set(-1e5, -1e5);
-    return { quad, container };
+    return { quad, container, extent };
   }
 
   /** Make the small body's quad (over the central body, under the star's own drawing) */
@@ -282,6 +282,29 @@ export class LoginBody {
     place(s.shown, p.x, p.y, s.r);
     if (!this.still && leaving(p.x, p.y, s.r)) this.retire();
     return spot();
+  }
+
+  /** The bodies on screen as this frame's update put them: each one's centre, its disc's radius `r` and the half-size of
+   *  the square it is drawn in (rings and all), in px. None till it shows itself. */
+  boxes(): { x: number; y: number; r: number; half: number }[] {
+    if (!this.container.visible) return [];
+    const box = (s: Shown) => ({ x: s.container.position.x, y: s.container.position.y, r: s.container.scale.x, half: s.container.scale.x * s.extent });
+    return this.small?.active && this.small.shown ? [box(this.main), box(this.small.shown)] : [box(this.main)];
+  }
+
+  /**
+   * Slide the bodies from where this frame's update put them (the next update puts them back): `offset` is given each
+   * one's centre, its disc's radius `r` and the half-size of the square it is drawn in (rings and all), in px, and says how
+   * far, and how much bigger it is drawn (`scale`, 1: as it is).
+   */
+  shift(offset: (box: { x: number; y: number; r: number; half: number }, which: 'main' | 'small') => { dx: number; dy: number; scale?: number }): void {
+    const move = (s: Shown, which: 'main' | 'small') => {
+      const c = s.container, o = offset({ x: c.position.x, y: c.position.y, r: c.scale.x, half: c.scale.x * s.extent }, which);
+      c.position.set(c.position.x + o.dx, c.position.y + o.dy);
+      if (o.scale !== undefined) c.scale.set(c.scale.x * o.scale);
+    };
+    move(this.main, 'main');
+    if (this.small?.active && this.small.shown) move(this.small.shown, 'small');
   }
 
   destroy(): void {

@@ -1,7 +1,7 @@
 /**
  * Editing which weapon groups a weapon is in (docs/design/groups-mines-docking.md, "Weapon groups"), in the hangar (saved
  * with the design) and in the field build overlay (the live ship, a `weaponGroups` message, free). Both work the same
- * way: hover a weapon and press 1-4 to put it in, or take it out of, that group. A weapon is always in at least one
+ * way: hover a weapon and press 1-5 to put it in, or take it out of, that group. A weapon is always in at least one
  * group. Each weapon shows its groups as small coloured squares, one per group it is in.
  *
  * Pure helpers here; HangarUI and FieldOverlay call them with one line each.
@@ -9,13 +9,16 @@
 import { WEAPON_GROUPS, inGroup, partWeaponGroups, cleanWeaponGroups } from '@space-game/common';
 import type { Blueprint, PlacedGeom, PlacedPart, ShipState } from '@space-game/common';
 
-/** A group's colour (1-4) */
-export const GROUP_COLORS = ['#7dd3fc', '#fbbf24', '#c4b5fd', '#4ade80'] as const;
+/** Every group's number, in order */
+export const ALL_GROUPS: readonly number[] = Array.from({ length: WEAPON_GROUPS }, (_, i) => i + 1);
+
+/** A group's colour (1-5) */
+export const GROUP_COLORS = ['#7dd3fc', '#fbbf24', '#c4b5fd', '#4ade80', '#fb7185'] as const;
 export const groupColor = (g: number): string => GROUP_COLORS[g - 1] ?? '#ffffff';
 
-/** The group a key picks (Digit1..Digit4), or 0 */
+/** The group a key picks (Digit1..Digit5), or 0 */
 export function groupOfKey(code: string): number {
-  const m = /^Digit([1-4])$/.exec(code);
+  const m = /^Digit([1-5])$/.exec(code);
   return m ? Number(m[1]) : 0;
 }
 
@@ -32,7 +35,7 @@ export function weaponParts(derived: Pick<ShipState['derived'], 'weapons'> | nul
 }
 
 /** The groups of a mask, as numbers: [1, 3] */
-export const groupsOf = (mask: number): number[] => [1, 2, 3, 4].filter((g) => inGroup(mask, g));
+export const groupsOf = (mask: number): number[] => ALL_GROUPS.filter((g) => inGroup(mask, g));
 
 /**
  * The hangar: key `code` over part `index` of the design toggles that group on it, in place. Returns the part when

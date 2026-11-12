@@ -17,19 +17,27 @@
  * check passes); isOwner is the owner's alone (missing: false).
  */
 
-export interface LobbyUser { id: number; username: string; isAdmin: boolean; isOwner?: boolean }
-export interface LobbyAccount extends LobbyUser { email: string; createdAt: string }
+/** `newsletterAsked` false: never asked about the email newsletter (the site asks once). Missing: an older lobby, not asked here */
+export interface LobbyUser { id: number; username: string; isAdmin: boolean; isOwner?: boolean; newsletterAsked?: boolean }
+/** `newsletter`: they want the email newsletter (server-browser/src/newsletter) */
+export interface LobbyAccount extends LobbyUser { email: string; createdAt: string; newsletter?: boolean }
+export interface NewsletterCounts { accounts: number; consented: number; declined: number; notAsked: number }
 export interface AdminUser { id: number; username: string; isAdmin: boolean; isOwner?: boolean; createdAt: string; ban: { until: number | null; reason: string; by: string } | null }
 
 export type Result<T> = ({ ok: true } & T) | { ok: false; error: string; status: number };
 
 export interface Lobby {
   login(username: string, password: string, ip: string): Promise<Result<{ token: string; user: LobbyUser }>>;
-  register(username: string, email: string, password: string, ip: string): Promise<Result<{ token: string; user: LobbyUser }>>;
+  /** `newsletter`: the sign-up form's own yes or no to the email newsletter (left out: not asked) */
+  register(username: string, email: string, password: string, ip: string, newsletter?: boolean): Promise<Result<{ token: string; user: LobbyUser }>>;
   /** The account behind a session (null: expired, signed out, or banned) */
   validate(token: string): Promise<LobbyUser | null>;
   logout(token: string): Promise<void>;
   account(token: string): Promise<Result<{ account: LobbyAccount }>>;
+  /** The session's own answer to the email newsletter: from the one-time question ('prompt') or the account page ('settings') */
+  setNewsletter(token: string, newsletter: boolean, via: 'prompt' | 'settings', ip: string): Promise<Result<object>>;
+  /** Admin (LOBBY_ADMIN_SECRET): how many said yes, no, or weren't asked (null: can't be read) */
+  newsletterCounts(): Promise<NewsletterCounts | null>;
   changePassword(token: string, password: string, newPassword: string, ip: string): Promise<Result<object>>;
   changeEmail(token: string, password: string, email: string, ip: string): Promise<Result<{ email: string }>>;
   logoutAll(token: string): Promise<Result<{ ended: number }>>;
@@ -76,12 +84,30 @@ export class HttpLobby implements Lobby {
   }
 
   login(username: string, password: string, ip: string) { return this.auth('login', { username, password }, ip); }
-  register(username: string, email: string, password: string, ip: string) { return this.auth('register', { username, email, password }, ip); }
+  register(username: string, email: string, password: string, ip: string, newsletter?: boolean) {
+    return this.auth('register', { username, email, password, ...(typeof newsletter === 'boolean' ? { newsletter } : {}) }, ip);
+  }
+
+  async setNewsletter(token: string, newsletter: boolean, via: 'prompt' | 'settings', ip: string) {
+    const r = await this.call('/newsletter/set', { token, newsletter, via }, { ip });
+    return r.body?.success ? { ok: true as const } : this.fail(r);
+  }
+
+  async newsletterCounts() {
+    if (!this.adminSecret) return null;
+    const r = await this.call('/admin/newsletter', {}, { admin: true });
+    const b = r.body;
+    const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    return b?.success ? { accounts: n(b.accounts), consented: n(b.consented), declined: n(b.declined), notAsked: n(b.notAsked) } : null;
+  }
 
   async validate(token: string): Promise<LobbyUser | null> {
     const r = await this.call('/auth/validate', { token });
     if (!r.body?.success) return null;
-    return { id: Number(r.body.id), username: String(r.body.username), isAdmin: !!r.body.isAdmin || !!r.body.isOwner, isOwner: !!r.body.isOwner };
+    return {
+      id: Number(r.body.id), username: String(r.body.username), isAdmin: !!r.body.isAdmin || !!r.body.isOwner, isOwner: !!r.body.isOwner,
+      ...(typeof r.body.newsletterAsked === 'boolean' ? { newsletterAsked: r.body.newsletterAsked } : {}),
+    };
   }
 
   async logout(token: string) { await this.call('/auth/logout', { token }); }
@@ -90,7 +116,7 @@ export class HttpLobby implements Lobby {
     const r = await this.call('/auth/account', { token });
     if (!r.body?.success) return this.fail(r);
     const b = r.body;
-    return { ok: true as const, account: { id: Number(b.id), username: b.username, email: b.email, isAdmin: !!b.isAdmin || !!b.isOwner, isOwner: !!b.isOwner, createdAt: b.createdAt } };
+    return { ok: true as const, account: { id: Number(b.id), username: b.username, email: b.email, isAdmin: !!b.isAdmin || !!b.isOwner, isOwner: !!b.isOwner, createdAt: b.createdAt, newsletter: b.newsletter === true, ...(typeof b.newsletterAsked === 'boolean' ? { newsletterAsked: b.newsletterAsked } : {}) } };
   }
 
   async changePassword(token: string, password: string, newPassword: string, ip: string) {
