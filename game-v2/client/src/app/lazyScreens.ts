@@ -59,7 +59,8 @@ export function makeTutorialUI(host: WindowHost, w: WindowSet): Lazy<TutorialUI>
       panelsOpen: () => {
         const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';
         return {
-          hold: w.inventoryWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
+          // (in flight the inventory key opens the Ship window; docked, cargo and storage: either is the lesson's "hold")
+          hold: w.inventoryWindow.isOpen || w.shipWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
           bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator', build: !!fieldBridge.overlay?.isOpen, pickup: w.pickup.panel.isOpen,
         };
       },

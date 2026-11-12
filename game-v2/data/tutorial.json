@@ -48,8 +48,8 @@
     },
     {
       "id": "hold",
-      "title": "Open your cargo",
-      "lines": ["Press {inventory} to see what you carry.", "Ore you mine goes into your cargo."],
+      "title": "Open the Ship window",
+      "lines": ["Press {inventory} to open the Ship window: your ship's status, power and weapons.", "Ore you mine goes into your cargo, shown in the panel on the left."],
       "trigger": { "kind": "panel", "panel": "hold" },
       "highlight": [".tp kbd"]
     },
