@@ -61,13 +61,12 @@ describe('gun range: weapon modifiers', () => {
     expect(S(r.server).ships.lastFiredTick(eid)).toBeGreaterThan(from);
   }, 60_000);
 
-  it('only what their own level opens, never more than a gun carries, and junk is nothing', async () => {
+  it('every effect whatever their level, never more than a gun carries, and junk is nothing', async () => {
     const r = await inRange(50);
-    S(r.server).pilots.realProfile(r.a.conn).level = 5;
+    S(r.server).pilots.realProfile(r.a.conn).level = 0;
     r.pick('cannon_pip', ['chain', 'pierce', 'split']);
-    expect(lastState(r.a).mods).toEqual(['split']);
-    expect(lastState(r.a).modOptions).not.toContain('chain');
-    S(r.server).pilots.realProfile(r.a.conn).level = 50;
+    expect(lastState(r.a).mods).toEqual(['split', 'pierce', 'chain']);
+    expect(lastState(r.a).modOptions).toEqual([...r.mt.effects]);
     r.pick('cannon_pip', [...r.mt.effects]);
     expect(lastState(r.a).mods).toHaveLength(4);
     expect(r.fx()).toHaveLength(4);

@@ -15429,17 +15429,17 @@
       "id": "common.gun-range.options",
       "path": "common/src/gunRange/options.ts",
       "group": "common/gunRange",
-      "lines": 64,
-      "owns": "which weapon models a pilot may try in the gun range: every model licensed at their level (as the hangar's palette lets them fit it), and any model they already have (on a ship of theirs, in the hold or in storage); and which weapon modifier effects, by the same rule over every part an effect takes",
-      "needs": "econ/{market (modelLicensed), items (parsePartItemId)}, gunRange/cheatShip (isRangeWeapon), gunRange/mods (rangeModNeed), ships/catalog",
+      "lines": 48,
+      "owns": "which weapon models a pilot may try in the gun range: every model there is, whatever their level (the range is where a pilot finds out what is worth working towards); and which weapon modifier effects: every one the game's parts can make",
+      "needs": "gunRange/cheatShip (isRangeWeapon), gunRange/mods (rangeModNeed), ships/catalog",
       "events": "",
       "invariants": [
         {
-          "text": "nothing above the pilot's level unless they hold one, and never a game-only (exclusive) or legacy weapon; an effect only with every part of it theirs to fit, never more than a gun carries (FX_MAX)",
+          "text": "every pilot is offered the same, level 1 or 60; never a game-only (exclusive) or legacy weapon; never more effects than a gun carries (FX_MAX)",
           "test": "common/src/gunRange/options.test.ts"
         }
       ],
-      "extend": "another way a pilot comes to have a part is one more source in owned() below",
+      "extend": "a limit on what the range offers is a test in gunRangeOptions / gunRangeMods (the pilot's view is passed)",
       "exports": [
         "RangePilotView",
         "cleanRangeMods",
@@ -15450,32 +15450,26 @@
         {
           "name": "RangePilotView",
           "kind": "interface",
-          "start": 22,
-          "end": 30
-        },
-        {
-          "name": "owned",
-          "kind": "function",
-          "start": 32,
-          "end": 38
+          "start": 18,
+          "end": 26
         },
         {
           "name": "gunRangeOptions",
           "kind": "function",
-          "start": 40,
-          "end": 50
+          "start": 28,
+          "end": 36
         },
         {
           "name": "gunRangeMods",
           "kind": "function",
-          "start": 52,
-          "end": 58
+          "start": 38,
+          "end": 42
         },
         {
           "name": "cleanRangeMods",
           "kind": "function",
-          "start": 60,
-          "end": 64
+          "start": 44,
+          "end": 48
         }
       ]
     },

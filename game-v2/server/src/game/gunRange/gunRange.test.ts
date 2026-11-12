@@ -185,7 +185,7 @@ describe('gun range: in and out', () => {
 });
 
 describe('gun range: the weapon picker and the guns', () => {
-  it('picks any weapon they can fit, refuses the rest, and each mount kind fires', async () => {
+  it('picks any weapon whatever their level, refuses what is no range weapon, and each mount kind fires', async () => {
     const { server, def } = boot();
     const a = await signIn(server, 'picker', 41);
     run(server, 3);
@@ -213,12 +213,16 @@ describe('gun range: the weapon picker and the guns', () => {
       run(server, 2);
       expect(S(server).ships.lastFiredTick(eid), model).toBeGreaterThan(from);
     }
-    // Not theirs to try: refused, the ship unchanged
+    // A new pilot may try a weapon far above their level; a thing that is no weapon model is refused, the ship unchanged
     S(server).pilots.realProfile(a.conn).level = 0;
-    const was = lastState(a).weapon;
     a.link.receive({ type: 'gunRangeWeapon', model: 'lance_lance' } as any);
     run(server, 1);
-    expect(lastState(a).weapon).toBe(was);
+    expect(lastState(a).weapon).toBe('lance_lance');
+    for (const model of ['power_cell_reactor', 'no_such_gun']) {
+      a.link.receive({ type: 'gunRangeWeapon', model } as any);
+      run(server, 1);
+      expect(lastState(a).weapon).toBe('lance_lance');
+    }
   }, 120_000);
 
   it('every target stands in the chamber, unpinned and clear of the walls, never fires, stays put, and gives nothing', async () => {

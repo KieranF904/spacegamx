@@ -136,7 +136,7 @@ export class GunRange {
     return !!this.targets?.some((room) => room.some((t) => t.isTarget(eid)));
   }
 
-  /** The weapon models this pilot may try (their real profile's level, licences and ships) */
+  /** The weapon models this pilot may try (every one, whatever their level: common gunRange/options.ts) */
   options(conn: PilotConn): string[] {
     const p = this.pilots.realProfile(conn);
     return p ? gunRangeOptions(this.host.catalog, p) : [];
@@ -180,7 +180,7 @@ export class GunRange {
     this.host.unberth(conn);
     this.visits.set(conn, { berth, room: 0, weapon, options, mods: [], modOptions: this.modOptions(conn), charge });
     this.atSpawn(conn, r, 0);
-    this.host.toast(conn, `Gun range: you are flying the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon you can fit. To go back to ${berth.name}, fly to the exit door and press {interact}.`, 'info');
+    this.host.toast(conn, `Gun range: you are flying the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon to try. To go back to ${berth.name}, fly to the exit door and press {interact}.`, 'info');
     this.sendState(conn);
   }
 
@@ -231,7 +231,7 @@ export class GunRange {
     const mods = cleanRangeMods(v.modOptions, asked === undefined ? v.mods : asked);
     if (!v.ship && model === v.weapon && mods.join() === v.mods.join()) return;
     v.options = this.options(conn);
-    if (!v.options.includes(model)) { this.host.toast(conn, 'That weapon is not one you can fit yet', 'warn'); this.sendState(conn); return; }
+    if (!v.options.includes(model)) { this.host.toast(conn, 'That is not a weapon the range has', 'warn'); this.sendState(conn); return; }
     const ship = this.ship(model, mods);
     if (!ship || !this.pilots.swapFrozenShip(conn, ship)) return;
     v.weapon = model; v.mods = mods; v.ship = undefined;

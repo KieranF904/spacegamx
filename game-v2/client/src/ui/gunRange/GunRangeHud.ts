@@ -209,7 +209,7 @@ export class GunRangeHud {
     this.mods.setAttribute('aria-label', 'Weapon modifiers');
     this.list = el('div', 'gr-list');
     this.list.setAttribute('role', 'list');
-    this.list.setAttribute('aria-label', 'Weapons you can fit');
+    this.list.setAttribute('aria-label', 'Weapons to try');
     this.keys = el('div', 'k');
     body.append(this.tabs, this.mods, this.roles, this.list, this.keys);
     this.pick.append(this.head, body);
@@ -329,7 +329,7 @@ export class GunRangeHud {
       + (takes ? (full ? '<div class="mn">A gun carries four at most: turn one off to try another</div>' : '')
         : '<div class="mn">Modifiers treat the energy of a shot: this gun fires on ammunition alone</div>') : '';
     if (focusMod) (this.mods.querySelector(`[data-mod="${CSS.escape(focusMod)}"]`) as HTMLElement | null)?.focus();
-    this.list.setAttribute('aria-label', onShips ? 'Library ships' : 'Weapons you can fit');
+    this.list.setAttribute('aria-label', onShips ? 'Library ships' : 'Weapons to try');
     if (onShips) this.drawShips(st.ships, st.ship);
     const shown = onShips ? [] : filterRows(this.rows, this.role);
     const tabRow = shown.find((r) => !st.ship && r.fn === st.weapon) ?? shown[0];

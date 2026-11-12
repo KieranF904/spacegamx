@@ -88,14 +88,11 @@ describe('gun range weapon modifiers', () => {
 
 describe('gun range modifier options', () => {
   const level = (fn: string) => catalog.functions.get(fn)!.unlock!.level;
-  it('a new pilot has none; they open with the parts, the specials last', () => {
-    expect(gunRangeMods(catalog, mt, { level: 0 })).toEqual([]);
-    const at = (n: number) => gunRangeMods(catalog, mt, { level: n });
-    expect(at(level('mod_coil'))).toEqual(expect.arrayContaining(['velocity', 'rapid', 'explosive', 'split']));
-    expect(at(level('mod_coil'))).not.toContain('pierce');
-    expect(at(level('mod_mount_double'))).toEqual(expect.arrayContaining(['pierce', 'wave']));
-    expect(at(level('mod_arc') - 1)).not.toContain('chain');
-    expect(at(50)).toEqual(mt.effects);
+  it('every pilot is offered every effect, whatever their level (the parts themselves still unlock by level)', () => {
+    expect(level('mod_arc')).toBeGreaterThan(0);
+    expect(gunRangeMods(catalog, mt, { level: 0 })).toEqual(mt.effects);
+    expect(gunRangeMods(catalog, mt, { level: 50 })).toEqual(mt.effects);
+    expect(gunRangeMods(catalog, mt)).toEqual(mt.effects);
     expect(gunRangeMods(catalog, undefined, { level: 50 })).toEqual([]);
   });
 
